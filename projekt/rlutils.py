@@ -13,7 +13,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
    def save(self):
       '''Save model to file. Note: RLlib does not let us chose save paths'''
       savedir = super().save(self.saveDir)
-      with open('experiment/path.txt', 'w') as f:
+      with open('{}/path.txt'.format(self.saveDir), 'w') as f:
          f.write(savedir)
       print('Saved to: {}'.format(savedir))
       return savedir
@@ -24,10 +24,10 @@ class SanePPOTrainer(ppo.PPOTrainer):
          print('Training from scratch...')
          return
       if model == 'current':
-         with open('experiment/path.txt') as f:
+         with open('{}/path.txt'.format(self.saveDir)) as f:
             path = f.read().splitlines()[0]
       else:
-         path = 'experiment/{}/checkpoint'.format(model)
+         path = '{}/{}/checkpoint'.format(self.saveDir, model)
 
       print('Loading from: {}'.format(path))
       super().restore(path)
