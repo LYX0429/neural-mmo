@@ -50,6 +50,7 @@ class Attention(nn.Module):
       self.flat = flat
 
    def forward(self, q):
+#     q = q.cuda()
       Q = self.Q(q)
       K = self.K(q)
       V = self.V(q)

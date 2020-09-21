@@ -23,12 +23,18 @@ from forge.ethyr.torch import utils
 import projekt
 from projekt import realm, rlutils
 
+import pcg
 from pcg import PCG
 
+import pcgrl
+
 #Instantiate a new environment
-def createEnv(config):
+def createPCGEnv(config):
   #return projekt.Realm(config)
    return PCG(config)
+
+def createEnv(config):
+    return projekt.Realm(config)
 
 #Map agentID to policyID -- requires config global
 def mapPolicy(agentID):
@@ -38,6 +44,21 @@ def mapPolicy(agentID):
 def createPolicies(config):
    obs      = projekt.realm.observationSpace(config)
    atns     = projekt.realm.actionSpace(config)
+   policies = {}
+
+   for i in range(config.NPOLICIES):
+      params = {
+            "agent_id": i,
+            "obs_space_dict": obs,
+            "act_space_dict": atns}
+      key           = mapPolicy(i)
+      policies[key] = (None, obs, atns, params)
+
+   return policies
+
+def createPCGPolicies(config):
+   obs      = pcg.observationSpace(config)
+   atns     = pcg.actionSpace(config)
    policies = {}
 
    for i in range(config.NPOLICIES):
@@ -64,16 +85,16 @@ if __name__ == '__main__':
 
    #RLlib registry
    rllib.models.ModelCatalog.register_custom_model(
-         'test_model', projekt.Policy)
-   ray.tune.registry.register_env("custom", createEnv)
+         'test_model', pcgrl.PCGPolicy)
+   ray.tune.registry.register_env("custom", createPCGEnv)
 
    #Create policies
-   policies  = createPolicies(config)
+   pcg_policies  = createPCGPolicies(config)
 
    #Instantiate monolithic RLlib Trainer object.
    trainer = rlutils.SanePPOTrainer(
          env="custom", path='experiment_pcg', config={
-      'num_workers': 4,
+      'num_workers': 1,
       'num_gpus': 1,
       'num_envs_per_worker': 1,
       'train_batch_size': 4000,
@@ -88,7 +109,7 @@ if __name__ == '__main__':
          'config': config
       },
       'multiagent': {
-         "policies": policies,
+         "policies": pcg_policies,
          "policy_mapping_fn": mapPolicy
       },
       'model': {
@@ -102,7 +123,7 @@ if __name__ == '__main__':
    trainer.restore(config.MODEL)
 
    if config.RENDER:
-      env = createEnv({'config': config})
+      env = createPCGEnv({'config': config})
       projekt.Evaluator(trainer, env, config).run()
    else:
       trainer.train()

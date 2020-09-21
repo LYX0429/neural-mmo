@@ -96,6 +96,8 @@ if __name__ == '__main__':
    #Print model size
    utils.modelSize(trainer.defaultModel())
    trainer.restore(config.MODEL)
+  #torch._C._cuda_init()
+#  trainer.defaultModel().cuda()
 
    if config.RENDER:
       env = createEnv({'config': config})

@@ -41,8 +41,9 @@ class Evaluator:
       actions, self.state, _ = self.trainer.compute_actions(
             self.obs, state=self.state, policy_id='policy_0')
 
+      #FIXME: no overlays for PCG
       #Compute overlay maps
-      self.overlays.register(self.obs)
+#     self.overlays.register(self.obs)
 
       #Step the environment
       self.obs, rewards, self.done, _ = self.env.step(actions)
