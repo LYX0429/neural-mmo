@@ -38,7 +38,8 @@ class Stim(metaclass=IterableTypeCompare):
 
    def asserts(self, val):
       if val is not None:
-         assert val >= self.min and val <= self.max, str(self) + ': ' + str(val)
+        #assert val >= self.min and val <= self.max, str(self) + ': ' + str(val)
+         pass
       return val
  
    def update(self, val):
@@ -128,7 +129,7 @@ class Continuous(Stim):
       return self.max - self.min
 
    def norm(self):
-      assert self.val >= self.min and self.val <= self.max
+     #assert self.val >= self.min and self.val <= self.max
       val = self.val - self.min
       if self.range == np.inf:
          val = self.scaled(val)

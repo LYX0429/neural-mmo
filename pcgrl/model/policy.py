@@ -9,19 +9,23 @@ from torch import nn
 
 from forge.ethyr.torch import io
 from forge.ethyr.torch import policy
-from forge.ethyr.torch.policy import baseline
+from pcgrl.model import baseline
 
-from pcg import actionSpace
+from pcgrl.game.io.action.static import actionSpace
 
 class PCGPolicy(RecurrentNetwork, nn.Module):
    '''Wrapper class for using our baseline models with RLlib'''
    def __init__(self, *args, **kwargs):
+      self.config = args[3]['custom_model_config']['config']
+      #FIXME: hack
+      args = (args[0], actionSpace(self.config), 6) + args[3:]
+      print('pcg policy args', args)
       super().__init__(*args, **kwargs)
       nn.Module.__init__(self)
-      self.config = args[3]['custom_model_config']['config']
       self.space  = actionSpace(self.config).spaces
 
       #Select appropriate baseline model
+
       if self.config.MODEL == 'attentional':
          self.model  = baseline.Attentional(self.config)
       elif self.config.MODEL == 'convolutional':
@@ -38,11 +42,14 @@ class PCGPolicy(RecurrentNetwork, nn.Module):
       logitDict, state = self.model(input_dict['obs'], state, seq_lens)
 
       logits = []
-      print('pcgrl.Policy.space:\n{}'.format(self.space))
+#     print('pcgrl.Policy.space:\n{}'.format(self.space))
+#     print('logitDict\n{}'.format(logitDict))
       #Flatten structured logits for RLlib
+
       for atnKey, atn in sorted(self.space.items()):
-         print('atnKey, atn',atnKey, atn)
+#        print('atnKey {}, atn {}'.format(atnKey, atn))
          for argKey, arg in sorted(atn.spaces.items()):
+#           print('logitDict[atnKey]: \n {}'.format(logitDict[atnKey]))
             logits.append(logitDict[atnKey][argKey])
 
       return torch.cat(logits, dim=1), state
@@ -52,4 +59,7 @@ class PCGPolicy(RecurrentNetwork, nn.Module):
 
    def attention(self):
       return self.model.attn
+
+
+
 

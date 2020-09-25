@@ -21,7 +21,6 @@ class Tile(StimHook):
 
       self.counts = [0 for _ in range(config.NPOP)]
 
-
    @property
    def serial(self):
       return self.r, self.c
@@ -58,13 +57,8 @@ class Tile(StimHook):
       return self.mat.dropTable.roll()
 
    def terraform(self, config, mat):
-       super().__init__(Stimulus.Tile, config)
-      #self.mat = mat()
-      #self.state = mat()
-      #print(self.__class__)
-      #print(dir(self))
-      #print(dir(self.mat))
-       if self.mat.harvestable:
-           print('harvesting tile!')
-           for i in range(20):
-               self.harvest()
+      super().__init__(Stimulus.Tile, config)
+      self.mat = mat()
+#     self.capacity = self.mat.capacity
+      
+  

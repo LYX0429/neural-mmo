@@ -36,6 +36,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
       return 'policy_{}'.format(idx)
 
    def model(self, policyID):
+      print('rlutils get policy ', policyID)
       return self.get_policy(policyID).model
 
    def defaultModel(self):

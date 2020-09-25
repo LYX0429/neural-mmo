@@ -22,6 +22,7 @@ class Base(nn.Module):
       self.config = config
 
       self.output = io.Output(config)
+     #print('base output:{}'.format(self.output))
       self.input  = io.Input(config,
             embeddings=policy.BiasedInput,
             attributes=policy.Attention)

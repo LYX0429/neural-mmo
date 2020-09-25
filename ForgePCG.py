@@ -21,24 +21,26 @@ from ray import rllib
 from forge.ethyr.torch import utils
 
 import projekt
-from projekt import realm, rlutils
+from projekt import realm
+from pcgrl import rlutils
 
 import pcg
 from pcg import PCG
 
 import pcgrl
+from pcgrl.game.io.action import static
 
 #Instantiate a new environment
-def createPCGEnv(config):
+def createPCGEnv(pcg_config):
   #return projekt.Realm(config)
-   return PCG(config)
+   return PCG(pcg_config)
 
 def createEnv(config):
     return projekt.Realm(config)
 
 #Map agentID to policyID -- requires config global
-def mapPolicy(agentID):
-   return 'policy_{}'.format(agentID % config.NPOLICIES)
+def mapPCGPolicy(agentID):
+   return 'policy_pcg_{}'.format(agentID % pcg_config.NPOLICIES)
 
 #Generate RLlib policies
 def createPolicies(config):
@@ -56,17 +58,17 @@ def createPolicies(config):
 
    return policies
 
-def createPCGPolicies(config):
-   obs      = pcg.observationSpace(config)
-   atns     = pcg.actionSpace(config)
+def createPCGPolicies(pcg_config):
+   obs      = static.observationSpace(pcg_config)
+   atns     = static.actionSpace(pcg_config)
    policies = {}
 
-   for i in range(config.NPOLICIES):
+   for i in range(pcg_config.NPOLICIES):
       params = {
             "agent_id": i,
             "obs_space_dict": obs,
             "act_space_dict": atns}
-      key           = mapPolicy(i)
+      key           = mapPCGPolicy(i)
       policies[key] = (None, obs, atns, params)
 
    return policies
@@ -77,23 +79,25 @@ if __name__ == '__main__':
    ray.init()
    
    #Built config with CLI overrides
-   config = projekt.Config()
-   config.STIM = 4
+   pcg_config = pcgrl.Config()
+   pcg_config.STIM = 4
    if len(sys.argv) > 1:
       sys.argv.insert(1, 'override')
-      Fire(config)
+      Fire(pcg_config)
 
    #RLlib registry
    rllib.models.ModelCatalog.register_custom_model(
-         'test_model', pcgrl.PCGPolicy)
-   ray.tune.registry.register_env("custom", createPCGEnv)
+         'test_pcg_model', pcgrl.PCGPolicy)
+   ray.tune.registry.register_env("custom_pcg", createPCGEnv)
 
    #Create policies
-   pcg_policies  = createPCGPolicies(config)
+   pcg_policies  = createPCGPolicies(pcg_config)
+
+   print('top level config', vars(pcg_config))
 
    #Instantiate monolithic RLlib Trainer object.
-   trainer = rlutils.SanePPOTrainer(
-         env="custom", path='experiment_pcg', config={
+   trainer = rlutils.SanePPOPCGTrainer(
+         env="custom_pcg", path='experiment_pcg', config={
       'num_workers': 1,
       'num_gpus': 1,
       'num_envs_per_worker': 1,
@@ -106,24 +110,24 @@ if __name__ == '__main__':
       'soft_horizon': False, 
       'no_done_at_end': False,
       'env_config': {
-         'config': config
+         'config': pcg_config
       },
       'multiagent': {
          "policies": pcg_policies,
-         "policy_mapping_fn": mapPolicy
+         "policy_mapping_fn": mapPCGPolicy
       },
       'model': {
-         'custom_model': 'test_model',
-         'custom_options': {'config': config}
+         'custom_model': 'test_pcg_model',
+         'custom_options': {'config': pcg_config}
       },
    })
 
    #Print model size
-   utils.modelSize(trainer.defaultModel())
-   trainer.restore(config.MODEL)
+   utils.modelSize(trainer.model('policy_pcg_0'))
+   trainer.restore(pcg_config.MODEL)
 
-   if config.RENDER:
-      env = createPCGEnv({'config': config})
-      projekt.Evaluator(trainer, env, config).run()
+   if pcg_config.RENDER:
+      env = createPCGEnv(pcg_config)
+      pcgrl.Evaluator(trainer, env, pcg_config).run()
    else:
       trainer.train()

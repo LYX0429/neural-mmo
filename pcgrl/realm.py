@@ -1,39 +1,22 @@
-from pdb import set_trace as T
-import numpy as np
-
 from collections import defaultdict
 from itertools import chain
-from copy import deepcopy
-
-from forge.blade import entity, core
-from forge.blade.io import stimulus
-
+from forge.blade.lib import enums
+from forge.trinity.ascend import Timed, runtime
+from pcgrl.game.env import Env
+from pcgrl.game import entity
 from forge.blade.lib.enums import Palette
-from forge.trinity.ascend import runtime, Timed
-
-def valToRGB(x):
-    '''x in range [0, 1]'''
-    return np.array([1-x, x, 0])
-
-class Packet():
-   '''Wrapper for state, reward, done signals'''
-   def __init__(self):
-      '''Instantiates packet data'''
-      self.stim   = None
-      self.reward = None
-      self.done   = None
 
 class Spawner:
    '''Manager class responsible for agent spawning logic'''
-   def __init__(self, config):
+   def __init__(self, pcg_config):
       '''
       Args:
          config: A Config object
       '''
-     #print('sim spawner config {}'.format(config))
-      self.nEnt, self.nPop = config.NENT, config.NPOP
+      print('spawner config ', pcg_config)
+      self.nEnt, self.nPop = pcg_config.NENT, pcg_config.NPOP
       self.popSz  = self.nEnt // self.nPop
-      self.config = config
+      self.config = pcg_config
 
       self.ents = 0
       self.pops = defaultdict(int)
@@ -87,7 +70,8 @@ class Spawner:
       if self.pops[pop] == 0:
          del self.pops[pop]
 
-class Realm(Timed):
+
+class PCGRealm(Timed):
    '''Neural MMO environment class implementing the OpenAI Gym API function
    signatures. The actual (ob, reward, done, info) data contents returned by
    the canonical reset() and step(action) methods conform to RLlib's Gym
@@ -97,7 +81,7 @@ class Realm(Timed):
    PyTorch+RLlib to take advantage of our prebuilt baseline implementations,
    but any framework that supports RLlib's fairly popular environment API and
    extended OpenAI gym.spaces observation/action definitions works as well.'''
-   def __init__(self, config, idx=0):
+   def __init__(self, config, idx=0, sim=None):
       '''
       Args:
          config : A forge.blade.core.Config (or subclass) specification object
@@ -105,7 +89,9 @@ class Realm(Timed):
       '''
       super().__init__()
       self.spawner   = Spawner(config)
-      self.world     = core.Env(config, idx)
+      self.sim = sim
+      self.world = sim.world
+#     self.world     = Env(config, idx, world_map)
       self.env       = self.world.env
 
       self.globalValues = None
@@ -208,6 +194,7 @@ class Realm(Timed):
          infos:
             An empty dictionary provided only for conformity with OpenAI Gym.
       '''
+     #print('PCGRealm decisions {}'.format(decisions))
       self.tick += 1
 
       #Spawn an ent
@@ -219,6 +206,9 @@ class Realm(Timed):
 
       self.stepEnv()
       obs, rewards, dones = self.getStims()
+
+      print('asserting same world')
+      assert self.world == self.sim.world
 
       return obs, rewards, dones, {}
 
@@ -296,13 +286,14 @@ class Realm(Timed):
       Returns:
          packet: A packet of data for the client
       '''
+      sim_packet = self.sim.clientData()
       packet = {
        #    'environment': self.world.env,
        #    'entities': dict((k, v.packet())
        #       for k, v in self.desciples.items()),
        #    'overlay': self.overlay
             }
-      return packet
+      return sim_packet
 
    def act(self, actions):
       '''Execute agent actions
@@ -431,6 +422,7 @@ class Realm(Timed):
          dones[ent.entID]   = True
          obs[ent.entID]     = ob
 
+      print('PCGRealm obs ', obs)
       return obs, rewards, dones
 
    @property

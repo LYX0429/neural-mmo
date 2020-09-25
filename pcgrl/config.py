@@ -1,3 +1,4 @@
+
 from forge.blade import core
 
 class Config(core.Config):
@@ -11,9 +12,9 @@ class Config(core.Config):
    MODEL   = 'recurrent'
    RENDER  = True
 
-   NENT    = 12 #Maximum population size
+   NENT    = 1 #Maximum population size
    NPOP    = 1   #Number of populations
-   NMAPS   = 1 #Number of game maps
+   NMAPS   = 256 #Number of game maps
 
    #Model dimensions
    EMBED   = 64

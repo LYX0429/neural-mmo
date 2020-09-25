@@ -1,3 +1,4 @@
+
 from pdb import set_trace as T
 import numpy as np
 
@@ -19,7 +20,7 @@ class Evaluator:
       config.RENDER = True
 
       self.trainer  = trainer
-      self.model    = self.trainer.get_policy('policy_0').model
+      self.model    = self.trainer.get_policy('policy_pcg_0').model
       self.overlays = Overlays(env, self.model, trainer, config)
 
    def run(self):
@@ -31,18 +32,27 @@ class Evaluator:
 
    def tick(self):
       '''#Compute actions and overlays for a single timestep'''
-
       #Remove dead agents
       for agentID in self.done:
          if self.done[agentID]:
             del self.obs[agentID]
+            print('deleting pcg agent')
+           #raise Exception
+
+      #FIXME How fucking dare you
+      if self.obs == {}:
+          self.obs = self.last_obs
            
+#     print('evaluator obs:', self.obs)
       #Compute batch of actions
       actions, self.state, _ = self.trainer.compute_actions(
-            self.obs, state=self.state, policy_id='policy_0')
+            self.obs, state=self.state, policy_id='policy_pcg_0')
 
+      #FIXME: no overlays for PCG
       #Compute overlay maps
       self.overlays.register(self.obs)
+
+      self.last_obs = self.obs
 
       #Step the environment
       self.obs, rewards, self.done, _ = self.env.step(actions)
