@@ -5,12 +5,15 @@ from forge.blade.lib import utils, enums
 from forge.blade.io.action.node import Node, NodeType
 from forge.blade.io.action.static import Direction, Fixed
 from forge.blade.io.stimulus.static import Stimulus
-from pcgrl.game.core.tile import Tile
+from forge.blade.core.tile import Tile
 
 from ray.rllib.utils.spaces.flexdict import FlexDict
 from ray.rllib.utils.spaces.repeated import Repeated
 from collections import defaultdict
 import gym
+
+import numpy as np
+np.set_printoptions(threshold=np.inf, linewidth=200)
 
 class Action(Node):
     nodeType = NodeType.SELECTION
@@ -65,15 +68,22 @@ class Terraform(Node):
        #print(dir(world.env))
        #print('world', world.env.tiles)
 
+       #print('pcg world ', world.env.np())
        #print(dir(entity))
         x, y = trg_pos = entity.base.pos
         trg_tile = world.env.tiles[trg_pos]
-        print('terraform target tile', trg_pos, trg_tile)
-        print(dir(trg_tile.mat))
+       #print('terraform target tile', trg_pos, trg_tile)
         if trg_tile.terraformable:
-            print('terraformable tile!!')
-            trg_tile.terraform(world.config, terr.terrain_type)
-        print('terraform terrain', terr)
+           #print('terraforming tile', x, y)
+            if trg_tile.mat.harvestable:
+               #print('pcg world ', world.env.np())
+                print('harvesting tile', trg_tile.r, trg_tile.c)
+               #print('world.env object ', world.env)
+               #world.env.step()
+                world.env.harvest(trg_tile.r, trg_tile.c)
+               #print('pcg world ', world.env.np())
+#           trg_tile.terraform(world.config, terr.terrain_type)
+       #print('terraform terrain', terr)
        #tile = Tile(world.config, terr.terrain_type, x, y, 1, None)
        #world.env.tiles[trg_pos] =  tile
 #       print(dir(world.env.tiles))

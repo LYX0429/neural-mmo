@@ -134,6 +134,7 @@ class Attack(Node):
       return abs(r - rCent) + abs(c - cCent)
 
    def call(world, entity, style, targ):
+#     print('sim world ', world.env.np())
       entity.history.attack = {}
       entity.history.attack['target'] = targ.entID
       entity.history.attack['style'] = style.__name__

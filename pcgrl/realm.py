@@ -207,9 +207,6 @@ class PCGRealm(Timed):
       self.stepEnv()
       obs, rewards, dones = self.getStims()
 
-      print('asserting same world')
-      assert self.world == self.sim.world
-
       return obs, rewards, dones, {}
 
    def reset(self):

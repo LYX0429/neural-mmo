@@ -58,7 +58,7 @@ class Tile(StimHook):
       return self.mat.dropTable.roll()
 
    def terraform(self, config, mat):
-       super().__init__(Stimulus.Tile, config)
+      #super().__init__(Stimulus.Tile, config)
       #self.mat = mat()
       #self.state = mat()
       #print(self.__class__)
@@ -66,5 +66,5 @@ class Tile(StimHook):
       #print(dir(self.mat))
        if self.mat.harvestable:
            print('harvesting tile!')
-           for i in range(20):
+           for i in range(1):
                self.harvest()
