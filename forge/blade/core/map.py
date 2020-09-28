@@ -20,6 +20,16 @@ def loadTiled(config, fPath, tiles, nCounts):
        tilemap[h, w] = core.Tile(config, tiles[tex], h, w, nCounts, tex)
     return tilemap
 
+def genTiled(config, tiles, nCounts):
+    W = config.MAP_WIDTH
+    H = config.MAP_WIDTH
+    tilemap = np.zeros((H, W), dtype=object)
+    print(tiles)
+    for w in range(W):
+        for h in range(H):
+            tilemap[h, w] = core.Tile(config, tiles["grass"], h, w, nCounts, 0)
+    return tilemap
+
 class Map:
    def __init__(self, config, idx):
       #print('Loading Map: ', idx)
@@ -67,8 +77,15 @@ class Map:
             self.tiles.ravel()]).reshape(*self.shape)
       return env
 
+   def np_terr(self):
+       env_terr = np.array([e.terr_state.index for e in self.tiles.ravel()]).reshape(*self.shape)
+       return env_terr
+
    def genEnv(self, fName):
       tiles = dict((mat.value.tex, mat.value) for mat in enums.Material)
       self.tiles = loadTiled(self.config, fName, tiles, self.nCounts)
+     #self.tiles = np.zeros((self.config.MAP_WIDTH, self.config.MAP_WIDTH))
+     #self.tiles = genTiled(self.config, tiles, self.nCounts)
+
       self.shape = self.tiles.shape
        

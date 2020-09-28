@@ -18,6 +18,7 @@ class Tile(StimHook):
       self.capacity = self.mat.capacity
       self.tex = tex
       self.terraformable = True
+#     self.terr_state = False
 
       self.counts = [0 for _ in range(config.NPOP)]
 
@@ -27,6 +28,8 @@ class Tile(StimHook):
       return self.r, self.c
 
    def addEnt(self, entID, ent):
+      if entID in self.ents:
+          print('duplicate entity on tile', entID, self.ents)
       assert entID not in self.ents
       self.ents[entID] = ent
 
@@ -45,7 +48,7 @@ class Tile(StimHook):
 
    @property
    def static(self):
-      assert self.capacity <= self.mat.capacity
+     #assert self.capacity <= self.mat.capacity
       return self.capacity == self.mat.capacity
 
    def harvest(self):
@@ -58,13 +61,13 @@ class Tile(StimHook):
       return self.mat.dropTable.roll()
 
    def terraform(self, config, mat):
-      #super().__init__(Stimulus.Tile, config)
-      #self.mat = mat()
-      #self.state = mat()
+       super().__init__(Stimulus.Tile, config)
+       self.mat = mat()
+       self.state = mat()
       #print(self.__class__)
       #print(dir(self))
       #print(dir(self.mat))
-       if self.mat.harvestable:
-           print('harvesting tile!')
-           for i in range(1):
-               self.harvest()
+      #if self.mat.harvestable:
+      #    print('harvesting tile!')
+      #    for i in range(1):
+      #        self.harvest()

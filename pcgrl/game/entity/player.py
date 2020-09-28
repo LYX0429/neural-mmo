@@ -195,9 +195,9 @@ class Player():
       if not self.base.alive:
          return
 
-      self.resources.update(self, world, actions)
-      self.status.update(self, world, actions)
-      self.skills.update(self, world, actions)
+     #self.resources.update(self, world, actions)
+     #self.status.update(self, world, actions)
+     #self.skills.update(self, world, actions)
       self.history.update(self, world, actions)
       #self.inventory.update(world, actions)
       #self.update(world, actions)

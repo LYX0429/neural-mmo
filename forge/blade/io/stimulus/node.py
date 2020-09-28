@@ -38,7 +38,7 @@ class Stim(metaclass=IterableTypeCompare):
 
    def asserts(self, val):
       if val is not None:
-         assert val >= self.min and val <= self.max, str(self) + ': ' + str(val)
+        #assert val >= self.min and val <= self.max, str(self) + ': ' + str(val)
          pass
       return val
  

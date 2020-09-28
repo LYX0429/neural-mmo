@@ -3,7 +3,9 @@ import numpy as np
 
 import torch
 from torch import nn
-
+import os
+os.environ['LD_LIBRARY_PATH'] = "/home/sme/anaconda3/envs/nmmo/lib"
+torch._C._cuda_init()
 from forge.ethyr.torch.policy import linear, functional
 
 class DecomposedAttention(nn.Module):
@@ -50,7 +52,7 @@ class Attention(nn.Module):
       self.flat = flat
 
    def forward(self, q):
-#     q = q.cuda()
+      q = q.cuda()
       Q = self.Q(q)
       K = self.K(q)
       V = self.V(q)

@@ -3,8 +3,11 @@ from itertools import chain
 from forge.blade.lib import enums
 from forge.trinity.ascend import Timed, runtime
 from pcgrl.game.env import Env
+#from forge.blade import entity
 from pcgrl.game import entity
-from forge.blade.lib.enums import Palette
+#from forge.blade.lib.enums import Palette
+from pcgrl.game.lib.enums import Palette
+from forge.blade.io import stimulus
 
 class Spawner:
    '''Manager class responsible for agent spawning logic'''
@@ -47,6 +50,7 @@ class Spawner:
       self.ents      += 1
 
       color = self.palette.colors[pop]
+      name = 'GM_'
       ent   = entity.Player(self.config, iden, pop, name, color)
       assert ent not in realm.desciples
 
@@ -246,7 +250,7 @@ class PCGRealm(Timed):
             entity identified by entID.
       '''
       if entID in self.dead:
-         return -1
+         return 0
       return 0
 
    def spawn(self):
@@ -275,7 +279,8 @@ class PCGRealm(Timed):
       pop        =  hash(str(self.entID)) % self.config.NPOP
       self.entID += 1
 
-      return self.entID, pop, 'Neural_'
+      #FIXME: ad hoc, implicit cap on number of sim agents
+      return self.entID + 256, pop, 'GM_'
 
    def clientData(self):
       '''Data packet used by the renderer
@@ -284,13 +289,14 @@ class PCGRealm(Timed):
          packet: A packet of data for the client
       '''
       sim_packet = self.sim.clientData()
+      entities = dict((k, v.packet()) for k, v in self.desciples.items())
+      entities.update(sim_packet['entities'])
       packet = {
-       #    'environment': self.world.env,
-       #    'entities': dict((k, v.packet())
-       #       for k, v in self.desciples.items()),
-       #    'overlay': self.overlay
+            'environment': self.world.env,
+            'entities': entities,
+            'overlay': self.overlay
             }
-      return sim_packet
+      return packet
 
    def act(self, actions):
       '''Execute agent actions
@@ -419,7 +425,7 @@ class PCGRealm(Timed):
          dones[ent.entID]   = True
          obs[ent.entID]     = ob
 
-      print('PCGRealm obs ', obs)
+     #print('PCGRealm obs ', obs)
       return obs, rewards, dones
 
    @property

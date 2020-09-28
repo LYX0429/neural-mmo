@@ -18,7 +18,7 @@ class PCGPolicy(RecurrentNetwork, nn.Module):
    def __init__(self, *args, **kwargs):
       self.config = args[3]['custom_model_config']['config']
       #FIXME: hack
-      args = (args[0], actionSpace(self.config), 6) + args[3:]
+      args = (args[0], actionSpace(self.config), 10) + args[3:]
       print('pcg policy args', args)
       super().__init__(*args, **kwargs)
       nn.Module.__init__(self)

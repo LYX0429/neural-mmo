@@ -12,7 +12,7 @@ class Config(core.Config):
    MODEL   = 'recurrent'
    RENDER  = True
 
-   NENT    = 1 #Maximum population size
+   NENT    = 12 #Maximum population size
    NPOP    = 1   #Number of populations
    NMAPS   = 256 #Number of game maps
 

@@ -50,7 +50,7 @@ class Evaluator:
 
       #FIXME: no overlays for PCG
       #Compute overlay maps
-      self.overlays.register(self.obs)
+     #self.overlays.register(self.obs)
 
       self.last_obs = self.obs
 

@@ -80,6 +80,7 @@ class GodswordServerProtocol(WebSocketServerProtocol):
         self.packet['ent'] = entities
 
         gameMap = environment.np().tolist()
+    #   terraMap = environment.
         self.packet['overlay'] = data['overlay']
         self.packet['map']     = gameMap
 

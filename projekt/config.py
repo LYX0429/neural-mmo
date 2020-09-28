@@ -30,3 +30,5 @@ class Config(core.Config):
    #The 1.4 baselines use one policy
    POPULATIONS_SHARE_POLICIES = True
    NPOLICIES = 1 if POPULATIONS_SHARE_POLICIES else NPOP
+
+   #MAP_WIDTH = 64

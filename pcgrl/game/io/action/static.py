@@ -74,15 +74,15 @@ class Terraform(Node):
         trg_tile = world.env.tiles[trg_pos]
        #print('terraform target tile', trg_pos, trg_tile)
         if trg_tile.terraformable:
+            trg_tile.terraform(world.config, terr.terrain_type)
            #print('terraforming tile', x, y)
-            if trg_tile.mat.harvestable:
-               #print('pcg world ', world.env.np())
-                print('harvesting tile', trg_tile.r, trg_tile.c)
-               #print('world.env object ', world.env)
-               #world.env.step()
-                world.env.harvest(trg_tile.r, trg_tile.c)
-               #print('pcg world ', world.env.np())
-#           trg_tile.terraform(world.config, terr.terrain_type)
+       #    if trg_tile.mat.harvestable:
+       #       #print('pcg world ', world.env.np())
+       #        print('harvesting tile', trg_tile.r, trg_tile.c)
+       #       #print('world.env object ', world.env)
+       #       #world.env.step()
+       #        world.env.harvest(trg_tile.r, trg_tile.c)
+       #       #print('pcg world ', world.env.np())
        #print('terraform terrain', terr)
        #tile = Tile(world.config, terr.terrain_type, x, y, 1, None)
        #world.env.tiles[trg_pos] =  tile
@@ -94,7 +94,7 @@ class Terrain(Node):
 
     @staticproperty
     def edges():
-        return [Water, Grass]
+        return [Water, Grass, Scrub, Stone, Forest, Lava]#Orerock
 
     def args(stim, entity, config):
         return Terrain.edges
@@ -110,11 +110,24 @@ class Terrain(Node):
 
 class Water(Node):
     terrain_type = enums.Water
-    delta = (-1, 0)
 
 class Grass(Node):
     terrain_type = enums.Grass
-    delta = (0, -1)
+
+class Scrub(Node):
+    terrain_type = enums.Scrub
+
+class Lava(Node):
+    terrain_type = enums.Lava
+
+class Forest(Node):
+    terrain_type = enums.Forest
+
+class Stone(Node):
+    terrain_type = enums.Stone
+
+class Orerock(Node):
+    terrain_type = enums.Orerock
 
 class Move(Node):
     priority = 0

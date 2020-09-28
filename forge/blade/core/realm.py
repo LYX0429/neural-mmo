@@ -68,6 +68,8 @@ class Spawner:
       assert ent not in realm.desciples
 
       r, c = ent.base.pos
+#     r = r % self.config.MAP_WIDTH
+#     c = c % self.config.MAP_WIDTH
       realm.desciples[ent.entID] = ent
       realm.world.env.tiles[r, c].addEnt(iden, ent)
       realm.world.env.tiles[r, c].counts[pop] += 1
@@ -297,10 +299,10 @@ class Realm(Timed):
          packet: A packet of data for the client
       '''
       packet = {
-       #    'environment': self.world.env,
-       #    'entities': dict((k, v.packet())
-       #       for k, v in self.desciples.items()),
-       #    'overlay': self.overlay
+            'environment': self.world.env,
+            'entities': dict((k, v.packet())
+               for k, v in self.desciples.items()),
+            'overlay': self.overlay
             }
       return packet
 

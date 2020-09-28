@@ -98,7 +98,7 @@ if __name__ == '__main__':
    #Instantiate monolithic RLlib Trainer object.
    trainer = rlutils.SanePPOPCGTrainer(
          env="custom_pcg", path='experiment_pcg', config={
-      'num_workers': 1,
+      'num_workers': 4,
       'num_gpus': 1,
       'num_envs_per_worker': 1,
       'train_batch_size': 4000,
@@ -127,7 +127,7 @@ if __name__ == '__main__':
    trainer.restore(pcg_config.MODEL)
 
    if pcg_config.RENDER:
-      env = createPCGEnv(pcg_config)
+      env = createPCGEnv({'config': pcg_config})
       pcgrl.Evaluator(trainer, env, pcg_config).run()
    else:
       trainer.train()
