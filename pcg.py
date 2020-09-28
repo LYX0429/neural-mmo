@@ -153,6 +153,7 @@ class PCG(PCGRealm, rllib.MultiAgentEnv):
                     }
                 },
             })
+#       self.sim_trainer.defaultModel().cuda()
         self.world = self.sim.world
 
     #self.size = self.sim.world.env.size = self.sim.world.env.tiles.shape
@@ -210,7 +211,7 @@ class PCG(PCGRealm, rllib.MultiAgentEnv):
 
         obs, rewards, dones, infos = super().step(actions)
 
-#       print(self.n_step, dones)
+       #print(self.n_step, dones)
         if self.n_step == self.max_steps:
             self.done = True
             for k in dones:
@@ -250,6 +251,7 @@ class PCG(PCGRealm, rllib.MultiAgentEnv):
         #dones = {0: self.done, '__all__': False}
         self.n_step += 1
         #print('obs', obs)
+       #print('pcg rewards', rewards)
 
         return obs, rewards, dones, {}
 

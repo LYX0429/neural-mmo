@@ -28,6 +28,7 @@ class Base(nn.Module):
             attributes=policy.Attention)
 
       self.valueF = nn.Linear(config.HIDDEN, 1)
+#     self.cuda()
 
    def hidden(self, obs, state=None, lens=None):
       '''Abstract method for hidden state processing, recurrent or otherwise,

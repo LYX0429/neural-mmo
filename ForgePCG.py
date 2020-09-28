@@ -30,6 +30,8 @@ from pcg import PCG
 import pcgrl
 from pcgrl.game.io.action import static
 
+
+
 #Instantiate a new environment
 def createPCGEnv(pcg_config):
   #return projekt.Realm(config)
@@ -98,7 +100,7 @@ if __name__ == '__main__':
    #Instantiate monolithic RLlib Trainer object.
    trainer = rlutils.SanePPOPCGTrainer(
          env="custom_pcg", path='experiment_pcg', config={
-      'num_workers': 4,
+      'num_workers': 1,
       'num_gpus': 1,
       'num_envs_per_worker': 1,
       'train_batch_size': 4000,
@@ -121,6 +123,7 @@ if __name__ == '__main__':
          'custom_options': {'config': pcg_config}
       },
    })
+#  trainer.defaultModel().cuda()
 
    #Print model size
    utils.modelSize(trainer.model('policy_pcg_0'))

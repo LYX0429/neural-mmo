@@ -35,8 +35,9 @@ class Evaluator:
       #Remove dead agents
       for agentID in self.done:
          if self.done[agentID]:
-            del self.obs[agentID]
-            print('deleting pcg agent')
+            if agentID in self.obs:
+                del self.obs[agentID]
+                print('deleting pcg agent')
            #raise Exception
 
       #FIXME How fucking dare you

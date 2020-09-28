@@ -26,12 +26,15 @@ class Input(nn.Module):
          self.embed = Embedding(cls, config.EMBED)
       elif isinstance(cls, stimulus.node.Continuous):
          self.embed = torch.nn.Linear(1, config.EMBED)
+#     self.embed = self.embed.cuda()
 
    def forward(self, x):
       if isinstance(self.cls, stimulus.node.Discrete):
          x = x.long()
       elif isinstance(self.cls, stimulus.node.Continuous):
          x = x.float().unsqueeze(-1)
+#     self.embed = self.embed.cuda()
+#     x = x.cuda()
       x = self.embed(x)
       return x
 
@@ -45,4 +48,7 @@ class BiasedInput(nn.Module):
       self.embed = Input(cls, config)
 
    def forward(self, x):
+#     self.embed = self.embed.cuda()
+#     self.bias = self.bias.cuda()
+#     x = x.cuda()
       return self.embed(x) + self.bias.weight

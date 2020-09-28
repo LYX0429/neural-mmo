@@ -16,7 +16,6 @@ class Spawner:
       Args:
          config: A Config object
       '''
-      print('spawner config ', pcg_config)
       self.nEnt, self.nPop = pcg_config.NENT, pcg_config.NPOP
       self.popSz  = self.nEnt // self.nPop
       self.config = pcg_config
@@ -425,7 +424,7 @@ class PCGRealm(Timed):
          dones[ent.entID]   = True
          obs[ent.entID]     = ob
 
-     #print('PCGRealm obs ', obs)
+#     print('PCGRealm rewards ', rewards)
       return obs, rewards, dones
 
    @property

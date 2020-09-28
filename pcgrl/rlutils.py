@@ -76,7 +76,7 @@ class SanePPOPCGTrainer(ppo.PPOTrainer):
          with open('{}/path.txt'.format(self.saveDir)) as f:
             path = f.read().splitlines()[0]
       else:
-         path = '{}/{}/checkpoint'.format(self.saveDir, model)
+         path = '{}/{}'.format(self.saveDir, model)
 
       print('Loading from: {}'.format(path))
       super().restore(path)

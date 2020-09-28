@@ -12,6 +12,9 @@ class BatchFirstLSTM(nn.LSTM):
       h, c       = hx
       h          = h.transpose(0, 1)
       c          = c.transpose(0, 1)
+#     input = input.cuda()
+#     h = h.cuda()
+#     c = c.cuda()
       hidden, hx = super().forward(input, [h, c])
       h, c       = hx
       h          = h.transpose(0, 1)
