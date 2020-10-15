@@ -8,17 +8,27 @@ import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 from pytmx import TiledMap
 
-def loadTiled(config, fPath, tiles, nCounts):
-    tm = TiledMap(fPath)
-    assert len(tm.layers) == 1
-    layer = tm.layers[0]
-    W, H = layer.width, layer.height
-    tilemap = np.zeros((H, W), dtype=object)
-    for w, h, dat in layer.tiles():
-       f = dat[0]
-       tex = f.split('/')[-1].split('.')[0]
-       tilemap[h, w] = core.Tile(config, tiles[tex], h, w, nCounts, tex)
-    return tilemap
+TILE_TYPES = ["grass"]
+
+def loadTiled(config, map_arr, tiles, nCounts):
+     W, H = map_arr.shape[0], map_arr.shape[1]
+     tilemap = np.zeros(map_arr.shape, dtype=object)
+     for w in range(W):
+         for h in range(H):
+            tilemap[w, h] = core.Tile(config, tiles[TILE_TYPES[map_arr[w, h]]], h, w, nCounts, 0)
+     return tilemap
+
+#def loadTiled(config, fPath, tiles, nCounts):
+#    tm = TiledMap(fPath)
+#    assert len(tm.layers) == 1
+#    layer = tm.layers[0]
+#    W, H = layer.width, layer.height
+#    tilemap = np.zeros((H, W), dtype=object)
+#    for w, h, dat in layer.tiles():
+#       f = dat[0]
+#       tex = f.split('/')[-1].split('.')[0]
+#       tilemap[h, w] = core.Tile(config, tiles[tex], h, w, nCounts, tex)
+#    return tilemap
 
 def genTiled(config, tiles, nCounts):
     W = config.MAP_WIDTH
@@ -31,12 +41,13 @@ def genTiled(config, tiles, nCounts):
     return tilemap
 
 class Map:
-   def __init__(self, config, idx):
+   def __init__(self, map_arr, config, idx):
       #print('Loading Map: ', idx)
       self.updateList = set()
       self.config = config
       self.nCounts = config.NPOP
-      self.genEnv(config.ROOT + str(idx) + config.SUFFIX)
+     #self.genEnv(config.ROOT + str(idx) + config.SUFFIX)
+      self.genEnv(map_arr)
 
    def harvest(self, r, c):
       self.updateList.add(self.tiles[r, c])
@@ -81,11 +92,16 @@ class Map:
        env_terr = np.array([e.terr_state.index for e in self.tiles.ravel()]).reshape(*self.shape)
        return env_terr
 
-   def genEnv(self, fName):
-      tiles = dict((mat.value.tex, mat.value) for mat in enums.Material)
-      self.tiles = loadTiled(self.config, fName, tiles, self.nCounts)
-     #self.tiles = np.zeros((self.config.MAP_WIDTH, self.config.MAP_WIDTH))
-     #self.tiles = genTiled(self.config, tiles, self.nCounts)
+   def genEnv(self, map_arr):
+       tiles = dict((mat.value.tex, mat.value) for mat in enums.Material)
+       self.tiles = loadTiled(self.config, map_arr, tiles, self.nCounts)
+       self.shape = self.tiles.shape
 
-      self.shape = self.tiles.shape
+  #def genEnv(self, fName):
+  #   tiles = dict((mat.value.tex, mat.value) for mat in enums.Material)
+  #   self.tiles = loadTiled(self.config, fName, tiles, self.nCounts)
+  #  #self.tiles = np.zeros((self.config.MAP_WIDTH, self.config.MAP_WIDTH))
+  #  #self.tiles = genTiled(self.config, tiles, self.nCounts)
+
+  #   self.shape = self.tiles.shape
        

@@ -25,7 +25,8 @@ from projekt import realm, rlutils
 
 #Instantiate a new environment
 def createEnv(config):
-   return projekt.Realm(config)
+   map_arr = config['map_arr']
+   return projekt.Realm(map_arr, config)
 
 #Map agentID to policyID -- requires config global
 def mapPolicy(agentID):
@@ -66,10 +67,13 @@ if __name__ == '__main__':
    #Create policies
    policies  = createPolicies(config)
 
+
+   map_arr = np.zeros((120, 120), dtype=int)
+
    #Instantiate monolithic RLlib Trainer object.
    trainer = rlutils.SanePPOTrainer(
          env="custom", path='experiment', config={
-      'num_workers': 4,
+      'num_workers': 1,
       'num_gpus': 1,
       'num_envs_per_worker': 1,
       'train_batch_size': 4000,
@@ -81,7 +85,8 @@ if __name__ == '__main__':
       'soft_horizon': False, 
       'no_done_at_end': False,
       'env_config': {
-         'config': config
+         'config': config,
+         'map_arr': map_arr,
       },
       'multiagent': {
          "policies": policies,
@@ -100,7 +105,8 @@ if __name__ == '__main__':
 #  trainer.defaultModel().cuda()
 
    if config.RENDER:
-      env = createEnv({'config': config})
-      projekt.Evaluator(trainer, env, config).run()
+      env = createEnv({'config': config,
+                        'map_arr': map_arr})
+      projekt.Evaluator(trainer, env, map_arr, config).run()
    else:
       trainer.train()

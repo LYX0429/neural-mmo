@@ -14,10 +14,10 @@ from forge.blade.io.stimulus.static import Stimulus
 from forge.blade.io.action.static import Action
 
 class Realm(core.Realm, rllib.MultiAgentEnv):
-   def __init__(self, config):
+   def __init__(self, map_arr, config):
       self.config = config['config']
 
-   def reset(self, idx=None):
+   def reset(self, map_arr, idx=None):
       '''Enable us to reset the Neural MMO environment.
       This is for training on limited-resource systems where
       simply using one env map per core is not feasible'''
@@ -26,7 +26,7 @@ class Realm(core.Realm, rllib.MultiAgentEnv):
          idx = np.random.randint(n)
 
       self.lifetimes = []
-      super().__init__(self.config, idx)
+      super().__init__(map_arr, self.config, idx)
       return self.step({})[0]
 
    def step(self, decisions):

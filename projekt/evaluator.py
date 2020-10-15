@@ -8,8 +8,8 @@ from projekt.overlay import Overlays
 class Evaluator:
    '''Test-time evaluation with communication to
    the Unity3D client. Makes use of batched GPU inference'''
-   def __init__(self, trainer, env, config):
-      self.obs   = env.reset(idx=0)
+   def __init__(self, trainer, env, map_arr, config):
+      self.obs   = env.reset(map_arr, idx=0)
       self.env   = env
 
       self.state = {}

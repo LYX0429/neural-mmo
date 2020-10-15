@@ -238,6 +238,8 @@ class PCG(PCGRealm, rllib.MultiAgentEnv):
         for agentID in self.sim_done:
             if self.sim_done[agentID]:
                 del self.sim_obs[agentID]
+                self.pcg_reward -= 20
+            else:
                 self.pcg_reward += 1
 
         # obs = self.sim_obs.items()[0][1]

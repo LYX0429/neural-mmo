@@ -14,9 +14,9 @@ from forge.blade.item import rawfish, knife, armor
 from pdb import set_trace as T
 
 class Env:
-   def __init__(self, config, idx):
+   def __init__(self, map_arr, config, idx):
       #Load the world file
-      self.env = core.Map(config, idx)
+      self.env = core.Map(map_arr, config, idx)
       self.shape = self.env.shape
       self.spawn = config.SPAWN
       self.config = config

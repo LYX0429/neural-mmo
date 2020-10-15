@@ -99,7 +99,7 @@ class Realm(Timed):
    PyTorch+RLlib to take advantage of our prebuilt baseline implementations,
    but any framework that supports RLlib's fairly popular environment API and
    extended OpenAI gym.spaces observation/action definitions works as well.'''
-   def __init__(self, config, idx=0):
+   def __init__(self, map_arr, config, idx=0):
       '''
       Args:
          config : A forge.blade.core.Config (or subclass) specification object
@@ -107,7 +107,7 @@ class Realm(Timed):
       '''
       super().__init__()
       self.spawner   = Spawner(config)
-      self.world     = core.Env(config, idx)
+      self.world     = core.Env(map_arr, config, idx)
       self.env       = self.world.env
 
       self.globalValues = None
