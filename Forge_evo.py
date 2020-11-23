@@ -56,18 +56,36 @@ def createPolicies(config):
 
     return policies
 
+@ray.remote
+class Counter:
+   def __init__(self, config):
+      self.count = 0
+   def inc(self, n):
+      self.count += n
+      if self.count == config.N_EVO_MAPS:
+          self.count = 0
+   def get(self):
+      return self.count
+
+
 
 if __name__ == '__main__':
     # Setup ray
     torch.set_num_threads(1)
     ray.init()
 
+
     # Built config with CLI overrides
-    config = projekt.Config()
+    config = projekt.config.EvoNMMO()
 
     if len(sys.argv) > 1:
         sys.argv.insert(1, 'override')
         Fire(config)
+
+
+    # on the driver
+    counter = Counter.options(name="global_counter").remote(config)
+    print(ray.get(counter.get.remote()))  # get the latest count
 
     # RLlib registry
     rllib.models.ModelCatalog.register_custom_model('test_model',
@@ -97,7 +115,7 @@ if __name__ == '__main__':
                               None,  # init the trainer in evolution script
                               config,
                               n_proc=   12,
-                              n_pop=    12,
+                              n_pop=    config.N_EVO_MAPS,
                               )
 #   print(torch.__version__)
 

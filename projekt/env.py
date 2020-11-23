@@ -1,5 +1,8 @@
+import os
 from pdb import set_trace as T
 import numpy as np
+import json
+import csv
 
 import time
 from collections import defaultdict
@@ -21,6 +24,7 @@ from forge.trinity.dataframe import DataType
 
 class Env(core.Env):
    def log(self, quill, ent):
+      print('logging')
       blob = quill.register('Lifetime', quill.HISTOGRAM, quill.LINE, quill.SCATTER, quill.GANTT)
       blob.log(ent.history.timeAlive.val)
 
@@ -49,25 +53,31 @@ class Env(core.Env):
 class RLLibEnv(Env, rllib.MultiAgentEnv):
    def __init__(self, config):
       self.config = config['config']
-      #self.perfTick = 0
+      self.n_step = 0
+      self.map_fitness = 0
+      self.skill_headers = []
+      super().__init__(self.config)
 
-   def reset(self, idx=None, dry=False):
+   def init_skill_log(self):
+      self.skill_log_path = './evo_experiment/{}/map_{}_skills.csv'.format(self.config.EVO_DIR, self.worldIdx)
+      with open(self.skill_log_path, 'w', newline='') as csvfile:
+         writer = csv.DictWriter(csvfile, fieldnames=self.skill_headers)
+         writer.writeheader()
+
+
+
+   def reset(self, idx=None, step=True):
       '''Enable us to reset the Neural MMO environment.
       This is for training on limited-resource systems where
       simply using one env map per core is not feasible'''
       self.env_reset = time.time()
 
-      n   = self.config.NMAPS
-      if idx is None:
-         idx = np.random.randint(n)
-
+      self.map_fitness = 0
       self.lifetimes = []
-      super().__init__(self.config, idx)
 
-      ret = None
-      if not dry:
-         ret = self.step({})[0]
+      ret = super().reset(idx=idx, step=step)
 
+      self.n_step = 0
       self.env_reset = time.time() - self.env_reset
       return ret
 
@@ -96,15 +106,13 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
          if entID in self.dead:
             continue
 
-         #TODO: Cleaner get function without merge every tick
-         ents = {**self.realm.players.entities, **self.realm.npcs.entities}
          for atn, args in decisions[entID].items():
             for arg, val in args.items():
                val = int(val)
                if len(arg.edges) > 0:
                   actions[entID][atn][arg] = arg.edges[val]
                elif val < len(rows):
-                  actions[entID][atn][arg] = ents[rows[val]]
+                  actions[entID][atn][arg] = self.realm.entity(rows[val])
                else:
                   actions[entID][atn][arg] = ent
 
@@ -120,12 +128,38 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
       for entID, ent in self.dead.items():
          lifetime = ent.history.timeAlive.val
          self.lifetimes.append(lifetime)
+         self.map_fitness -= 1
          if not self.config.RENDER and len(self.lifetimes) >= 1000:
+        ##FIXME: very sketchy hack -smearle
+        #if self.n_step >= self.config.MAX_STEPS:
             lifetime = np.mean(self.lifetimes)
             print('Lifetime: {}'.format(lifetime))
             dones['__all__'] = True
 
+      self.n_step += 1
       self.env_step += time.time() - env_post
+      skills = {}
+      if self.n_step > 0 and self.n_step % (self.config.MAX_STEPS - 1) == 0:
+          a_skills = None
+          for d, v in self.realm.players.items():
+              a_skills = v.skills.packet()
+              a_skill_vals = {}
+              for k, v in a_skills.items():
+                  if not isinstance(v, dict):
+                      continue
+                  a_skill_vals[k] = v['exp']
+              skills[d] = a_skill_vals
+          if a_skills:
+              if not self.skill_headers:
+                  self.skill_headers = list(a_skills.keys())
+                  self.init_skill_log()
+              with open(self.skill_log_path, 'w') as outfile:
+                 writer = csv.DictWriter(outfile, fieldnames=self.skill_headers)
+                 writer.writeheader()
+                 for skills in skills.values():
+                     writer.writerow(skills)
+      if self.n_step % (self.config.MAX_STEPS * self.config.MATURE_AGE) == 0:
+          dones['__all__'] = True
       return obs, rewards, dones, infos
 
 #Neural MMO observation space

@@ -71,10 +71,10 @@ class EvoPPOTrainer(ppo.PPOTrainer):
      epoch += 1
      return stats
 
-   def reset(self):
+   def reset(self, new_remote_workers):
       print('sane reset evoTrainer \n')
       print(self.workers.local_worker, self.workers.remote_workers)
-      self.workers.reset()
+      self.workers.reset(new_remote_workers)
 #     raise Exception
 
 

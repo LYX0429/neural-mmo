@@ -1,12 +1,11 @@
 from forge.blade import core
-
+import os
 
 class Config(core.Config):
-   EVO_DIR = 'unfroze_test_0'
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
-   MODEL = None
+   MODEL = 'current'
    SCRIPTED_BFS = False
    SCRIPTED_DP  = False
    RENDER = False  # Don't edit this manually; TODO: remove it
@@ -16,13 +15,11 @@ class Config(core.Config):
    HIDDEN = 64
 
    # Environment parameters
-   NENT = 256  # Maximum population size
-   NPOP = 1  # Number of populations
-   NMOB = 0  # Number of NPCS
-   # NMOB    = 1024     #Number of NPCS
+   NENT = 64  # Maximum population size
+   NPOP = 1    # Number of populations
+   NMOB = 0   # Number of NPCS
 
-   TERRAIN_SIZE = 80  # Side dimension of each map
-   NMAPS = 256  # Number maps to generate
+   NMAPS = 256 # Number maps to generate
 
    # Evaluation parameters
    EVALUATION_HORIZON = 2048
@@ -55,3 +52,44 @@ class Config(core.Config):
    PLOT_COLUMNS = 4
    PLOT_TOOLS = False
    PLOT_INTERACTIVE = False
+
+#Map Size Presets
+class SmallMap(Config):
+   TERRAIN_SIZE       = 64 
+   TERRAIN_OCTAVES    = 1
+   TERRAIN_FOREST_LOW = 0.30
+
+class LargeMap(Config):
+   pass
+
+#Battle Royale Presets
+class BattleRoyale(Config):
+   pass
+
+class SmallBR(SmallMap, BattleRoyale):
+   pass
+
+class LargeBR(LargeMap, BattleRoyale):
+   pass
+
+#MMO Presets
+class MMO(Config):
+   TERRAIN_INVERT    = True
+
+class SmallMMO(SmallMap, MMO):
+   pass
+
+class LargeMMO(LargeMap, MMO):
+   pass
+
+class EvoNMMO(SmallMap):
+   NENT = 8  # Maximum population size
+   TERRAIN_SIZE = 80
+   EVO_DIR = 'unfroze_test_0'
+   EVO_ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps')
+   N_EVO_MAPS = 48
+   MAX_STEPS = 102
+   MATURE_AGE = 5
+   TERRAIN_RENDER = True
+
+
