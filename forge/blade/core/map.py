@@ -76,6 +76,7 @@ class Map:
       return env
 
    def genEnv(self, realm, fName):
+     #print([mat.value.tex for mat in enums.Material])
       tiles = dict((mat.value.tex, mat.value) for mat in enums.Material)
       self.tiles = loadTiled(realm, self.config, fName, tiles, self.nCounts)
       self.shape = self.tiles.shape

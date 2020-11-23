@@ -2,10 +2,11 @@ from forge.blade import core
 
 
 class Config(core.Config):
+   EVO_DIR = 'unfroze_test_0'
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
-   MODEL = 'current'
+   MODEL = None
    SCRIPTED_BFS = False
    SCRIPTED_DP  = False
    RENDER = False  # Don't edit this manually; TODO: remove it
@@ -17,7 +18,7 @@ class Config(core.Config):
    # Environment parameters
    NENT = 256  # Maximum population size
    NPOP = 1  # Number of populations
-   NMOB = 32  # Number of NPCS
+   NMOB = 0  # Number of NPCS
    # NMOB    = 1024     #Number of NPCS
 
    TERRAIN_SIZE = 80  # Side dimension of each map

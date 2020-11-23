@@ -173,5 +173,6 @@ for i, seed in enumerate(seeds):
    #fractal(terrain, path+'fractal.png')
    #render(tiles, path+'map.png')
    index(tiles, path)
+   T()
 
 
