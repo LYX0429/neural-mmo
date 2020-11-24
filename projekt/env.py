@@ -63,7 +63,7 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
       with open(self.skill_log_path, 'w', newline='') as csvfile:
          writer = csv.DictWriter(csvfile, fieldnames=self.skill_headers)
          writer.writeheader()
-
+      assert csvfile.closed
 
 
    def reset(self, idx=None, step=True):
