@@ -1,3 +1,4 @@
+from pdb import set_trace as T
 from forge.blade import core
 import os
 
@@ -5,13 +6,13 @@ class Config(core.Config):
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
-   MODEL = 'current'
+   MODEL        = 'current'
    SCRIPTED_BFS = False
    SCRIPTED_DP  = False
-   RENDER = False  # Don't edit this manually; TODO: remove it
+   RENDER       = False  # Don't edit this manually; TODO: remove it
 
    # Model dimensions
-   EMBED = 64
+   EMBED  = 64
    HIDDEN = 64
 
    # Environment parameters
@@ -59,8 +60,17 @@ class SmallMap(Config):
    TERRAIN_OCTAVES    = 1
    TERRAIN_FOREST_LOW = 0.30
 
+#  MODEL              = 'small-map'
+   TERRAIN_DIR        = Config.TERRAIN_DIR_SMALL
+   ROOT               = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
+
+   NPC_LEVEL_MAX      = 40
+   NPC_LEVEL_SPREAD   = 10
+
 class LargeMap(Config):
-   pass
+   MODEL              = 'large-map'
+   TERRAIN_DIR        = Config.TERRAIN_DIR_LARGE
+   ROOT               = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
 
 #Battle Royale Presets
 class BattleRoyale(Config):
@@ -83,10 +93,11 @@ class LargeMMO(LargeMap, MMO):
    pass
 
 class EvoNMMO(SmallMap):
+   MODEL = 'current'
    NENT = 8  # Maximum population size
-   TERRAIN_SIZE = 80
-   EVO_DIR = 'unfroze_test_0'
-   EVO_ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps')
+   TERRAIN_SIZE = 64
+   EVO_DIR = 'unfroze_w64_0'
+   ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 102
    MATURE_AGE = 5

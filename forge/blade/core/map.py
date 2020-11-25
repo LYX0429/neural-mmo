@@ -37,8 +37,7 @@ class Map:
 
    def reset(self, realm, idx):
       materials = dict((mat.value.index, mat.value) for mat in enums.Material)
-     #fName     = self.config.ROOT + str(idx) + self.config.SUFFIX
-      fName     = os.path.join(self.config.EVO_ROOT, 'map' + str(idx)) + self.config.SUFFIX
+      fName     = self.config.ROOT + str(idx) + self.config.SUFFIX
 
       loadTiled(self.tiles, fName, materials)
       self.updateList = set()

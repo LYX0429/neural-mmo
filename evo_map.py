@@ -18,8 +18,10 @@ import projekt
 from forge.ethyr.torch import utils
 from pcg import TILE_TYPES
 from projekt import rlutils
-#from projekt.overlay import Overlays
+from projekt.evaluator import Evaluator
+from projekt.overlay import OverlayRegistry
 from forge.blade.core.terrain import MapGenerator, Save
+from forge.blade.lib import enums
 
 import ray
 from typing import Dict
@@ -136,7 +138,8 @@ class EvolverNMMO(LambdaMuEvolver):
         self.trainer = trainer
         self.map_width = config.TERRAIN_SIZE#+ 2 * config.TERRAIN_BORDER
         self.map_height = config.TERRAIN_SIZE#+ 2 * config.TERRAIN_BORDER
-        self.n_tiles = len(TILE_TYPES)
+        # FIXME: hack: ignore orerock
+        self.n_tiles = len(TILE_TYPES) - 1
         # how much has each individual's score varied over the past n simulations?
         # can tell us how informative further simulation will be
         # assumes task is stationary
@@ -150,11 +153,11 @@ class EvolverNMMO(LambdaMuEvolver):
         self.done = {}
         # self.config   = config
         # config.RENDER = True
-        map_arr = self.genRandMap()
         self.map_generator = MapGenerator(config)
         config = {'config': config, #'map_arr': map_arr
                 }
         self.config = config
+        map_arr = self.genRandMap()
 #       env = make_env(config)
 #       self.obs = env.reset(map_arr=map_arr, idx=0)
 #       self.population[0] = (env, None, 0)
@@ -167,8 +170,10 @@ class EvolverNMMO(LambdaMuEvolver):
         self.skill_idxs = {}
         self.idx_skills = {}
 
-    def saveMaps(self, maps, mutated):
+    def saveMaps(self, maps, mutated=None):
        #for i, map_arr in maps.items():
+        if mutated is None:
+            mutated = list(self.population.keys())
         for i in mutated:
            map_arr = maps[i]
            print('Generating map ' + str(i))
@@ -305,7 +310,7 @@ class EvolverNMMO(LambdaMuEvolver):
         self.n_epoch += 1
 
 
-#       self.overlays = Overlays(env, self.model, trainer, config['config'])
+       #self.overlays = Overlay(env, self.model, trainer, config['config'])
 
     def make_game(self, child_map):
         config = self.config
@@ -319,7 +324,6 @@ class EvolverNMMO(LambdaMuEvolver):
         '''
         trash_data: to avoid undetermined weirdness when reloading
         '''
-
 #       for g_hash, (game, score, age) in self.population.items():
 #           if game is None:
 #              #self.config['map_arr'] = self.genes[g_hash]
@@ -342,11 +346,12 @@ class EvolverNMMO(LambdaMuEvolver):
                                              path='experiment',
                                              config={
                                                  'num_workers': 12, # normally: 4
+                                                 'num_gpus_per_worker': 0.083,  # hack fix
                                                  'num_gpus': 1,
                                                  'num_envs_per_worker': 4,
                                                  'train_batch_size': 120, # normally: 4000
                                                  'rollout_fragment_length':
-                                                 self.config['config'].MAX_STEPS + 2,
+                                                 self.config['config'].MAX_STEPS + 3,
                                                  'sgd_minibatch_size': 110,  # normally: 128
                                                  'num_sgd_iter': 1,
                                                  'framework': 'torch',
@@ -392,19 +397,23 @@ class EvolverNMMO(LambdaMuEvolver):
 
         if not g_hash:
             raise Exception('No population found for inference.')
-        game = self.population[g_hash][0]
-        if game is None:
-            game = self.make_env(self.config)
-        map_arr = self.genes[g_hash]
-       #map_arr = self.genRandMap()
-        self.run(game, map_arr)
-        map_arr = self.genes[g_hash]
+#       game = self.population[g_hash][0]
+#       game = self.make_env(self.config)
+#       model    = self.trainer.get_policy('policy_0').model
+        evaluator = Evaluator(self.config['config'], self.trainer)
+        evaluator.render()
+#       self.registry = OverlayRegistry(game, self.model, self.trainer, self.config['config'])
+#       map_arr = self.genes[g_hash]
+#      #map_arr = self.genRandMap()
+#       self.run(game, map_arr)
+#       map_arr = self.genes[g_hash]
 
 
     def genRandMap(self):
         if self.n_epoch > 0:
             print('generating new random map when I probably should not be... \n\n')
-        map_arr= np.random.randint(0, self.n_tiles,
+        # FIXME: hack: ignore lava
+        map_arr= np.random.randint(1, self.n_tiles,
                                     (self.map_width, self.map_height))
        #map_arr.fill(TILE_TYPES.index('forest'))
        #map_arr[20:-20, 20:-20]= TILE_TYPES.index('water')
@@ -413,11 +422,18 @@ class EvolverNMMO(LambdaMuEvolver):
         return map_arr
 
     def add_border(self, map_arr):
-        b= 9
-        map_arr[0:b, :]= 0#TILE_TYPES.index('grass')
-        map_arr[:, 0:b]= 0#TILE_TYPES.index('grass')
-        map_arr[-b:, :]= 0#TILE_TYPES.index('grass')
-        map_arr[:, -b:]= 0#TILE_TYPES.index('grass')
+        b = self.config['config'].TERRAIN_BORDER
+        # agents should not spawn and die immediately, as this may crash the env
+        a = 2
+        map_arr[b:b+a, :]= enums.Material.GRASS.value.index
+        map_arr[:, b:b+a]= enums.Material.GRASS.value.index
+        map_arr[:, -b-a:-b]= enums.Material.GRASS.value.index
+        map_arr[-b-a:-b, :]= enums.Material.GRASS.value.index
+        # the border must be lava
+        map_arr[0:b, :]= enums.Material.LAVA.value.index
+        map_arr[:, 0:b]= enums.Material.LAVA.value.index
+        map_arr[-b:, :]= enums.Material.LAVA.value.index
+        map_arr[:, -b:]= enums.Material.LAVA.value.index
 
         return map_arr
 
@@ -427,7 +443,8 @@ class EvolverNMMO(LambdaMuEvolver):
         for i in range(random.randint(0, self.n_mutate_actions)):
             x= random.randint(0, self.map_width - 1)
             y= random.randint(0, self.map_height - 1)
-            t= random.randint(0, self.n_tiles - 1)
+            # FIXME: hack: ignore lava
+            t= np.random.randint(1, self.n_tiles)
             map_arr[x, y]= t
         map_arr = self.add_border(map_arr)
 
@@ -634,7 +651,7 @@ class EvolverNMMO(LambdaMuEvolver):
                     self.obs, state=self.state, policy_id='policy_0')
 
                 # Compute overlay maps
-                #           self.overlays.register(self.obs)
+                self.overlays.register(self.obs)
 
                 # Step the environment
                 self.obs, rewards, self.done, _= game.step(actions)

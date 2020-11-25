@@ -45,9 +45,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
    def defaultModel(self):
       return self.model(self.policyID(0))
 
-   def compute_actions(self, *args, **kwargs):
-      ret = super().compute_actions(*args, **kwargs)
-
    def train(self, 
       #maps
       ):

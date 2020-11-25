@@ -1,4 +1,5 @@
 import os
+from projekt.visualize import visualize
 import pickle
 import sys
 # My favorite debugging macro
