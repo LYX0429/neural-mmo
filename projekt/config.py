@@ -9,7 +9,7 @@ class Config(core.Config):
    MODEL        = 'current'
    SCRIPTED_BFS = False
    SCRIPTED_DP  = False
-   RENDER       = False  # Don't edit this manually; TODO: remove it
+   EVALUATE     = False
 
    # Model dimensions
    EMBED  = 64
@@ -93,10 +93,11 @@ class LargeMMO(LargeMap, MMO):
    pass
 
 class EvoNMMO(SmallMap):
-   MODEL = 'current'
+   RENDER = False
+   MODEL = None
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = 'unfroze_w64_0'
+   EVO_DIR = 'unfroze_w64_2'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 102

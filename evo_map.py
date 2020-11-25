@@ -346,7 +346,7 @@ class EvolverNMMO(LambdaMuEvolver):
                                              path='experiment',
                                              config={
                                                  'num_workers': 12, # normally: 4
-                                                 'num_gpus_per_worker': 0.083,  # hack fix
+                                                #'num_gpus_per_worker': 0.083,  # hack fix
                                                  'num_gpus': 1,
                                                  'num_envs_per_worker': 4,
                                                  'train_batch_size': 120, # normally: 4000

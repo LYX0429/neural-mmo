@@ -101,10 +101,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       for entID, ent in self.dead.items():
          lifetime = ent.history.timeAlive.val
          self.lifetimes.append(lifetime)
-         self.map_fitness -= 1
-         if not self.config.RENDER and len(self.lifetimes) >= 1000:
-        ##FIXME: very sketchy hack -smearle
-        #if self.n_step >= self.config.MAX_STEPS:
+         if not self.config.EVALUATE and len(self.lifetimes) >= 1000:
             lifetime = np.mean(self.lifetimes)
             print('Lifetime: {}'.format(lifetime))
             dones['__all__'] = True
