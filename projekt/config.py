@@ -94,7 +94,7 @@ class LargeMMO(LargeMap, MMO):
 
 class EvoNMMO(SmallMap):
    RENDER = False
-   MODEL = None
+   MODEL = 'current'
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
    EVO_DIR = 'unfroze_w64_2'

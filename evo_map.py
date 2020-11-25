@@ -305,7 +305,7 @@ class EvolverNMMO(LambdaMuEvolver):
                 self.score_hists[g_hash] = []
                 j += 1
 
-        if self.n_epoch % 10 == 0 or self.n_epoch == 2:
+        if self.n_epoch % 10 == 0:
             self.save()
         self.n_epoch += 1
 
@@ -345,10 +345,10 @@ class EvolverNMMO(LambdaMuEvolver):
             trainer = rlutils.EvoPPOTrainer(env="custom",
                                              path='experiment',
                                              config={
-                                                 'num_workers': 12, # normally: 4
+                                                 'num_workers': 6, # normally: 4
                                                 #'num_gpus_per_worker': 0.083,  # hack fix
                                                  'num_gpus': 1,
-                                                 'num_envs_per_worker': 4,
+                                                 'num_envs_per_worker': 8,
                                                  'train_batch_size': 120, # normally: 4000
                                                  'rollout_fragment_length':
                                                  self.config['config'].MAX_STEPS + 3,
@@ -357,6 +357,7 @@ class EvolverNMMO(LambdaMuEvolver):
                                                  'framework': 'torch',
                                                  'horizon': np.inf,
                                                  'soft_horizon': False,
+                                                 '_use_trajectory_view_api': False,
                                                  'no_done_at_end': False,
                                                  'callbacks': LogCallbacks,
                                                  'env_config': {
@@ -597,9 +598,8 @@ class EvolverNMMO(LambdaMuEvolver):
                 assert csv_skills.closed
                 self.population[g_hash] = (game, score, age)
             except FileNotFoundError:
-                T()
-                raise Exception
-                score = None
+                print('Missing a csv file with agent simulation stats. I assume this is the 0th generation? Re-running the training step.')
+                self.evolve_generation()
 
         for g_hash, (game, score_t, age) in self.population.items():
             # get score from latest simulation
