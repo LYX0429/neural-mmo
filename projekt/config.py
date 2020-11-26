@@ -3,6 +3,7 @@ from forge.blade import core
 import os
 
 class Config(core.Config):
+   EVO_MAP = False
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
@@ -93,14 +94,15 @@ class LargeMMO(LargeMap, MMO):
    pass
 
 class EvoNMMO(SmallMap):
+   EVO_MAP = True
    RENDER = False
    MODEL = 'current'
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = 'unfroze_w64_2'
+   EVO_DIR = 'unfroze_w64_5'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
-   N_EVO_MAPS = 48
-   MAX_STEPS = 102
+   N_EVO_MAPS = 12
+   MAX_STEPS = 100
    MATURE_AGE = 5
    TERRAIN_RENDER = True
 

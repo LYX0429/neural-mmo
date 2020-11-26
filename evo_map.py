@@ -1,56 +1,50 @@
-import argparse
-from pdb import set_trace as T
-import copy
 import csv
 import os
 import pickle
 import random
 import sys
 import time
-import json
-from multiprocessing import Pipe, Process
+from pdb import set_trace as T
 from shutil import copyfile
-from evolution.lambda_mu import LambdaMuEvolver
+from typing import Dict
 
 import numpy as np
+import ray
+from ray import rllib
+from ray.rllib.agents.callbacks import DefaultCallbacks
+from ray.rllib.env import BaseEnv
+from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
+from ray.rllib.policy import Policy
+from ray.rllib.policy.sample_batch import SampleBatch
 
 import projekt
+from evolution.lambda_mu import LambdaMuEvolver
+from forge.blade.core.terrain import MapGenerator, Save
+from forge.blade.lib import enums
 from forge.ethyr.torch import utils
 from pcg import TILE_TYPES
 from projekt import rlutils
 from projekt.evaluator import Evaluator
 from projekt.overlay import OverlayRegistry
-from forge.blade.core.terrain import MapGenerator, Save
-from forge.blade.lib import enums
-
-import ray
-from typing import Dict
-from ray import rllib
-from ray.rllib.env import BaseEnv
-from ray.rllib.policy import Policy
-from ray.rllib.policy.sample_batch import SampleBatch
-from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
-from ray.rllib.agents.callbacks import DefaultCallbacks
 
 np.set_printoptions(threshold=sys.maxsize,
                     linewidth=120,
                     suppress=True,
                    #precision=10
                     )
-import torch
 
-
-
+# keep trainer here while saving evolver object
+global TRAINER
+TRAINER = None
 
 def calc_diversity_l2(agent_skills):
-    score = 0
-    agent_skills = np.array(agent_skills)
-    for a in agent_skills:
-        for b in agent_skills:
-            score += np.linalg.norm(a-b)
-#   print('agent skills:\n{}'.format(np.array(agent_skills)))
-#   print('score:\n{}\n'.format(
-#       score))
+    assert len(agent_skills) == 1
+    a = agent_skills[0]
+    b = a.reshape(a.shape[0], 1, a.shape[1])
+    score = np.sum(np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b)))/2
+    print('agent skills:\n{}'.format(a))
+    print('score:\n{}\n'.format(
+        score))
 
     return score
 
@@ -58,22 +52,21 @@ def calc_diversity_l2(agent_skills):
 class LogCallbacks(DefaultCallbacks):
    STEP_KEYS = 'env_step realm_step env_stim stim_process'.split()
    EPISODE_KEYS = ['env_reset']
-   
+
    def init(self, episode):
-      for key in LogCallbacks.STEP_KEYS + LogCallbacks.EPISODE_KEYS: 
+      for key in LogCallbacks.STEP_KEYS + LogCallbacks.EPISODE_KEYS:
          episode.hist_data[key] = []
-      episode.hist_data['map_fitness'] = []
 
    def on_episode_start(self, *, worker: RolloutWorker, base_env: BaseEnv,
          policies: Dict[str, Policy],
          episode: MultiAgentEpisode, **kwargs):
       self.init(episode)
-     #episode.hist_data['map_fitness'].append((base_env.envs[0].worldIdx, -1))
 
    def on_episode_step(self, *, worker: RolloutWorker, base_env: BaseEnv,
          episode: MultiAgentEpisode, **kwargs):
 
       env = base_env.envs[0]
+
       for key in LogCallbacks.STEP_KEYS:
          if not hasattr(env, key):
             continue
@@ -82,33 +75,29 @@ class LogCallbacks(DefaultCallbacks):
    def on_episode_end(self, *, worker: RolloutWorker, base_env: BaseEnv,
          policies: Dict[str, Policy], episode: MultiAgentEpisode, **kwargs):
       env = base_env.envs[0]
+
       for key in LogCallbacks.EPISODE_KEYS:
          if not hasattr(env, key):
             continue
          episode.hist_data[key].append(getattr(env, key))
-      episode.hist_data['map_fitness'].append((env.worldIdx, env.map_fitness))
 
    def on_train_result(self, *, trainer, result: dict, **kwargs) -> None:
+      n_epis = result["episodes_this_iter"]
       print("trainer.train() result: {} -> {} episodes".format(
-         trainer, result["episodes_this_iter"]))
+         trainer, n_epis))
       # you can mutate the result dict to add new fields to return
       # result['something'] = True
 
-#sz = 16 + 16
-#scale = int(sz / 5)
-#root = 'resource/maps/'
-
 
 # Map agentID to policyID -- requires config global
-def mapPolicy(agentID, 
+def mapPolicy(agentID,
         #config
         ):
+
     return 'policy_{}'.format(agentID % 1)
 
 
 # Generate RLlib policies
-
-
 def createPolicies(config):
     obs = projekt.env.observationSpace(config)
     atns = projekt.env.actionSpace(config)
@@ -124,49 +113,23 @@ def createPolicies(config):
     return policies
 
 
-
-
-
 class EvolverNMMO(LambdaMuEvolver):
     def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
-#       save_path = os.path.abspath(os.path.join('evo_experiment', 'evo_test'))
         super().__init__(save_path, n_proc=n_proc, n_pop=n_pop)
-#       torch._C._cuda_init()
-        # balance between skill and agent entropies
-#       self.alpha = config.DIVERSITY_ALPHA
         self.make_env = make_env
         self.trainer = trainer
         self.map_width = config.TERRAIN_SIZE#+ 2 * config.TERRAIN_BORDER
         self.map_height = config.TERRAIN_SIZE#+ 2 * config.TERRAIN_BORDER
         # FIXME: hack: ignore orerock
         self.n_tiles = len(TILE_TYPES) - 1
-        # how much has each individual's score varied over the past n simulations?
-        # can tell us how informative further simulation will be
-        # assumes task is stationary
-       #self.score_var = {}
-        # age at which individuals can die and reproduce
-       #self.gens_alive = {}
-       #self.last_scores = {}
         self.mature_age = config.MATURE_AGE
-
         self.state = {}
         self.done = {}
-        # self.config   = config
-        # config.RENDER = True
         self.map_generator = MapGenerator(config)
         config = {'config': config, #'map_arr': map_arr
                 }
         self.config = config
         map_arr = self.genRandMap()
-#       env = make_env(config)
-#       self.obs = env.reset(map_arr=map_arr, idx=0)
-#       self.population[0] = (env, None, 0)
-#       self.genes[0] = map_arr
-#       self.score_hists[0] = []
-       #self.score_var[0] = None, []
-       #self.gens_alive[0] = 0
-       #self.last_scores[0] = 0
-
         self.skill_idxs = {}
         self.idx_skills = {}
 
@@ -174,6 +137,7 @@ class EvolverNMMO(LambdaMuEvolver):
        #for i, map_arr in maps.items():
         if mutated is None:
             mutated = list(self.population.keys())
+
         for i in mutated:
            map_arr = maps[i]
            print('Generating map ' + str(i))
@@ -182,135 +146,10 @@ class EvolverNMMO(LambdaMuEvolver):
               os.mkdir(path)
            except FileExistsError:
                pass
-           #  terrain, tiles = self.map_generator.grid(self.config['config'], seed)
-           #  Save.np(tiles, path)
-           #  if self.config['config'].TERRAIN_RENDER:
-           #     Save.fractal(terrain, path+'fractal.png')
-           #     Save.render(tiles, self.map_generator.textures, path+'map.png')
-
-              #terrain = copy.deepcopy(terrain).astype(object)
-              #for y in range(map_arr.shape[1]):
-              #    for x in range(map_arr.shape[0]):
-              #        tile_type = TILE_TYPES[map_arr[x, y]]
-              #       #print(tile_type)
-              #        texture = tex[tile_type]
-              #       #print(texture)
-              #        terrain[y, x] = texture
            Save.np(map_arr, path)
+
            if self.config['config'].TERRAIN_RENDER:
-       #      Save.fractal(terrain, path+'fractal.png')
               Save.render(map_arr, self.map_generator.textures, path+'map.png')
-           #fractal(terrain, path+'fractal.png')
-           #render(tiles, path+'map.png')
-
-    def evolve_generation(self):
-        print('epoch {}'.format(self.n_epoch))
-        population = self.population
-        n_cull = int(self.n_pop * self.mu)
-        n_parents = int(self.n_pop * self.lam)
-        dead_hashes = []
-        processes = {}
-        n_proc = 0
-
-        for g_hash, (game, score, age) in population.items():
-            map_arr = self.genes[g_hash]
-            if MULTIPROCESSING:
-                parent_conn, child_conn = Pipe()
-                p = Process(target=self.simulate_game,
-                        args=(
-                            game,
-                            map_arr,
-                            self.n_sim_ticks,
-                            child_conn,
-                            ))
-                p.start()
-                processes[g_hash] = p, parent_conn, child_conn
-            else:
-                # NB: specific to NMMO!!
-                p = self.simulate_game(game, map_arr, self.n_sim_ticks, g_hash=g_hash)
-                parent_conn, child_conn = None, None
-                processes[g_hash] = p, parent_conn, child_conn
-                for g_hash in self.population.keys():
-                    with open(os.path.join('./evo_experiment', '{}'.format(self.config.EVO_DIR), 'env_{}_skills.json'.format(g_hash))) as f:
-                        agent_skills = json.load(f)
-                        p = self.update_entropy_skills(agent_skills, self.alpha)
-                        raise Exception
-                break
-
-            n_proc += 1
-
-        if n_proc % self.n_proc == 0:
-            self.join_procs(processes)
-
-        if len(processes) > 0:
-            self.join_procs(processes)
-
-        ranked_pop = sorted(
-                [(g_hash, game, score, age)
-                    for g_hash, (game, score, age) in self.population.items()],
-                key=lambda tpl: tpl[2])
-        print('Ranked population: (id, running_mean_score, last_score, age)')
-
-        with open(self.log_path, mode='a') as log_file:
-            log_writer = csv.writer(
-                    log_file, delimiter=',',
-                    quotechar='"',
-                    quoting=csv.QUOTE_MINIMAL)
-            log_writer.writerow(['epoch {}'.format(self.n_epoch)])
-            log_writer.writerow(
-                    ['id', 'running_score', 'last_score', 'age'])
-
-            for g_hash, game, score, age in ranked_pop:
-
-                if g_hash in self.score_hists:
-                    last_score = self.score_hists[g_hash][-1]
-                else:
-                    last_score = -1
-                print('{}, {:2f}, {:2f}, {}'.format(
-                    g_hash, score, last_score, age))
-                log_writer.writerow([g_hash, score, last_score, age])
-
-        for j in range(n_cull):
-            dead_hash = ranked_pop[j][0]
-
-            if self.population[dead_hash][2] > self.mature_age:
-                dead_hashes.append(dead_hash)
-
-        par_hashes = []
-
-        for i in range(n_parents):
-            par_hash, _, _, age = ranked_pop[-(i + 1)]
-
-            if age > self.mature_age:
-                par_hashes.append(par_hash)
-
-        # for all we have culled, add new mutated individual
-        j = 0
-
-        if par_hashes:
-            while dead_hashes:
-                n_parent = j % len(par_hashes)
-                par_hash = par_hashes[n_parent]
-                # parent = population[par_hash]
-                par_map = self.genes[par_hash]
-                # par_game = parent[0]  # get game from (game, score, age) tuple
-                g_hash = dead_hashes.pop()
-                population.pop(g_hash)
-               #self.score_var.pop(g_hash)
-                child_map = self.mutate(par_map)
-               #child_game = self.make_game(child_map)
-                child_game = None
-                population[g_hash] = (child_game, None, 0)
-                self.genes[g_hash] = child_map
-                self.score_hists[g_hash] = []
-                j += 1
-
-        if self.n_epoch % 10 == 0:
-            self.save()
-        self.n_epoch += 1
-
-
-       #self.overlays = Overlay(env, self.model, trainer, config['config'])
 
     def make_game(self, child_map):
         config = self.config
@@ -319,66 +158,59 @@ class EvolverNMMO(LambdaMuEvolver):
 
         return game
 
-
     def restore(self, trash_data=False):
         '''
         trash_data: to avoid undetermined weirdness when reloading
         '''
-#       for g_hash, (game, score, age) in self.population.items():
-#           if game is None:
-#              #self.config['map_arr'] = self.genes[g_hash]
-
-#               if trash_data:
-#                   pass
-#                  #score = None
-#                  #age = 0
-#                  #self.score_var[g_hash] = None, []
-#                  #self.score_hists[g_hash] = []
-#               self.population[g_hash] = (game, score, age)
+        global TRAINER
+        self.trainer = TRAINER
 
         if self.trainer is None:
 
             # Create policies
             policies = createPolicies(self.config['config'])
 
+            conf = self.config['config']
             # Instantiate monolithic RLlib Trainer object.
-            trainer = rlutils.EvoPPOTrainer(env="custom",
-                                             path='experiment',
-                                             config={
-                                                 'num_workers': 6, # normally: 4
-                                                #'num_gpus_per_worker': 0.083,  # hack fix
-                                                 'num_gpus': 1,
-                                                 'num_envs_per_worker': 8,
-                                                 'train_batch_size': 120, # normally: 4000
-                                                 'rollout_fragment_length':
-                                                 self.config['config'].MAX_STEPS + 3,
-                                                 'sgd_minibatch_size': 110,  # normally: 128
-                                                 'num_sgd_iter': 1,
-                                                 'framework': 'torch',
-                                                 'horizon': np.inf,
-                                                 'soft_horizon': False,
-                                                 '_use_trajectory_view_api': False,
-                                                 'no_done_at_end': False,
-                                                 'callbacks': LogCallbacks,
-                                                 'env_config': {
-                                                     'config':
-                                                     self.config['config'],
-                                                    #'map_arr': self.genRandMap(),
-                                                    #'maps': self.genes,
-                                                 },
-                                                 'multiagent': {
-                                                     "policies": policies,
-                                                     "policy_mapping_fn":
-                                                     mapPolicy
-                                                 },
-                                                 'model': {
-                                                     'custom_model': 'test_model',
-                                                     'custom_model_config': {
-                                                         'config':
-                                                         self.config['config']
-                                                     }
-                                                 },
-                                             })
+            trainer = rlutils.EvoPPOTrainer(
+                 env="custom",
+                 path='experiment',
+                 config={
+                 'num_workers': 6, # normally: 4
+                #'num_gpus_per_worker': 0.083,  # hack fix
+                 'num_gpus': 1,
+                 'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
+                 # batch size is n_env_steps * maps per generation
+                 # plus 1 to actually reset the last env
+                 'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
+                 'rollout_fragment_length': 100,
+                 'sgd_minibatch_size': 100,  # normally: 128
+                 'num_sgd_iter': 1,
+                 'framework': 'torch',
+                 'horizon': np.inf,
+                 'soft_horizon': False,
+                 '_use_trajectory_view_api': False,
+                 'no_done_at_end': False,
+                 'callbacks': LogCallbacks,
+                 'env_config': {
+                     'config':
+                     self.config['config'],
+                    #'map_arr': self.genRandMap(),
+                    #'maps': self.genes,
+                 },
+                 'multiagent': {
+                     "policies": policies,
+                     "policy_mapping_fn":
+                     mapPolicy
+                 },
+                 'model': {
+                     'custom_model': 'test_model',
+                     'custom_model_config': {
+                         'config':
+                         self.config['config']
+                     }
+                 },
+             })
 
             # Print model size
             utils.modelSize(trainer.defaultModel())
@@ -392,23 +224,14 @@ class EvolverNMMO(LambdaMuEvolver):
 
         g_hash = None
 
-        for g_hash, (game, score, age) in self.population.items():
+        for g_hash, (_, score, age) in self.population.items():
             if score and score > best_score[1] and age > self.mature_age:
                 best_score = g_hash, score
 
         if not g_hash:
             raise Exception('No population found for inference.')
-#       game = self.population[g_hash][0]
-#       game = self.make_env(self.config)
-#       model    = self.trainer.get_policy('policy_0').model
         evaluator = Evaluator(self.config['config'], self.trainer)
         evaluator.render()
-#       self.registry = OverlayRegistry(game, self.model, self.trainer, self.config['config'])
-#       map_arr = self.genes[g_hash]
-#      #map_arr = self.genRandMap()
-#       self.run(game, map_arr)
-#       map_arr = self.genes[g_hash]
-
 
     def genRandMap(self):
         if self.n_epoch > 0:
@@ -416,8 +239,6 @@ class EvolverNMMO(LambdaMuEvolver):
         # FIXME: hack: ignore lava
         map_arr= np.random.randint(1, self.n_tiles,
                                     (self.map_width, self.map_height))
-       #map_arr.fill(TILE_TYPES.index('forest'))
-       #map_arr[20:-20, 20:-20]= TILE_TYPES.index('water')
         self.add_border(map_arr)
 
         return map_arr
@@ -495,70 +316,9 @@ class EvolverNMMO(LambdaMuEvolver):
             if xp > self.max_skills[skill]:
                 self.max_skills[skill] = max_xp
 
-    def update_entropy_skills(self, skill_dict):
-        agent_skills = [[] for _ in range(len(skill_dict))]
-        i = 0
-
-        for a_skills in skill_dict:
-            j = 0
-            for a_skill in a_skills:
-                try:
-                    val = float(a_skill)
-                    agent_skills[i].append(val)
-                    j += 1
-                except:
-                    pass
-            i += 1
-
-       #for agent_id, skills in skill_dict.items():
-       #for skill, vals in skill_dict.items():
-
-#      #    skills = skills['skills']
-       #    if agent_skills is None:
-       #        agent_skills = [[None for j in range(len(skills)-4)] for i in range(len(skill_dict))]
-       #    j = 0
-
-       #   #for s, v in skills.items():
-       #       #if s in ['level', 'constitution', 'hunting', 'fishing']:
-       #       #    continue
-
-       #       #if s not in self.skill_idxs:
-       #       #    skill_idx = j
-       #       #    self.skill_idxs[s] = skill_idx
-       #       #    self.idx_skills[skill_idx] = s
-       #       #else:
-       #       #    skill_idx = self.skill_idxs[s]
-       #    exp_val = vals['exp']
-       #       #if self.idx_skills[j] in ['woodcutting', 'mining']:
-       #       #    exp_val -= 1154
-       #    agent_skills[i][j] = exp_val
-       #   #    j += 1
-       #   #i += 1
-
-        return calc_diversity_l2(agent_skills)
-
     def simulate_game(self, game, map_arr, n_ticks, conn=None, g_hash=None):
-        #       print('running simulation on this map: {}'.format(map_arr))
-#       self.obs= game.reset(#map_arr=map_arr, 
-#               idx=g_hash)
-#       self.done= {}
-#       #       self.overlays = Overlays(game, self.model, self.trainer, self.config['config'])
-
         score = 0
-
-       #for i in range(n_ticks):
-       #    print('tick', i)
         score += self.tick_game(game, g_hash=g_hash)
-           #self.tick_game(game)
-
-        # reward for diversity of skills developed during simulation
-        # consider max skills of living agents
-
-       #score += self.update_entropy_skills(game.desciples.values())
-       #for ent in game.desciples.values():
-       #   #self.update_max_skills(ent)
-       #    self.update_specialized_skills(ent)
-       #score += sum(list(self.max_skills.values()))
 
         if conn:
             conn.send(score)
@@ -566,40 +326,50 @@ class EvolverNMMO(LambdaMuEvolver):
         return score
 
     def run(self, game, map_arr):
-        self.obs= game.reset(#map_arr=map_arr, 
+        self.obs= game.reset(#map_arr=map_arr,
                 idx=0)
         self.game= game
         from forge.trinity.twistedserver import Application
         Application(game, self.tick).run()
 
     def evolve_generation(self):
-#       self.trainer.reset(self.trainer.workers.remote_workers())
-        stats = self.trainer.train()
-       #print('evo map trainer stats', stats)
+        train_stats = self.trainer.train()
+        n_epis = train_stats['episodes_this_iter']
+
+        if n_epis == 0:
+            print('Missing simulation stats. I assume this is the 0th generation? Re-running the training step.')
+
+            return self.evolve_generation()
+
+        global_stats = ray.get_actor("global_stats")
+        stats = ray.get(global_stats.get.remote())
+        global_stats.reset.remote()
 
         for g_hash, (game, score, age) in self.population.items():
-            try:
-                with open(os.path.join('./evo_experiment', '{}'.format(self.config['config'].EVO_DIR),
-                    'map_{}_skills.csv'.format(g_hash)), newline='') as csv_skills:
-                    skillsreader = csv.reader(csv_skills, delimiter=',', quotechar='|')
-                    agent_skills = []
-                    i = 0
-                    for row in skillsreader:
-                      # if i == 0:
-                      #     if not self.skill_idxs:
-                      #         for j, s_name in enumerate(row):
-                      #             self.skill_idxs[s_name] = j
-                      #     for j, s_name in enumerate(row):
-                      #         skill_idxs[j] = s_name
-                        if i > 0:
-                            agent_skills.append(row)
-                        i += 1
-                    score = self.update_entropy_skills(agent_skills)
-                assert csv_skills.closed
-                self.population[g_hash] = (game, score, age)
-            except FileNotFoundError:
-                print('Missing a csv file with agent simulation stats. I assume this is the 0th generation? Re-running the training step.')
-                self.evolve_generation()
+            score = calc_diversity_l2(stats[g_hash])
+            self.population[g_hash] = (game, score, age)
+           #try:
+           #    with open(os.path.join('./evo_experiment', '{}'.format(self.config['config'].EVO_DIR),
+           #        'map_{}_skills.csv'.format(g_hash)), newline='') as csv_skills:
+           #        skillsreader = csv.reader(csv_skills, delimiter=',', quotechar='|')
+           #        agent_skills = []
+           #        i = 0
+
+           #        for row in skillsreader:
+           #          # if i == 0:
+           #          #     if not self.skill_idxs:
+           #          #         for j, s_name in enumerate(row):
+           #          #             self.skill_idxs[s_name] = j
+           #          #     for j, s_name in enumerate(row):
+           #          #         skill_idxs[j] = s_name
+           #            if i > 0:
+           #                agent_skills.append(row)
+           #            i += 1
+           #        score = update_entropy_skills(agent_skills)
+           #    assert csv_skills.closed
+           #    self.population[g_hash] = (game, score, age)
+           #except FileNotFoundError:
+           #    pass
 
         for g_hash, (game, score_t, age) in self.population.items():
             # get score from latest simulation
@@ -609,6 +379,7 @@ class EvolverNMMO(LambdaMuEvolver):
                 while len(self.score_hists[g_hash]) >= 100:
                     self.score_hists[g_hash].pop(0)
             # hack
+
             if score_t is None:
                 score_t = 0
             else:
@@ -624,10 +395,11 @@ class EvolverNMMO(LambdaMuEvolver):
     def tick(self, game=None, g_hash=None):
         # check if we are doing inference
         FROZEN = True
+
         if FROZEN:
             if game is None:
                 game = self.game
-                self.update_entropy_skills(game.desciples.values())
+                update_entropy_skills(game.desciples.values())
 
            #if self.n_tick > 15:
            #    self.obs = game.reset()
@@ -661,22 +433,22 @@ class EvolverNMMO(LambdaMuEvolver):
            #self.trainer.train(self.genes[g_hash])
             stats = self.trainer.train()
             print('evo map trainer stats', stats)
-
-           #self.trainer.train()
-
         self.n_tick += 1
-
         reward = 0
+
         return reward
 
     def save(self):
         save_file= open(self.evolver_path, 'wb')
+
         for g_hash in self.population:
             game, score, age= self.population[g_hash]
             # FIXME: omething weird is happening after reload. Not the maps though.
             # so for now, trash score history and re-calculate after reload
             self.population[g_hash]= None, score, age
            #self.population[g_hash]= None, score, age
+        global TRAINER
+        TRAINER = self.trainer
         self.trainer= None
         self.game= None
         # map_arr = self.genes[g_hash]
@@ -684,10 +456,28 @@ class EvolverNMMO(LambdaMuEvolver):
         pickle.dump(self, save_file)
         self.restore()
 
+    def init_pop(self):
+        self.config['config'].MODEL = None
+        super().init_pop()
+        self.config['config'].MODEL = 'current'
 
-    # main()
-# evolve(experiment_name, load, args)
+def update_entropy_skills(skill_dict):
+    agent_skills = [[] for _ in range(len(skill_dict))]
+    i = 0
 
+    for a_skills in skill_dict:
+        j = 0
+
+        for a_skill in a_skills:
+            try:
+                val = float(a_skill)
+                agent_skills[i].append(val)
+                j += 1
+            except:
+                pass
+        i += 1
+
+    return calc_diversity_l2(agent_skills)
 
 def calc_diversity(agent_skills, alpha, skill_idxs=None):
     BASE_VAL = 0.0001
@@ -759,5 +549,3 @@ def calc_diversity(agent_skills, alpha, skill_idxs=None):
         np.array(skill_ents), skill_score, np.array(agent_ents), agent_score, score))
 
     return score
-
-

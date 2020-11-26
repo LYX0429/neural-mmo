@@ -10,6 +10,7 @@ import gym
 
 import time
 
+import ray
 from ray import rllib
 
 from ray.rllib.utils.spaces.repeated import Repeated
@@ -29,6 +30,9 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       self.n_step = 0
       self.map_fitness = 0
       self.skill_headers = []
+      self.n_epi = 0
+      # names of per-agent stats used by evolution
+      self.headers = None
       super().__init__(self.config)
 
    def init_skill_log(self):
@@ -44,6 +48,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       This is for training on limited-resource systems where
       simply using one env map per core is not feasible'''
       self.env_reset = time.time()
+      self.n_epi += 1
 
       self.map_fitness = 0
       self.lifetimes = []
@@ -101,19 +106,23 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       for entID, ent in self.dead.items():
          lifetime = ent.history.timeAlive.val
          self.lifetimes.append(lifetime)
-         if not self.config.EVALUATE and len(self.lifetimes) >= 1000:
-            lifetime = np.mean(self.lifetimes)
-            print('Lifetime: {}'.format(lifetime))
-            dones['__all__'] = True
+         if not self.config.EVO_MAP:
+             if not self.config.EVALUATE and len(self.lifetimes) >= 1000:
+                lifetime = np.mean(self.lifetimes)
+                print('Lifetime: {}'.format(lifetime))
+                dones['__all__'] = True
 
-      self.n_step += 1
       self.env_step += time.time() - env_post
       skills = {}
       # are we doing evolution? 
-      if hasattr(self.config, 'MATURE_AGE'):
-         # Do not save skills data if rendering.
-         if not self.config.RENDER:
-            if self.n_step > 0 and self.n_step % (self.config.MAX_STEPS - 1) == 0:
+      if self.config.EVO_MAP:
+         # reset the env manually, to load from the new updated population of maps
+         if self.n_step == self.config.MAX_STEPS:
+            global_stats = ray.get_actor('global_stats')
+           #print('preparing env {} for reset'.format(self.worldIdx))
+            dones['__all__'] = True
+            # Do not save skills data if rendering.
+            if not self.config.RENDER:
                 a_skills = None
                 for d, v in self.realm.players.items():
                     a_skills = v.skills.packet()
@@ -124,16 +133,26 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                         a_skill_vals[k] = v['exp']
                     skills[d] = a_skill_vals
                 if a_skills:
-                    if not self.skill_headers:
-                        self.skill_headers = list(a_skills.keys())
-                        self.init_skill_log()
-                    with open(self.skill_log_path, 'w') as outfile:
-                       writer = csv.DictWriter(outfile, fieldnames=self.skill_headers)
-                       writer.writeheader()
-                       for skills in skills.values():
-                           writer.writerow(skills)
-         if self.n_step % (self.config.MAX_STEPS * self.config.MATURE_AGE) == 0:
-            dones['__all__'] = True
+                    if not self.headers:
+                        headers = list(a_skills.keys())
+                        self.headers = ray.get(global_stats.get_headers.remote(headers))
+                    stats = np.zeros((len(skills), len(self.headers)))
+                    # over agents
+                    for i, a_skills in enumerate(skills.values()):
+                        # over skills
+                        for j, k in enumerate(self.headers):
+                            if k != 'level':
+                                stats[i, j] = a_skills[k]
+                    global_stats.add.remote(stats, self.worldIdx)
+                   #if not self.skill_headers:
+                   #    self.skill_headers = list(a_skills.keys())
+                   #    self.init_skill_log()
+                   #with open(self.skill_log_path, 'w') as outfile:
+                   #   writer = csv.DictWriter(outfile, fieldnames=self.skill_headers)
+                   #   writer.writeheader()
+                   #   for skills in skills.values():
+                   #       writer.writerow(skills)
+      self.n_step += 1
       return obs, rewards, dones, infos
 
 #Neural MMO observation space

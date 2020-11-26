@@ -59,16 +59,34 @@ def createPolicies(config):
 
 @ray.remote
 class Counter:
+   ''' When using rllib trainer to train and simulate on evolved maps, this global object will be
+   responsible for providing unique indexes to parallel environments.'''
    def __init__(self, config):
       self.count = 0
-   def inc(self, n):
-      self.count += n
+   def get(self):
+      self.count += 1
       if self.count == config.N_EVO_MAPS:
           self.count = 0
-   def get(self):
       return self.count
 
-
+@ray.remote
+class Stats:
+    def __init__(self):
+        self.stats = {}
+        self.headers = None
+    def add(self, stats, mapIdx):
+        if mapIdx not in self.stats:
+            self.stats[mapIdx] = [stats]
+        else:
+            self.stats[mapIdx].append(stats)
+    def get(self):
+        return self.stats
+    def reset(self):
+        self.stats = {}
+    def get_headers(self, headers):
+        if not self.headers:
+            self.headers = headers
+        return self.headers
 
 if __name__ == '__main__':
     # Setup ray
@@ -86,6 +104,7 @@ if __name__ == '__main__':
 
     # on the driver
     counter = Counter.options(name="global_counter").remote(config)
+    stats = Stats.options(name="global_stats").remote()
     print(ray.get(counter.get.remote()))  # get the latest count
 
     # RLlib registry
@@ -115,7 +134,7 @@ if __name__ == '__main__':
                               createEnv,
                               None,  # init the trainer in evolution script
                               config,
-                              n_proc=   12,
+                              n_proc=   6,
                               n_pop=    config.N_EVO_MAPS,
                               )
 #   print(torch.__version__)
