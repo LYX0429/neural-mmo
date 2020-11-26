@@ -68,6 +68,8 @@ class Counter:
       if self.count == config.N_EVO_MAPS:
           self.count = 0
       return self.count
+   def set(self, i):
+      self.count = i - 1
 
 @ray.remote
 class Stats:
