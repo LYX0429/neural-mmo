@@ -12,17 +12,23 @@ class Resources:
       self.health = Static.Entity.Health(ent.dataframe, ent.entID)
       self.water  = Static.Entity.Water( ent.dataframe, ent.entID)
       self.food   = Static.Entity.Food(  ent.dataframe, ent.entID)
+      self.ore    = Static.Entity.Ore(  ent.dataframe, ent.entID)
+      self.wood   = Static.Entity.Wood(  ent.dataframe, ent.entID)
 
    def update(self, realm, entity, actions):
       self.health.max = entity.skills.constitution.level
       self.water.max  = entity.skills.fishing.level
       self.food.max   = entity.skills.hunting.level
+      self.ore.max    = entity.skills.mining.level
+      self.wood.max   = entity.skills.woodcutting.level
 
    def packet(self):
       data = {}
       data['health'] = self.health.packet()
       data['food']   = self.food.packet()
       data['water']  = self.water.packet()
+      data['ore']    = self.ore.packet()
+      data['wood']   = self.wood.packet()
       return data
 
 class Status:

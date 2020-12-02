@@ -17,9 +17,13 @@ class PC(Entity):
       self.maxHealth = 10
       self.maxFood = 16
       self.maxWater = 16
+      self.maxOre = 10
+      self.maxWood = 10
       self.health = self.maxHealth
       self.food = self.maxFood
       self.water = self.maxWater
+      self.ore = 0
+      self.wood = 0
       self.decProb = 0.2
       self.index = 1
       self.lastAction = None

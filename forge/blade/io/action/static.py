@@ -61,6 +61,12 @@ class Move(Node):
       if len(env.map.tiles[rNew, cNew].ents) != 0:
          return
       if env.map.tiles[rNew, cNew].state.index in enums.IMPASSIBLE:
+         trg = rNew, cNew
+         dest_tex = env.map.tiles[trg].state.tex
+         if dest_tex == 'tree':
+             return Woodcut.call(env, entity, trg)
+         if dest_tex == 'orerock':
+             return Mine.call(env, entity, trg)
          return
       if not utils.inBounds(rNew, cNew, env.shape):
          return
@@ -246,16 +252,19 @@ class Skill(Node):
    nodeType = NodeType.SELECTION
    @staticproperty
    def edges():
-      return [Harvest, Process]
+     #return [Harvest, Process]
+      return [Harvest]
 
    def args(stim, entity, config):
       return Skill.edges
 
 class Harvest(Node):
+   priority = 2
    nodeType = NodeType.SELECTION
    @staticproperty
    def edges():
-      return [Fish, Mine]
+     #return [Fish, Mine]
+      return [Mine, Woodcut]
 
    def args(stim, entity, config):
       return Harvest.edges
@@ -264,7 +273,51 @@ class Fish(Node):
    nodeType = NodeType.ACTION
 
 class Mine(Node):
-   nodeType = NodeType.ACTION
+   nodeType = NodeType.SELECTION
+
+#  def update(self, realm, entity):
+   def call(env, entity, direction):
+      if not env.map.harvest(*trg):
+         return
+      ore = entity.resources.ore
+      mining = entity.skills.mining
+
+      restore = np.floor(mining.level * 1)
+      ore.increment(restore)
+
+      scale = entity.config.XP_SCALE
+      entity.skills.mining.exp += scale * restore
+
+   @staticproperty
+   def edges():
+      return [Direction]
+
+  #@staticproperty
+  #def leaf():
+  #   return True
+
+class Woodcut(Node):
+   nodeType = NodeType.SELECTION
+
+   def call(env, entity, trg):
+      if not env.map.harvest(*trg):
+         return
+      wood = entity.resources.wood
+      woodcutting = entity.skills.woodcutting
+
+      restore = np.floor(woodcutting.level * 1)
+      wood.increment(restore)
+
+      scale = entity.config.XP_SCALE
+      entity.skills.woodcutting.exp += scale * restore
+
+   @staticproperty
+   def edges():
+      return [Direction]
+
+   @staticproperty
+   def leaf():
+      return True
 
 class Process(Node):
    nodeType = NodeType.SELECTION

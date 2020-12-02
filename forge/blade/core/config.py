@@ -89,7 +89,9 @@ class Config(Template):
    TERRAIN_FOREST_LOW   = 0.25
    TERRAIN_GRASS        = 0.715
    TERRAIN_FOREST_HIGH  = 0.75
-
+   # Exclude new tile-types by default
+   TERRAIN_TREE         = -1
+   TERRAIN_OREROCK      = -1
 
    #Map load parameters
    ROOT   = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')

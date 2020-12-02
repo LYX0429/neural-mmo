@@ -62,6 +62,7 @@ class Gathering(SkillGroup):
       self.fishing      = Fishing(self)
       self.hunting      = Hunting(self)
       self.mining       = Mining(self)
+      self.woodcutting  = Woodcutting(self)
 
 class Processing(SkillGroup):
    def __init__(self, realm):
@@ -178,7 +179,7 @@ class Fishing(HarvestingSkill):
 
    def update(self, realm, entity):
       water = entity.resources.water
-      water.decrement(1)
+     #water.decrement(1)
 
       if Material.WATER.value not in ai.utils.adjacentMats(
             realm.map.tiles, entity.pos):
@@ -198,6 +199,7 @@ class Hunting(HarvestingSkill):
 
    def update(self, realm, entity):
       food = entity.resources.food
+      wood = entity.resources.wood
       food.decrement(1)
 
       r, c = entity.pos
@@ -205,14 +207,57 @@ class Hunting(HarvestingSkill):
             not realm.map.harvest(r, c)):
          return
 
-      restore = np.floor(self.level * self.config.RESOURCE_RESTORE)
+      # pseudo-cooking
+      mult = min(wood.val + 1, 1.5)
+      wood.decrement(1)
+      restore = np.floor(self.level * self.config.RESOURCE_RESTORE * mult)
       food.increment(restore)
 
       scale     = self.config.XP_SCALE
       self.exp += scale * restore
 
 
-class Mining(HarvestingSkill): pass
+class Mining(HarvestingSkill):
+   def __init__(self, skillGroup):
+      super().__init__(skillGroup)
+      self.setExpByLevel(self.config.RESOURCE)
+
+   def update(self, realm, entity):
+      pass
+#     ore = entity.resources.ore
+
+#     r, c = entity.pos
+#     if Material.OREROCK.value not in ai.utils.adjacentMats(
+#           realm.map.tiles, entity.pos):
+#        return
+
+#     restore = np.floor(self.level * 1)
+#     ore.increment(restore)
+
+#     scale = self.config.XP_SCALE
+#     self.exp += scale * restore
+
+
+class Woodcutting(HarvestingSkill):
+   def __init__(self, skillGroup):
+      super().__init__(skillGroup)
+      self.setExpByLevel(self.config.RESOURCE)
+
+   def update(self, realm, entity):
+      return
+#     wood = entity.resources.wood
+
+#     r, c = entity.pos
+#     if Material.TREE.value not in ai.utils.adjacentMats(
+#           realm.map.tiles, entity.pos):
+#        return
+
+#     restore = np.floor(self.level * 1)
+#     wood.increment(restore)
+
+#     scale = self.config.XP_SCALE
+#     self.exp += scale * restore
+
 
 class ProcessingSkill(NonCombatSkill):
    def process(self, inv, item):

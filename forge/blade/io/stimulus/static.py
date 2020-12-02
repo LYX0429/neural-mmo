@@ -81,6 +81,16 @@ class Stimulus(Config):
             self.max = config.RESOURCE
             self.scale = 0.1
 
+      class Ore(node.Continuous):
+         def init(self, config):
+            self.val     = -7
+            self.max     = config.RESOURCE
+
+      class Wood(node.Continuous):
+         def init(self, config):
+            self.val     = -7
+            self.max     = config.RESOURCE
+
       class Health(node.Continuous):
          def init(self, config):
             self.val = config.HEALTH 

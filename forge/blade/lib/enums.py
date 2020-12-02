@@ -43,7 +43,7 @@ class Stone(Tile):
    tex = 'stone'
 class Orerock(Tile):
    index = 6
-   degenIndex = Stone.index
+   degen = Stone
    tex = 'iron_ore'
    capacity = 1
    respawnprob = 0.05
@@ -52,6 +52,15 @@ class Orerock(Tile):
       self.harvestable = True
       #self.dropTable = systems.DropTable()
       #self.dropTable.add(ore.Copper, 1)
+class Tree(Tile):
+   index = 7
+   degen = Forest
+   tex = 'tree'
+   capacity = 1
+   respawnProb = 0.05
+   def __init__(self):
+      super().__init__()
+      self.harvestable = True
 
 class Material(Enum):
    LAVA     = Lava
@@ -61,8 +70,9 @@ class Material(Enum):
    FOREST   = Forest
    STONE    = Stone
    OREROCK  = Orerock
+   TREE     = Tree
 
-IMPASSIBLE = (1, 5, 6)
+IMPASSIBLE = (1, 5, 6, 7)
 HABITABLE  = (2, 3, 4)
 
 class Defaults:

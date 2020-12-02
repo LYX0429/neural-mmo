@@ -41,6 +41,11 @@ class Policy(RecurrentNetwork, nn.Module):
       #Flatten structured logits for RLlib
       for atnKey, atn in sorted(self.space.items()):
          for argKey, arg in sorted(atn.spaces.items()):
+            # for harvest, ignore type; only direction matters
+           #if atnKey.__name__ == 'Harvest':
+           #   for h_argKey, h_arg in sorted(arg.spaces.items()):
+           #      logits.append(logitDict[h_atnKey][h_argKey])
+           #else:
             logits.append(logitDict[atnKey][argKey])
 
       return torch.cat(logits, dim=1), state

@@ -82,7 +82,9 @@ class Input(nn.Module):
 
       inp['Entity']['Discrete'] *= 0
       tileWeight = torch.Tensor([0.0, 0.0, 1.00, 1.00])
-      entWeight  = torch.Tensor([0.0, 0.0, 0.00, 0.00, 0.0, 0.00, 0.1, 0.1, 0.1, 0.0, 0.0, 0.00])
+      # This should also be making wood/ore continuous
+      entWeight  = torch.Tensor([0.0, 0.0, 0.00, 0.00, 0.0, 0.00, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.00])
+      scratch = inp['Entity']['Continuous']
 
       try:
          inp['Tile']['Continuous']   *= tileWeight

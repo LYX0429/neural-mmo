@@ -92,4 +92,20 @@ class SmallMMO(SmallMap, MMO):
 class LargeMMO(LargeMap, MMO):
    pass
 
-
+class ResourcesTest(Config):
+   NMOB                 = 0
+   MODEL                = None
+   TERRAIN_SIZE         = 80
+   TERRAIN_DIR          = Config.TERRAIN_DIR_SMALL
+   ROOT                 = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
+#  TERRAIN_RENDER       = True
+   TERRAIN_LAVA         = 0.0
+   TERRAIN_WATER        = 0.25
+#  TERRAIN_WATER        = -1
+   TERRAIN_GRASS        = 0.6
+   TERRAIN_FOREST_HIGH  = 0.635
+#  TERRAIN_GRASS        = -1
+#  TERRAIN_FOREST_HIGH  = 0.4
+   TERRAIN_TREE         = 0.67
+   TERRAIN_OREROCK      = 0.75
+#  TERRAIN_OREROCK      = 1
