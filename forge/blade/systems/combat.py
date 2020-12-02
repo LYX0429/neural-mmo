@@ -32,15 +32,15 @@ def attack(entity, targ, skill):
 
 #Compute maximum damage roll
 def damage(skill, level, resources, config):
+   # pseudo-smithing
+   mult = min(resources.ore.val + 1, 1.5)
+   resources.ore.decrement(1)
    if skill == 'Melee':
-      # pseudo-smithing
-      mult = min(resources.ore.val + 1, 1.5)
-      resources.ore.decrement(1)
-      return np.floor(5 + level * config.MELEE_MULT * mult)
+      return np.floor((5 + level * config.MELEE_MULT) * mult)
    if skill == 'Range':
-      return np.floor(3 + level * config.RANGE_MULT)
+      return np.floor((3 + level * config.RANGE_MULT) * mult)
    if skill == 'Mage':
-      return np.floor(1 + level * config.MAGE_MULT)
+      return np.floor((1 + level * config.MAGE_MULT) * mult)
 
 #Compute maximum attack or defense roll (same formula)
 #Max attack 198 - min def 1 = 197. Max 198 - max 198 = 0

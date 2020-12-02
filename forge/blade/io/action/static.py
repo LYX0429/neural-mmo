@@ -65,7 +65,7 @@ class Move(Node):
          dest_tex = env.map.tiles[trg].state.tex
          if dest_tex == 'tree':
              return Woodcut.call(env, entity, trg)
-         if dest_tex == 'orerock':
+         if dest_tex == 'iron_ore':
              return Mine.call(env, entity, trg)
          return
       if not utils.inBounds(rNew, cNew, env.shape):
@@ -276,7 +276,7 @@ class Mine(Node):
    nodeType = NodeType.SELECTION
 
 #  def update(self, realm, entity):
-   def call(env, entity, direction):
+   def call(env, entity, trg):
       if not env.map.harvest(*trg):
          return
       ore = entity.resources.ore
@@ -286,7 +286,9 @@ class Mine(Node):
       ore.increment(restore)
 
       scale = entity.config.XP_SCALE
-      entity.skills.mining.exp += scale * restore
+      # we don't use RESOURCE_RESTORE to affect inventory, but factor it into experience for the
+      # sake of diversity calculations
+      entity.skills.mining.exp += scale * restore * 10 
 
    @staticproperty
    def edges():
@@ -309,7 +311,7 @@ class Woodcut(Node):
       wood.increment(restore)
 
       scale = entity.config.XP_SCALE
-      entity.skills.woodcutting.exp += scale * restore
+      entity.skills.woodcutting.exp += scale * restore * 10
 
    @staticproperty
    def edges():

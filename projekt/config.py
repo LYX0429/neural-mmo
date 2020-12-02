@@ -98,7 +98,7 @@ class LargeMMO(LargeMap, MMO):
 
 class ResourcesTest(Config):
    NMOB                 = 0
-   MODEL                = 'current'
+   MODEL                = None
    TERRAIN_SIZE         = 80
    TERRAIN_DIR          = Config.TERRAIN_DIR_SMALL
    ROOT                 = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
@@ -120,9 +120,9 @@ class EvoNMMO(ResourcesTest):
    MODEL = 'current'
    NENT = 16  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = '12_01_2020'
+   EVO_DIR = '12_02_2020'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
-   N_EVO_MAPS = 12
+   N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 5
    TERRAIN_RENDER = True

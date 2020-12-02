@@ -179,7 +179,7 @@ class Fishing(HarvestingSkill):
 
    def update(self, realm, entity):
       water = entity.resources.water
-     #water.decrement(1)
+      water.decrement(1)
 
       if Material.WATER.value not in ai.utils.adjacentMats(
             realm.map.tiles, entity.pos):

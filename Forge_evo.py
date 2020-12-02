@@ -1,5 +1,4 @@
 import os
-from projekt.visualize import visualize
 import pickle
 import sys
 # My favorite debugging macro
@@ -16,6 +15,7 @@ from evolution.evo_map import EvolverNMMO, calc_differential_entropy
 from forge.ethyr.torch import utils
 from pcg import TILE_TYPES
 from projekt import env, rlutils
+from projekt.visualize import visualize
 
 '''Main file for the neural-mmo/projekt demo
 
@@ -27,23 +27,19 @@ own models immediately or hack on the environment'''
 
 # Instantiate a new environment
 
-
 def createEnv(config):
 #   map_arr = config['map_arr']
 
-    return projekt.RLLibEnv(#map_arr, 
+    return projekt.RLLibEnv(#map_arr,
             config)
 
-
 # Map agentID to policyID -- requires config global
-
 
 def mapPolicy(agentID):
     return 'policy_{}'.format(agentID % config.NPOLICIES)
 
 
 # Generate RLlib policies
-
 
 def createPolicies(config):
     obs = env.observationSpace(config)
@@ -65,8 +61,10 @@ class Counter:
       self.count = 0
    def get(self):
       self.count += 1
+
       if self.count == config.N_EVO_MAPS:
           self.count = 0
+
       return self.count
    def set(self, i):
       self.count = i - 1
@@ -83,7 +81,9 @@ class Stats:
          print(self.headers)
          print(stats)
          print(calc_differential_entropy(stats))
+
          return
+
       if mapIdx not in self.stats:
          self.stats[mapIdx] = [stats]
       else:
@@ -95,8 +95,10 @@ class Stats:
    def get_headers(self, headers=None):
       if not headers:
          return self.headers
+
       if not self.headers:
          self.headers = headers
+
       return self.headers
    def add_mults(self, g_hash, mults):
       self.mults[g_hash] = mults
@@ -132,6 +134,7 @@ if __name__ == '__main__':
    #save_path = 'evo_experiment/skill_ent_0'
 
     save_path = os.path.join('evo_experiment', '{}'.format(config.EVO_DIR))
+
     if not os.path.isdir(save_path):
         os.mkdir(save_path)
 
@@ -164,7 +167,7 @@ if __name__ == '__main__':
 #   print(torch.cuda.get_device_name(0))
 #   print(torch.cuda.is_available())
 #   print(torch.cuda.current_device())
-    
+
     if config.RENDER:
         evolver.infer()
     else:

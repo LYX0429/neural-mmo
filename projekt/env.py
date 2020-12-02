@@ -107,25 +107,23 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
          lifetime = ent.history.timeAlive.val
          self.lifetimes.append(lifetime)
          if not self.config.EVO_MAP:
-             if not self.config.EVALUATE and len(self.lifetimes) >= 1000:
-                lifetime = np.mean(self.lifetimes)
-                print('Lifetime: {}'.format(lifetime))
-                dones['__all__'] = True
+            if not self.config.EVALUATE and len(self.lifetimes) >= 1000:
+               lifetime = np.mean(self.lifetimes)
+               print('Lifetime: {}'.format(lifetime))
+               dones['__all__'] = True
 
       self.env_step += time.time() - env_post
       skills = {}
       # are we doing evolution? 
       if self.config.EVO_MAP:
-         # reset the env manually, to load from the new updated population of maps
          if self.n_step == self.config.MAX_STEPS or self.config.RENDER:
             global_stats = ray.get_actor('global_stats')
-           #print('preparing env {} for reset'.format(self.worldIdx))
+            # reset the env manually, to load from the new updated population of maps
             dones['__all__'] = True
-            # Do not save skills data if rendering.
-           #if not self.config.RENDER:
             a_skills = None
-            for d, v in self.realm.players.items():
-               a_skills = v.skills.packet()
+            for d, player in self.realm.players.items():
+               player_packet = player.packet()
+               a_skills = player_packet['skills']
                a_skill_vals = {}
                for k, v in a_skills.items():
                   if not isinstance(v, dict):
@@ -136,27 +134,22 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                   if k in ['fishing', 'hunting', 'constitution']:
                      # FIXME: hack -- just easier on the eyes, mostly. Don't change config.RESOURCE !
                      a_skill_vals[k] -= 1154
+               a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 100
+               # timeAlive will only add expressivity if we fit more than one gaussian.
+               # a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
                skills[d] = a_skill_vals
             if a_skills:
-                if not self.headers:
-                    headers = list(a_skill_vals.keys())
-                    self.headers = ray.get(global_stats.get_headers.remote(headers))
-                stats = np.zeros((len(skills), len(self.headers)))
-                # over agents
-                for i, a_skills in enumerate(skills.values()):
-                    # over skills
-                    for j, k in enumerate(self.headers):
-                        if k not in ['level', 'cooking', 'smithing']:
-                            stats[i, j] = a_skills[k]
-                global_stats.add.remote(stats, self.worldIdx)
-                   #if not self.skill_headers:
-                   #    self.skill_headers = list(a_skills.keys())
-                   #    self.init_skill_log()
-                   #with open(self.skill_log_path, 'w') as outfile:
-                   #   writer = csv.DictWriter(outfile, fieldnames=self.skill_headers)
-                   #   writer.writeheader()
-                   #   for skills in skills.values():
-                   #       writer.writerow(skills)
+               if not self.headers:
+                  headers = list(a_skill_vals.keys())
+                  self.headers = ray.get(global_stats.get_headers.remote(headers))
+               stats = np.zeros((len(skills), len(self.headers)))
+               # over agents
+               for i, a_skills in enumerate(skills.values()):
+                  # over skills
+                  for j, k in enumerate(self.headers):
+                     if k not in ['level', 'cooking', 'smithing']:
+                        stats[i, j] = a_skills[k]
+               global_stats.add.remote(stats, self.worldIdx)
       self.n_step += 1
       return obs, rewards, dones, infos
 
@@ -168,7 +161,6 @@ def observationSpace(config):
       #for attr in sorted(entity.values()):
       #   attrDict[attr] = attr(config, None).space
       nRows = entity.N(config)
-
       nContinuous = 0
       nDiscrete   = 0
       for _, attr in entity:

@@ -211,10 +211,11 @@ class Env(Timed):
       '''
       err = 'Neural MMO is persistent and may only be reset once upon initialization'
       if idx is None:
-         counter = ray.get_actor("global_counter")
-         idx = ray.get(counter.get.remote())
-        #idx = np.random.randint(self.config.NMAPS)
-        #idx = np.random.randint(self.config.N_EVO_MAPS)
+         if self.config.EVO_MAP:
+            counter = ray.get_actor("global_counter")
+            idx = ray.get(counter.get.remote())
+         else:
+            idx = np.random.randint(self.config.NMAPS)
       if self.config.EVO_MAP:
          global_stats = ray.get_actor("global_stats")
          atk_mults = ray.get(global_stats.get_mults.remote(idx))

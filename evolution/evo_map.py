@@ -239,23 +239,23 @@ class EvolverNMMO(LambdaMuEvolver):
          self.trainer = trainer
 
    def infer(self):
-       ''' Do inference, just on the top individual for now.'''
-       global_counter = ray.get_actor("global_counter")
+      ''' Do inference, just on the top individual for now.'''
+      global_counter = ray.get_actor("global_counter")
+      self.send_genes(self.global_stats)
+      best_g, best_score = None, -999
 
-       best_g, best_score = None, -999
+      for g_hash, (_, score, age) in self.population.items():
+          if score and score > best_score and age > self.mature_age:
+              print('new best', score)
+              best_g, best_score = g_hash, score
 
-       for g_hash, (_, score, age) in self.population.items():
-           if score and score > best_score and age > self.mature_age:
-               print('new best', score)
-               best_g, best_score = g_hash, score
-
-       if not best_g:
-           raise Exception('No population found for inference.')
-       print("Loading map {} for inference.".format(best_g))
-       global_counter.set.remote(best_g)
-       self.config['config'].EVALUATE = True
-       evaluator = Evaluator(self.config['config'], self.trainer)
-       evaluator.render()
+      if not best_g:
+          raise Exception('No population found for inference.')
+      print("Loading map {} for inference.".format(best_g))
+      global_counter.set.remote(best_g)
+      self.config['config'].EVALUATE = True
+      evaluator = Evaluator(self.config['config'], self.trainer)
+      evaluator.render()
 
    def genRandMap(self):
       if self.n_epoch > 0:
@@ -264,8 +264,8 @@ class EvolverNMMO(LambdaMuEvolver):
                                   (self.map_width, self.map_height))
       self.add_border(map_arr)
       # generate melee, range, and mage attack multipliers for automatic game-balancing
-      atks = ['Melee', 'Range', 'Mage']
-      mults = [(atks[i], np.random.random()) for i in range(3)]
+      atks = ['MELEE_MULT', 'RANGE_MULT', 'MAGE_MULT']
+      mults = [(atks[i], 0.2 + np.random.random() * 0.8) for i in range(3)]
       atk_mults = dict(mults)
 
       return map_arr, atk_mults
@@ -273,7 +273,7 @@ class EvolverNMMO(LambdaMuEvolver):
    def add_border(self, map_arr):
        b = self.config['config'].TERRAIN_BORDER
        # agents should not spawn and die immediately, as this may crash the env
-       a = 2
+       a = 1
        map_arr[b:b+a, :]= enums.Material.GRASS.value.index
        map_arr[:, b:b+a]= enums.Material.GRASS.value.index
        map_arr[:, -b-a:-b]= enums.Material.GRASS.value.index
@@ -298,7 +298,7 @@ class EvolverNMMO(LambdaMuEvolver):
          map_arr[x, y]= t
       map_arr = self.add_border(map_arr)
       # kind of arbitrary, no?
-      atk_mults = dict([(atk, max(min(mult + np.random.random() / 3, 1), 0)) for atk, mult in atk_mults.items()])
+      atk_mults = dict([(atk, max(min(mult + (np.random.random() * 2 - 1) / 3, 1), 0.2)) for atk, mult in atk_mults.items()])
 
       return map_arr, atk_mults
 
@@ -362,12 +362,18 @@ class EvolverNMMO(LambdaMuEvolver):
        from forge.trinity.twistedserver import Application
        Application(game, self.tick).run()
 
-   def evolve_generation(self):
-      global_stats = self.global_stats
+   def send_genes(self, global_stats):
+      ''' Send (some) gene information to a global object to be retrieved by parallel environments.
+      '''
       for g_hash, (_, atk_mults) in self.genes.items():
          global_stats.add_mults.remote(g_hash, atk_mults)
+
+   def evolve_generation(self):
+      global_stats = self.global_stats
+      self.send_genes(global_stats)
       train_stats = self.trainer.train()
       stats = ray.get(global_stats.get.remote())
+      headers = ray.get(global_stats.get_headers.remote())
       n_epis = train_stats['episodes_this_iter']
 
       if n_epis == 0:
@@ -380,6 +386,9 @@ class EvolverNMMO(LambdaMuEvolver):
       for g_hash, (game, score, age) in self.population.items():
          score = calc_differential_entropy(stats[g_hash])
          self.population[g_hash] = (game, score, age)
+         print(headers)
+         print(stats[g_hash][0])
+         print('diversity score: ', score)
 
       for g_hash, (game, score_t, age) in self.population.items():
          # get score from latest simulation
