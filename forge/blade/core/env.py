@@ -14,6 +14,7 @@ from forge.blade.systems import combat
 from forge.blade.lib.enums import Palette
 from forge.blade.lib import log
 from forge.trinity.ascend import runtime, Timed
+import ray
 
 def valToRGB(x):
     '''x in range [0, 1]'''
@@ -210,7 +211,10 @@ class Env(Timed):
       '''
       err = 'Neural MMO is persistent and may only be reset once upon initialization'
       if idx is None:
-         idx = np.random.randint(self.config.NMAPS)
+         counter = ray.get_actor("global_counter")
+         idx = ray.get(counter.get.remote())
+        #idx = np.random.randint(self.config.NMAPS)
+        #idx = np.random.randint(self.config.N_EVO_MAPS)
 
       self.worldIdx = idx
       self.dead     = {}
@@ -314,8 +318,8 @@ class Env(Timed):
       for entID, ent in dead.items():
          #Why do we have to provide an ob for the last timestep?
          #Currently just copying one over
-         rewards[ent.entID] = self.reward(ent)
          dones[ent.entID]   = True
+         rewards[ent.entID] = self.reward(ent)
          obs[ent.entID]     = ob
 
       return obs, rewards, dones

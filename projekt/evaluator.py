@@ -75,7 +75,7 @@ class Evaluator:
       '''
       #Remove dead agents
       for agentID in self.done:
-         if self.done[agentID]:
+         if self.done[agentID] and agentID != '__all__':
             del self.obs[agentID]
            
       #Compute batch of actions
@@ -96,5 +96,6 @@ class Evaluator:
 
       #Step the environment
       self.obs, rewards, self.done, self.infos = self.env.step(actions)
-      self.log.update([self.infos])
+      #FIXME: this breaks evolution inference
+     #self.log.update([self.infos])
 

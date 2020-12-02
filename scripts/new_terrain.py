@@ -153,7 +153,7 @@ def fractal(terrain, path):
    frac = (256*terrain).astype(np.uint8)
    imsave(path, terrain)
 
-nMaps, sz = 1, 1024
+nMaps, sz = 1, 64
 #nMaps, sz = 12, 512
 seeds = np.linspace(0, 2**32, nMaps)
 scale = int(sz / 5)
@@ -173,5 +173,6 @@ for i, seed in enumerate(seeds):
    #fractal(terrain, path+'fractal.png')
    #render(tiles, path+'map.png')
    index(tiles, path)
+   T()
 
 

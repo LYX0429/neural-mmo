@@ -3,6 +3,7 @@ from forge.blade import core
 import os
 
 class Config(core.Config):
+   EVO_MAP = False
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
@@ -16,9 +17,9 @@ class Config(core.Config):
    HIDDEN = 64
 
    # Environment parameters
-   NENT = 256  # Maximum population size
+   NENT = 64  # Maximum population size
    NPOP = 1    # Number of populations
-   NMOB = 32   # Number of NPCS
+   NMOB = 0   # Number of NPCS
 
    NMAPS = 256 # Number maps to generate
 
@@ -56,11 +57,11 @@ class Config(core.Config):
 
 #Map Size Presets
 class SmallMap(Config):
-   TERRAIN_SIZE       = 80 
+   TERRAIN_SIZE       = 64 
    TERRAIN_OCTAVES    = 1
    TERRAIN_FOREST_LOW = 0.30
 
-   MODEL              = 'small-map'
+#  MODEL              = 'small-map'
    TERRAIN_DIR        = Config.TERRAIN_DIR_SMALL
    ROOT               = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
 
@@ -109,3 +110,17 @@ class ResourcesTest(Config):
    TERRAIN_TREE         = 0.67
    TERRAIN_OREROCK      = 0.75
 #  TERRAIN_OREROCK      = 1
+
+class EvoNMMO(ResourcesTest):
+   EVO_MAP = True
+   RENDER = False
+   MODEL = 'current'
+   NENT = 8  # Maximum population size
+   TERRAIN_SIZE = 64
+   EVO_DIR = 'unfroze_w64_5'
+   ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
+   N_EVO_MAPS = 12
+   MAX_STEPS = 100
+   MATURE_AGE = 5
+   TERRAIN_RENDER = True
+
