@@ -4,6 +4,9 @@ import os
 
 class Config(core.Config):
    EVO_MAP = False
+   MELEE_MULT = 0.5
+   RANGE_MULT = 0.5
+   MAGE_MULT = 0.5
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
@@ -95,7 +98,7 @@ class LargeMMO(LargeMap, MMO):
 
 class ResourcesTest(Config):
    NMOB                 = 0
-   MODEL                = None
+   MODEL                = 'current'
    TERRAIN_SIZE         = 80
    TERRAIN_DIR          = Config.TERRAIN_DIR_SMALL
    ROOT                 = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')

@@ -46,37 +46,28 @@ class Output(nn.Module):
       rets = defaultdict(dict)
       for atn in static.Action.edges:
          for arg in atn.edges:
-           ## For harvesting, skip past harvesting type; only direction matters.'''
-           #if atn.__name__ == 'Harvest':
-           #   for h_arg in arg.edges:
-           #      rets = self.unroll_edges(atn, h_arg, rets, obs, lookup)
-           #else:
-            rets = self.unroll_edges(atn, arg, rets, obs, lookup)
-      return rets
+            lens  = None
+            if arg.argType == static.Fixed:
+               batch = obs.shape[0]
+               idxs  = [e.idx for e in arg.edges]
+               #cands = lookup[static.Fixed.__name__][idxs]
+               cands = self.arg.weight[idxs]
+               cands = cands.repeat(batch, 1, 1)
+               #Fixed arg
+            else:
+               #Temp hack, rename
+               cands = lookup['Entity']
+               lens  = lookup['N']
 
-   def unroll_edges(self, root_atn, atn, rets, obs, lookup):
-      arg = atn
-      lens  = None
-      if arg.argType == static.Fixed:
-         batch = obs.shape[0]
-         idxs  = [e.idx for e in arg.edges]
-         #cands = lookup[static.Fixed.__name__][idxs]
-         cands = self.arg.weight[idxs]
-         cands = cands.repeat(batch, 1, 1)
-         #Fixed arg
-      else:
-         #Temp hack, rename
-         cands = lookup['Entity']
-         lens  = lookup['N']
+            #lens = [cands.shape[1] for e in range(cands.shape[0])]
+            logits = self.net(obs, cands, lens)
+            #if logits.shape[1] > 5 and logits[0][1] != logits[0][2]:
+            #   T()
 
-      #lens = [cands.shape[1] for e in range(cands.shape[0])]
-      logits = self.net(obs, cands, lens)
-      #if logits.shape[1] > 5 and logits[0][1] != logits[0][2]:
-      #   T()
+            #String names for RLlib for now
+            #rets[atn.__name__][arg.__name__] = logits
+            rets[atn][arg] = logits
 
-      #String names for RLlib for now
-      #rets[atn.__name__][arg.__name__] = logits
-      rets[root_atn][arg] = logits
       return rets
       
 class Action(nn.Module):

@@ -1,3 +1,4 @@
+# This is only here for backward compatability w/ old evolution runs. Do not edit.
 import csv
 import os
 import pickle
@@ -132,6 +133,7 @@ class EvolverNMMO(LambdaMuEvolver):
         map_arr = self.genRandMap()
         self.skill_idxs = {}
         self.idx_skills = {}
+        self.global_stats = ray.get_actor("global_stats")
 
     def saveMaps(self, maps, mutated=None):
        #for i, map_arr in maps.items():
@@ -219,17 +221,19 @@ class EvolverNMMO(LambdaMuEvolver):
 
     def infer(self):
         ''' Do inference, just on the top individual for now.'''
+        global_counter = ray.get_actor("global_counter")
 
-        best_score = None, -999
-
-        g_hash = None
+        best_g, best_score = None, -999
 
         for g_hash, (_, score, age) in self.population.items():
-            if score and score > best_score[1] and age > self.mature_age:
-                best_score = g_hash, score
+            if score and score > best_score and age > self.mature_age:
+                print('new best', score)
+                best_g, best_score = g_hash, score
 
-        if not g_hash:
+        if not best_g:
             raise Exception('No population found for inference.')
+        print("Loading map {} for inference.".format(best_g))
+        global_counter.set.remote(best_g)
         evaluator = Evaluator(self.config['config'], self.trainer)
         evaluator.render()
 
@@ -341,7 +345,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
             return self.evolve_generation()
 
-        global_stats = ray.get_actor("global_stats")
+        global_stats = self.global_stats
         stats = ray.get(global_stats.get.remote())
         global_stats.reset.remote()
 

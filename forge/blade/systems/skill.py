@@ -220,10 +220,10 @@ class Hunting(HarvestingSkill):
 class Mining(HarvestingSkill):
    def __init__(self, skillGroup):
       super().__init__(skillGroup)
-      self.setExpByLevel(self.config.RESOURCE)
+      self.setExpByLevel(1)
 
    def update(self, realm, entity):
-      pass
+      return
 #     ore = entity.resources.ore
 
 #     r, c = entity.pos
@@ -241,7 +241,7 @@ class Mining(HarvestingSkill):
 class Woodcutting(HarvestingSkill):
    def __init__(self, skillGroup):
       super().__init__(skillGroup)
-      self.setExpByLevel(self.config.RESOURCE)
+      self.setExpByLevel(1)
 
    def update(self, realm, entity):
       return

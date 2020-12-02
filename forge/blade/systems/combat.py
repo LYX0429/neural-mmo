@@ -24,23 +24,23 @@ def attack(entity, targ, skill):
    #1 dmg on a miss, max hit on success
    dmg = 1
    if np.random.rand() < accuracy(attackLevel, defenseLevel):
-      dmg = damage(skill, attackLevel, entity.resources)
+      dmg = damage(skill, attackLevel, entity.resources, entity.config)
       
    entity.applyDamage(dmg, skill.lower())
    targ.receiveDamage(entity, dmg)
    return dmg
 
 #Compute maximum damage roll
-def damage(skill, level, resources):
+def damage(skill, level, resources, config):
    if skill == 'Melee':
       # pseudo-smithing
       mult = min(resources.ore.val + 1, 1.5)
       resources.ore.decrement(1)
-      return np.floor(5 + level * 45 / 99 * mult)
+      return np.floor(5 + level * config.MELEE_MULT * mult)
    if skill == 'Range':
-      return np.floor(3 + level * 32 / 99)
+      return np.floor(3 + level * config.RANGE_MULT)
    if skill == 'Mage':
-      return np.floor(1 + level * 24 / 99)
+      return np.floor(1 + level * config.MAGE_MULT)
 
 #Compute maximum attack or defense roll (same formula)
 #Max attack 198 - min def 1 = 197. Max 198 - max 198 = 0
