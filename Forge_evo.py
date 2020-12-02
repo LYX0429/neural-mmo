@@ -12,7 +12,7 @@ from fire import Fire
 from ray import rllib
 
 import projekt
-from evo_map import EvolverNMMO
+from evolution.evo_map import EvolverNMMO, calc_diversity_l2
 from forge.ethyr.torch import utils
 from pcg import TILE_TYPES
 from projekt import env, rlutils
@@ -73,10 +73,16 @@ class Counter:
 
 @ray.remote
 class Stats:
-    def __init__(self):
+    def __init__(self, config):
         self.stats = {}
         self.headers = None
+        self.config = config
     def add(self, stats, mapIdx):
+        if config.RENDER:
+            print(self.headers)
+            print(stats)
+            print(calc_diversity_l2(stats[0]))
+            return
         if mapIdx not in self.stats:
             self.stats[mapIdx] = [stats]
         else:
@@ -106,7 +112,7 @@ if __name__ == '__main__':
 
     # on the driver
     counter = Counter.options(name="global_counter").remote(config)
-    stats = Stats.options(name="global_stats").remote()
+    stats = Stats.options(name="global_stats").remote(config)
     print(ray.get(counter.get.remote()))  # get the latest count
 
     # RLlib registry
@@ -127,7 +133,11 @@ if __name__ == '__main__':
         with open(evolver_path, 'rb') as save_file:
             evolver = pickle.load(save_file)
             print('loading evolver from save file')
+        evolver.config['config'].MAX_STEPS = 200
         evolver.restore(trash_data=True)
+
+        evolver.n_epochs = 15000
+
     except FileNotFoundError as e:
         print(e)
         print('no save file to load')

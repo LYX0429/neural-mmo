@@ -99,9 +99,9 @@ class EvoNMMO(SmallMap):
    MODEL = 'current'
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = 'unfroze_w64_5'
+   EVO_DIR = 'unfroze_w64_pop48_0'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
-   N_EVO_MAPS = 12
+   N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 5
    TERRAIN_RENDER = True

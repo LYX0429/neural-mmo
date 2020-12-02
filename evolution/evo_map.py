@@ -1,4 +1,3 @@
-# This is only here for backward compatability w/ old evolution runs. Do not edit.
 import csv
 import os
 import pickle
@@ -234,6 +233,7 @@ class EvolverNMMO(LambdaMuEvolver):
             raise Exception('No population found for inference.')
         print("Loading map {} for inference.".format(best_g))
         global_counter.set.remote(best_g)
+        self.config['config'].EVALUATE = True
         evaluator = Evaluator(self.config['config'], self.trainer)
         evaluator.render()
 

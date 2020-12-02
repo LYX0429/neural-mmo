@@ -23,6 +23,18 @@ from forge.blade.systems import combat
 
 from forge.trinity.dataframe import DataType
 
+def calc_diversity_l2(agent_skills):
+    assert len(agent_skills) == 1
+    a = agent_skills[0]
+    b = a.reshape(a.shape[0], 1, a.shape[1])
+    score = np.sum(np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b)))/2
+    print('agent skills:\n{}'.format(a))
+    print('score:\n{}\n'.format(
+        score))
+
+    return score
+
+
 #Moved log to forge/blade/core/env
 class RLLibEnv(core.Env, rllib.MultiAgentEnv):
    def __init__(self, config):
@@ -117,33 +129,33 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       # are we doing evolution? 
       if self.config.EVO_MAP:
          # reset the env manually, to load from the new updated population of maps
-         if self.n_step == self.config.MAX_STEPS:
+         if self.n_step == self.config.MAX_STEPS or self.config.RENDER:
             global_stats = ray.get_actor('global_stats')
            #print('preparing env {} for reset'.format(self.worldIdx))
             dones['__all__'] = True
             # Do not save skills data if rendering.
-            if not self.config.RENDER:
-                a_skills = None
-                for d, v in self.realm.players.items():
-                    a_skills = v.skills.packet()
-                    a_skill_vals = {}
-                    for k, v in a_skills.items():
-                        if not isinstance(v, dict):
-                            continue
-                        a_skill_vals[k] = v['exp']
-                    skills[d] = a_skill_vals
-                if a_skills:
-                    if not self.headers:
-                        headers = list(a_skills.keys())
-                        self.headers = ray.get(global_stats.get_headers.remote(headers))
-                    stats = np.zeros((len(skills), len(self.headers)))
-                    # over agents
-                    for i, a_skills in enumerate(skills.values()):
-                        # over skills
-                        for j, k in enumerate(self.headers):
-                            if k != 'level':
-                                stats[i, j] = a_skills[k]
-                    global_stats.add.remote(stats, self.worldIdx)
+           #if not self.config.RENDER:
+            a_skills = None
+            for d, v in self.realm.players.items():
+                a_skills = v.skills.packet()
+                a_skill_vals = {}
+                for k, v in a_skills.items():
+                    if not isinstance(v, dict):
+                        continue
+                    a_skill_vals[k] = v['exp']
+                skills[d] = a_skill_vals
+            if a_skills:
+                if not self.headers:
+                    headers = list(a_skills.keys())
+                    self.headers = ray.get(global_stats.get_headers.remote(headers))
+                stats = np.zeros((len(skills), len(self.headers)))
+                # over agents
+                for i, a_skills in enumerate(skills.values()):
+                    # over skills
+                    for j, k in enumerate(self.headers):
+                        if k != 'level':
+                            stats[i, j] = a_skills[k]
+                global_stats.add.remote(stats, self.worldIdx)
                    #if not self.skill_headers:
                    #    self.skill_headers = list(a_skills.keys())
                    #    self.init_skill_log()
