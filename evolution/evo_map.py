@@ -199,7 +199,7 @@ class EvolverNMMO(LambdaMuEvolver):
             config={
             'num_workers': 6, # normally: 4
            #'num_gpus_per_worker': 0.083,  # hack fix
-            'num_gpus': 1,
+            'num_gpus': 3,
             'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env

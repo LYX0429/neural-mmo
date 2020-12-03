@@ -6,6 +6,7 @@ import numpy as np
 
 if __name__ == '__main__':
 
+    my_dpi = 96
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment-name',
                         default='scratch',
@@ -22,6 +23,7 @@ if __name__ == '__main__':
 
     exp_name = args.experiment_name
     log_path = 'evo_experiment/{}/log.csv'.format(exp_name)
+    im_path = 'evo_experiment/{}/fitness.png'.format(exp_name)
 
     with open(log_path, mode='r') as log_file:
         results = {}
@@ -67,7 +69,7 @@ if __name__ == '__main__':
             'saddlebrown', 'greenyellow', 'limegreen', 'turquoise', 'midnightblue', 'darkkhaki', 'darkseagreen', 'teal',
             'cyan', 'lightsalmon', 'springgreen', 'mediumblue', 'dodgerblue', 'mediumpurple', 'darkslategray', 'goldenrod',
             'indigo', 'steelblue', 'coral', 'mistyrose', 'indianred']
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(1800/my_dpi, 900/my_dpi), dpi=my_dpi)
     if True:
         for i in range(len(scores)):
             ind_y = []
@@ -87,3 +89,4 @@ if __name__ == '__main__':
     plt.ylabel('fitness')
     plt.xlabel('generation')
     plt.show()
+    plt.savefig(im_path, dpi=my_dpi)
