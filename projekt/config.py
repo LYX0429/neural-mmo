@@ -124,6 +124,6 @@ class EvoNMMO(ResourcesTest):
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
-   MATURE_AGE = 5
+   MATURE_AGE = 3
    TERRAIN_RENDER = True
 

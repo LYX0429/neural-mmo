@@ -143,10 +143,10 @@ if __name__ == '__main__':
         with open(evolver_path, 'rb') as save_file:
             evolver = pickle.load(save_file)
             print('loading evolver from save file')
-        evolver.config['config'].MAX_STEPS = 200
+	# change params on reload here
+#       evolver.config['config'].MAX_STEPS = 200
+#       evolver.n_epochs = 15000
         evolver.restore(trash_data=True)
-
-        evolver.n_epochs = 15000
 
     except FileNotFoundError as e:
         print(e)
