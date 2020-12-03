@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 import pickle
 import random
@@ -7,7 +8,6 @@ import time
 from pdb import set_trace as T
 from shutil import copyfile
 from typing import Dict
-import json
 
 import numpy as np
 import projekt
@@ -263,10 +263,49 @@ class EvolverNMMO(LambdaMuEvolver):
       map_arr= np.random.randint(0, self.n_tiles,
                                   (self.map_width, self.map_height))
       self.add_border(map_arr)
+      atk_mults = self.gen_mults()
+
+      return map_arr, atk_mults
+
+   def gen_mults(self):
       # generate melee, range, and mage attack multipliers for automatic game-balancing
-      atks = ['MELEE_MULT', 'RANGE_MULT', 'MAGE_MULT']
-      mults = [(atks[i], 0.2 + np.random.random() * 0.8) for i in range(3)]
-      atk_mults = dict(mults)
+     #atks = ['MELEE_MULT', 'RANGE_MULT', 'MAGE_MULT']
+     #mults = [(atks[i], 0.2 + np.random.random() * 0.8) for i in range(3)]
+     #atk_mults = dict(mults)
+      # range is way too dominant, always
+      atk_mults = {
+            # b/w 0.2 and 1.0
+            'MELEE_MULT': np.random.random() * 0.8 + 0.2,
+            'MAGE_MULT': np.random.random() * 0.8 + 0.2,
+            # b/w 0.0 and 0.8
+            'RANGE_MULT': np.random.random() * 0.8,
+            }
+
+      return atk_mults
+
+   def mutate(self, gene):
+      map_arr, atk_mults = gene
+      map_arr= map_arr.copy()
+
+      for i in range(random.randint(0, self.n_mutate_actions)):
+         x= random.randint(0, self.map_width - 1)
+         y= random.randint(0, self.map_height - 1)
+         # FIXME: hack: ignore lava
+         t= np.random.randint(0, self.n_tiles)
+         map_arr[x, y]= t
+      map_arr = self.add_border(map_arr)
+      # kind of arbitrary, no?
+     #atk_mults = dict([(atk, max(min(mult + (np.random.random() * 2 - 1) / 3, 1), 0.2)) for atk, mult in atk_mults.items()])
+      rand = np.random.random()
+
+      if rand < 0.2:
+         atk_mults = self.gen_mults()
+      else:
+         atk_mults = {
+            'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 1), 0.2),
+            'MAGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 1), 0.2),
+            'RANGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 0.8), 0),
+               }
 
       return map_arr, atk_mults
 
@@ -286,21 +325,6 @@ class EvolverNMMO(LambdaMuEvolver):
 
        return map_arr
 
-   def mutate(self, gene):
-      map_arr, atk_mults = gene
-      map_arr= map_arr.copy()
-
-      for i in range(random.randint(0, self.n_mutate_actions)):
-         x= random.randint(0, self.map_width - 1)
-         y= random.randint(0, self.map_height - 1)
-         # FIXME: hack: ignore lava
-         t= np.random.randint(0, self.n_tiles)
-         map_arr[x, y]= t
-      map_arr = self.add_border(map_arr)
-      # kind of arbitrary, no?
-      atk_mults = dict([(atk, max(min(mult + (np.random.random() * 2 - 1) / 3, 1), 0.2)) for atk, mult in atk_mults.items()])
-
-      return map_arr, atk_mults
 
    def update_max_skills(self, ent):
        skills = ent.skills.packet()
@@ -365,6 +389,7 @@ class EvolverNMMO(LambdaMuEvolver):
    def send_genes(self, global_stats):
       ''' Send (some) gene information to a global object to be retrieved by parallel environments.
       '''
+
       for g_hash, (_, atk_mults) in self.genes.items():
          global_stats.add_mults.remote(g_hash, atk_mults)
 
