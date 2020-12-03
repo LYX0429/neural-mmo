@@ -74,7 +74,7 @@ class Stats:
    def __init__(self, config):
       self.stats = {}
       self.mults = {}
-      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'wildernerss']
+      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'wilderness']
       self.config = config
    def add(self, stats, mapIdx):
       if config.RENDER:

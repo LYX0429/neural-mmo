@@ -147,7 +147,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                # over agents
                for i, a_skills in enumerate(skills.values()):
                   # over skills
-                  for j, k in enumerate(a_skill_vals.keys()):
+                  for j, k in enumerate(self.headers):
                      if k not in ['level', 'cooking', 'smithing']:
                         stats[i, j] = a_skills[k]
                global_stats.add.remote(stats, self.worldIdx)
