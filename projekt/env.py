@@ -114,6 +114,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
 
       self.env_step += time.time() - env_post
       skills = {}
+      self.n_step += 1
       # are we doing evolution? 
       if self.config.EVO_MAP:
          if self.n_step == self.config.MAX_STEPS or self.config.RENDER:
@@ -150,7 +151,6 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                      if k not in ['level', 'cooking', 'smithing']:
                         stats[i, j] = a_skills[k]
                global_stats.add.remote(stats, self.worldIdx)
-      self.n_step += 1
       return obs, rewards, dones, infos
 
 #Neural MMO observation space

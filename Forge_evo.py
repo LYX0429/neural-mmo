@@ -74,7 +74,7 @@ class Stats:
    def __init__(self, config):
       self.stats = {}
       self.mults = {}
-      self.headers = None
+      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting']
       self.config = config
    def add(self, stats, mapIdx):
       if config.RENDER:
@@ -106,69 +106,70 @@ class Stats:
       return self.mults[g_hash]
 
 if __name__ == '__main__':
-    # Setup ray
-    torch.set_num_threads(1)
-    ray.init()
+   # Setup ray
+#  torch.set_num_threads(1)
+   torch.set_num_threads(torch.get_num_threads())
+   ray.init()
 
 
-    # Built config with CLI overrides
-    config = projekt.config.EvoNMMO()
+   # Built config with CLI overrides
+   config = projekt.config.EvoNMMO()
 
-    if len(sys.argv) > 1:
-        sys.argv.insert(1, 'override')
-        Fire(config)
+   if len(sys.argv) > 1:
+       sys.argv.insert(1, 'override')
+       Fire(config)
 
 
-    # on the driver
-    counter = Counter.options(name="global_counter").remote(config)
-    stats = Stats.options(name="global_stats").remote(config)
-    print(ray.get(counter.get.remote()))  # get the latest count
+   # on the driver
+   counter = Counter.options(name="global_counter").remote(config)
+   stats = Stats.options(name="global_stats").remote(config)
+   print(ray.get(counter.get.remote()))  # get the latest count
 
-    # RLlib registry
-    rllib.models.ModelCatalog.register_custom_model('test_model',
-                                                    projekt.Policy)
-    ray.tune.registry.register_env("custom", createEnv)
+   # RLlib registry
+   rllib.models.ModelCatalog.register_custom_model('test_model',
+                                                   projekt.Policy)
+   ray.tune.registry.register_env("custom", createEnv)
 
-   #save_path = 'evo_experiment/skill_entropy_life'
-   #save_path = 'evo_experiment/scratch'
-   #save_path = 'evo_experiment/skill_ent_0'
+   save_path = 'evo_experiment/skill_entropy_life'
+   save_path = 'evo_experiment/scratch'
+   save_path = 'evo_experiment/skill_ent_0'
 
-    save_path = os.path.join('evo_experiment', '{}'.format(config.EVO_DIR))
+   save_path = os.path.join('evo_experiment', '{}'.format(config.EVO_DIR))
 
-    if not os.path.isdir(save_path):
-        os.mkdir(save_path)
+   if not os.path.isdir(save_path):
+       os.mkdir(save_path)
 
-    try:
-        evolver_path = os.path.join(save_path, 'evolver')
-        with open(evolver_path, 'rb') as save_file:
-            evolver = pickle.load(save_file)
-            print('loading evolver from save file')
-	# change params on reload here
-#       evolver.config['config'].MAX_STEPS = 200
-#       evolver.n_epochs = 15000
-        evolver.restore(trash_data=True)
+   try:
+      evolver_path = os.path.join(save_path, 'evolver')
+      with open(evolver_path, 'rb') as save_file:
+         evolver = pickle.load(save_file)
+         print('loading evolver from save file')
+      # change params on reload here
+#     evolver.config['config'].MAX_STEPS = 200
+#     evolver.n_epochs = 15000
+      evolver.restore(trash_data=True)
 
-    except FileNotFoundError as e:
-        print(e)
-        print('no save file to load')
+   except FileNotFoundError as e:
+      print(e)
+      print('no save file to load')
 
-        evolver = EvolverNMMO(save_path,
-                              createEnv,
-                              None,  # init the trainer in evolution script
-                              config,
-                              n_proc=   6,
-                              n_pop=    config.N_EVO_MAPS,
-                              )
-#   print(torch.__version__)
+      evolver = EvolverNMMO(save_path,
+                            createEnv,
+                            None,  # init the trainer in evolution script
+                            config,
+                            n_proc=   6,
+                            n_pop=    config.N_EVO_MAPS,
+                            )
+#  print(torch.__version__)
 
-#   print(torch.cuda.current_device())
-#   print(torch.cuda.device(0))
-#   print(torch.cuda.device_count())
-#   print(torch.cuda.get_device_name(0))
-#   print(torch.cuda.is_available())
-#   print(torch.cuda.current_device())
+#  print(torch.cuda.current_device())
+#  print(torch.cuda.device(0))
+#  print(torch.cuda.device_count())
+#  print(torch.cuda.get_device_name(0))
+#  print(torch.cuda.is_available())
+#  print(torch.cuda.current_device())
 
-    if config.RENDER:
-        evolver.infer()
-    else:
-        evolver.evolve()
+   if config.RENDER:
+      evolver.infer()
+   else:
+      evolver.evolve()

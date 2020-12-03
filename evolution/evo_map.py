@@ -16,7 +16,7 @@ import scipy
 from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
 from forge.ethyr.torch import utils
-from pcg import TILE_TYPES
+from pcg import TILE_PROBS, TILE_TYPES
 from projekt import rlutils
 from projekt.evaluator import Evaluator
 from projekt.overlay import OverlayRegistry
@@ -52,8 +52,9 @@ def calc_diversity_l2(agent_skills):
 
 def calc_differential_entropy(agent_skills):
    # in future we will process multiple matrices from multiple simulations. Noy yet though.
-   assert len(agent_skills) == 1
-   a_skills = agent_skills[0]
+   a_skills = np.vstack(agent_skills)
+#  assert len(agent_skills) == 1
+  #a_skills = agent_skills[0]
    mean = np.mean(a_skills, axis=0)
    cov = np.cov(a_skills,rowvar=0)
    gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
@@ -129,6 +130,8 @@ def createPolicies(config):
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
       super().__init__(save_path, n_proc=n_proc, n_pop=n_pop)
+      self.lam = 1/4
+      self.mu = 1/4
       self.make_env = make_env
       self.trainer = trainer
       self.map_width = config.TERRAIN_SIZE#+ 2 * config.TERRAIN_BORDER
@@ -200,7 +203,8 @@ class EvolverNMMO(LambdaMuEvolver):
             'num_workers': 6, # normally: 4
            #'num_gpus_per_worker': 0.083,  # hack fix
             'num_gpus': 1,
-            'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
+           #'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
+            'num_envs_per_worker': 1,
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
             'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
@@ -216,8 +220,6 @@ class EvolverNMMO(LambdaMuEvolver):
             'env_config': {
                 'config':
                 self.config['config'],
-               #'map_arr': self.genRandMap(),
-               #'maps': self.genes,
             },
             'multiagent': {
                 "policies": policies,
@@ -260,8 +262,11 @@ class EvolverNMMO(LambdaMuEvolver):
    def genRandMap(self):
       if self.n_epoch > 0:
          print('generating new random map when I probably should not be... \n\n')
-      map_arr= np.random.randint(0, self.n_tiles,
+      # FIXME: hack: ignore lava
+      map_arr= np.random.randint(1, self.n_tiles,
                                   (self.map_width, self.map_height))
+      map_arr = np.random.choice(np.arange(1, self.n_tiles), (self.map_width, self.map_height),
+            p=TILE_PROBS[1:])
       self.add_border(map_arr)
       atk_mults = self.gen_mults()
 
@@ -273,12 +278,16 @@ class EvolverNMMO(LambdaMuEvolver):
      #mults = [(atks[i], 0.2 + np.random.random() * 0.8) for i in range(3)]
      #atk_mults = dict(mults)
       # range is way too dominant, always
+      self.MELEE_MIN = 0.4
+      self.MELEE_MAX = 1.4
+      self.RANGE_MIN = 0.2
+      self.RANGE_MAX = 1
       atk_mults = {
             # b/w 0.2 and 1.0
-            'MELEE_MULT': np.random.random() * 0.8 + 0.2,
-            'MAGE_MULT': np.random.random() * 0.8 + 0.2,
+            'MELEE_MULT': np.random.random() * (self.MELEE_MAX - self.MELEE_MIN) + self.MELEE_MIN,
+            'MAGE_MULT': np.random.random() * (self.MELEE_MAX - self.MELEE_MIN) + self.MELEE_MIN,
             # b/w 0.0 and 0.8
-            'RANGE_MULT': np.random.random() * 0.8,
+            'RANGE_MULT': np.random.random() * (self.RANGE_MAX - self.RANGE_MIN) + self.RANGE_MIN,
             }
 
       return atk_mults
@@ -291,7 +300,7 @@ class EvolverNMMO(LambdaMuEvolver):
          x= random.randint(0, self.map_width - 1)
          y= random.randint(0, self.map_height - 1)
          # FIXME: hack: ignore lava
-         t= np.random.randint(0, self.n_tiles)
+         t= np.random.randint(1, self.n_tiles)
          map_arr[x, y]= t
       map_arr = self.add_border(map_arr)
       # kind of arbitrary, no?
@@ -302,9 +311,12 @@ class EvolverNMMO(LambdaMuEvolver):
          atk_mults = self.gen_mults()
       else:
          atk_mults = {
-            'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 1), 0.2),
-            'MAGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 1), 0.2),
-            'RANGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 0.8), 0),
+            'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+                                  self.MELEE_MAX), self.MELEE_MIN),
+            'MAGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+                                 self.MELEE_MAX), self.MELEE_MIN),
+            'RANGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+                                  self.RANGE_MAX), self.RANGE_MIN),
                }
 
       return map_arr, atk_mults
@@ -419,8 +431,8 @@ class EvolverNMMO(LambdaMuEvolver):
          # get score from latest simulation
          # cull score history
 
-         if len(self.score_hists[g_hash]) >= 100:
-            while len(self.score_hists[g_hash]) >= 100:
+         if len(self.score_hists[g_hash]) >= 10:
+            while len(self.score_hists[g_hash]) >= 10:
                self.score_hists[g_hash].pop(0)
           # hack
 
