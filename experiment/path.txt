@@ -1,1 +1,1 @@
-evo_experiment/12_03_2020/models/checkpoint_3/checkpoint-3
+evo_experiment/12_03_2020/models/checkpoint_10/checkpoint-10
