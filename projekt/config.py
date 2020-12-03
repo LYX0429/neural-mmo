@@ -118,7 +118,7 @@ class EvoNMMO(ResourcesTest):
    EVO_MAP = True
    RENDER = False
    MODEL = 'current'
-   NENT = 16  # Maximum population size
+   NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
    EVO_DIR = '12_03_2020'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')

@@ -280,12 +280,14 @@ class EvolverNMMO(LambdaMuEvolver):
       # range is way too dominant, always
       self.MELEE_MIN = 0.4
       self.MELEE_MAX = 1.4
+      self.MAGE_MIN = 0.6
+      self.MAGE_MAX = 1.6
       self.RANGE_MIN = 0.2
       self.RANGE_MAX = 1
       atk_mults = {
             # b/w 0.2 and 1.0
             'MELEE_MULT': np.random.random() * (self.MELEE_MAX - self.MELEE_MIN) + self.MELEE_MIN,
-            'MAGE_MULT': np.random.random() * (self.MELEE_MAX - self.MELEE_MIN) + self.MELEE_MIN,
+            'MAGE_MULT': np.random.random() * (self.MAGE_MAX - self.MAGE_MIN) + self.MAGE_MIN,
             # b/w 0.0 and 0.8
             'RANGE_MULT': np.random.random() * (self.RANGE_MAX - self.RANGE_MIN) + self.RANGE_MIN,
             }
@@ -313,9 +315,9 @@ class EvolverNMMO(LambdaMuEvolver):
          atk_mults = {
             'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
                                   self.MELEE_MAX), self.MELEE_MIN),
-            'MAGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
-                                 self.MELEE_MAX), self.MELEE_MIN),
-            'RANGE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+            'MAGE_MULT': max(min(atk_mults['MAGE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+                                 self.MAGE_MAX), self.MAGE_MIN),
+            'RANGE_MULT': max(min(atk_mults['RANGE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
                                   self.RANGE_MAX), self.RANGE_MIN),
                }
 
