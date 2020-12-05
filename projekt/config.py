@@ -22,15 +22,9 @@ class Config(core.Config):
    HIDDEN = 64
 
    # Environment parameters
-<<<<<<< HEAD
-   NENT = 64  # Maximum population size
-   NPOP = 1    # Number of populations
-   NMOB = 0   # Number of NPCS
-=======
    NPOP = 1    # Number of populations
    NENT = 256  # Maximum population size
    NMOB = 32   # Number of NPCS
->>>>>>> 0e4ce1b07736b3160621338d2a7f0b48db2c862b
 
    NMAPS = 256 # Number maps to generate
 
@@ -114,7 +108,7 @@ class EvoNMMO(ResourcesTest):
    MODEL = 'current'
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = '12_03_2020'
+   EVO_DIR = 'cppn_scratch'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 42
    MAX_STEPS = 100
