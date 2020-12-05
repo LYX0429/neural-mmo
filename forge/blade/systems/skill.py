@@ -179,7 +179,8 @@ class Fishing(HarvestingSkill):
 
    def update(self, realm, entity):
       water = entity.resources.water
-      water.decrement(1)
+      if entity.history.timeAlive > self.config.RESOURCE_GRACE_PERIOD:
+         water.decrement(1)
 
       if Material.WATER.value not in ai.utils.adjacentMats(
             realm.map.tiles, entity.pos):
@@ -199,8 +200,13 @@ class Hunting(HarvestingSkill):
 
    def update(self, realm, entity):
       food = entity.resources.food
+<<<<<<< HEAD
       wood = entity.resources.wood
       food.decrement(1)
+=======
+      if entity.history.timeAlive > self.config.RESOURCE_GRACE_PERIOD:
+         food.decrement(1)
+>>>>>>> 0e4ce1b07736b3160621338d2a7f0b48db2c862b
 
       r, c = entity.pos
       if (type(realm.map.tiles[r, c].mat) not in [Material.FOREST.value] or

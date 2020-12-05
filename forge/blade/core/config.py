@@ -57,12 +57,12 @@ class Config(Template):
       generated automatically.
    '''
 
-   #Terrain parameters
-   TERRAIN_DIR       = 'resource/maps/procedural/'
-   '''Directory in which generated maps are saved'''
+   TERRAIN_DIR_SMALL = 'resource/maps/procedural-small'
+   TERRAIN_DIR_LARGE = 'resource/maps/procedural-large'
 
-   TERRAIN_DIR_SMALL = 'resource/maps/procedural-small/'
-   TERRAIN_DIR_LARGE = 'resource/maps/procedural-large/'
+   #Terrain parameters
+   TERRAIN_DIR       = TERRAIN_DIR_LARGE
+   '''Directory in which generated maps are saved'''
 
    TERRAIN_RENDER    = False
    '''Whether map generation should also save .png previews (slow + large file size)'''
@@ -79,19 +79,25 @@ class Config(Template):
    TERRAIN_OCTAVES   = 8
    '''Number of octaves sampled from log2 spaced TERRAIN_FREQUENCY range'''
 
-   TERRAIN_INVERT    = False
-   '''Specify normal generation (lower frequency at map center) or inverted generation (lower frequency at map edges). Only applied for TERRAIN_OCTAVES > 1'''
+   TERRAIN_MODE      = 'expand'
+   '''expand or contract. Specify normal generation (lower frequency at map center) or inverted generation (lower frequency at map edges)'''
 
-   TERRAIN_ALPHA        = 0.035
-   TERRAIN_BETA         = 0.05
+   TERRAIN_LERP      = True 
+
+   TERRAIN_ALPHA        = 0.15
+   TERRAIN_BETA         = 0.025
    TERRAIN_LAVA         = 0.0
    TERRAIN_WATER        = 0.25
-   TERRAIN_FOREST_LOW   = 0.25
-   TERRAIN_GRASS        = 0.715
-   TERRAIN_FOREST_HIGH  = 0.75
    # Exclude new tile-types by default
    TERRAIN_TREE         = -1
    TERRAIN_OREROCK      = -1
+   TERRAIN_FOREST_LOW   = 0.35
+   TERRAIN_GRASS        = 0.75
+   TERRAIN_FOREST_HIGH  = 0.775
+
+   TERRAIN_WATER_RADIUS  = 3.5
+   TERRAIN_CENTER_REGION = 19 #Keep this number odd for large maps
+   TERRAIN_CENTER_WIDTH  = 3
 
    #Map load parameters
    ROOT   = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
@@ -153,7 +159,7 @@ class Config(Template):
 
 
    # Combat parameters
-   IMMUNE                  = 10
+   IMMUNE                  = 0
    '''Number of ticks an agent cannot be damaged after spawning'''
 
    WILDERNESS              = True
@@ -165,9 +171,15 @@ class Config(Template):
    WILDERNESS_MIN          = -1
    WILDERNESS_MAX          = 99
 
-   NPC_SPAWN_AGGRESSIVE    = 0.70
-   NPC_SPAWN_NEUTRAL       = 0.45
-   NPC_SPAWN_PASSIVE       = 0.20
+   #Fix this to be for small maps in systems skill
+   RESOURCE_GRACE_PERIOD   = -1 
+
+   PLAYER_SPAWN_ATTEMPTS   = 1
+   NPC_SPAWN_ATTEMPTS      = 25
+
+   NPC_SPAWN_AGGRESSIVE    = 0.75
+   NPC_SPAWN_NEUTRAL       = 0.40
+   NPC_SPAWN_PASSIVE       = 0.02
    
    NPC_LEVEL_MIN           = 1
    NPC_LEVEL_MAX           = 99
@@ -202,18 +214,33 @@ class Config(Template):
          position:
             The position (row, col) to spawn the given agent
       '''
-      mmax = self.TERRAIN_SIZE - self.TERRAIN_BORDER - 1
-      mmin = self.TERRAIN_BORDER
+      #Spawn at edges
+      if self.TERRAIN_MODE == 'contract':
+         mmax = self.TERRAIN_SIZE - self.TERRAIN_BORDER - 1
+         mmin = self.TERRAIN_BORDER
 
-      var  = np.random.randint(mmin, mmax)
-      fixed = np.random.choice([mmin, mmax])
-      r, c = int(var), int(fixed)
-      if np.random.rand() > 0.5:
-          r, c = c, r 
-      return (r, c)
+         var  = np.random.randint(mmin, mmax)
+         fixed = np.random.choice([mmin, mmax])
+         r, c = int(var), int(fixed)
+         if np.random.rand() > 0.5:
+             r, c = c, r 
+         return (r, c)
+      #Spawn at center
+      else:
+         spawnRadius = self.TERRAIN_CENTER_REGION
+         spawnWidth  = self.TERRAIN_CENTER_WIDTH
 
-      W     = 2 #Offset
-      R, C  = Config.R//2, Config.C//2
-      spawn = [(R+W, C+W), (R-W, C-W), (R+W, C-W), (R-W, C+W)]
-      idx   = np.random.randint(0, len(spawn))
-      return spawn[idx]
+         cent  = self.TERRAIN_SIZE // 2
+         left  = cent - self.TERRAIN_CENTER_REGION
+         right = cent + self.TERRAIN_CENTER_REGION
+
+         var  = np.random.randint(left, right)
+         if np.random.rand() > 0.5:
+            fixed = np.random.randint(left, left+spawnWidth)
+         else:
+            fixed = np.random.randint(right-spawnWidth, right)
+
+         r, c = int(var), int(fixed)
+         if np.random.rand() > 0.5:
+            r, c = c, r
+         return r, c

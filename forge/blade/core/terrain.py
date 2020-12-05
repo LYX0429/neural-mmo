@@ -55,16 +55,16 @@ class MapGenerator:
 
    def material(self, config, val, gamma=0):
       assert 0 <= gamma <= 1
-      alpha = config.TERRAIN_ALPHA * gamma
-      beta  = config.TERRAIN_ALPHA * gamma
+      alpha = (1 - gamma) * config.TERRAIN_ALPHA
+      beta  = config.TERRAIN_BETA * gamma
 
       if val == config.TERRAIN_LAVA:
          return Terrain.LAVA
       if val <= config.TERRAIN_WATER:
          return Terrain.WATER
-      if val <= config.TERRAIN_FOREST_LOW + beta:
+      if val <= config.TERRAIN_FOREST_LOW - alpha:
          return Terrain.FOREST
-      if val <= config.TERRAIN_GRASS + alpha:
+      if val <= config.TERRAIN_GRASS + beta:
          return Terrain.GRASS
       if val <= config.TERRAIN_FOREST_HIGH:
          return Terrain.FOREST
@@ -93,16 +93,22 @@ class MapGenerator:
 
          Save.np(tiles, path)
          if self.config.TERRAIN_RENDER:
-            Save.fractal(terrain, path+'fractal.png')
-            Save.render(tiles, self.textures, path+'map.png')
+            Save.fractal(terrain, path+'/fractal.png')
+            Save.render(tiles, self.textures, path+'/map.png')
 
    def grid(self, config, seed):
       sz          = config.TERRAIN_SIZE
       frequency   = config.TERRAIN_FREQUENCY
       octaves     = config.TERRAIN_OCTAVES
+      mode        = config.TERRAIN_MODE
+      lerp        = config.TERRAIN_LERP
       border      = config.TERRAIN_BORDER
-      invert      = config.TERRAIN_INVERT
-      
+      waterRadius = config.TERRAIN_WATER_RADIUS
+      spawnRegion = config.TERRAIN_CENTER_REGION
+      spawnWidth  = config.TERRAIN_CENTER_WIDTH
+
+      assert mode in {'expand', 'contract', 'flat'}
+
       val   = np.zeros((sz, sz, octaves))
       s     = np.arange(sz)
       X, Y  = np.meshgrid(s, s)
@@ -113,45 +119,53 @@ class MapGenerator:
          val[:, :, idx] = 0.5 + 0.5*vec_noise.snoise2(seed*sz + freq*X, idx*sz + freq*Y)
 
       #Compute L1 and L2 distances
-      x     = np.concatenate([np.arange(sz//2, 0, -1), np.arange(1, sz//2+1)])
-      X, Y  = np.meshgrid(x, x)
-      data  = np.stack((X, Y), -1)
-      l1    = np.max(abs(data), -1)
-      l2    = np.sqrt(np.sum(data**2, -1))
+      x      = np.concatenate([np.arange(sz//2, 0, -1), np.arange(1, sz//2+1)])
+      X, Y   = np.meshgrid(x, x)
+      data   = np.stack((X, Y), -1)
+      l1     = np.max(abs(data), -1)
+      l2     = np.sqrt(np.sum(data**2, -1))
+      thresh = l1
 
       #Linear octave blend mask
       if octaves > 1:
          dist  = np.linspace(0.5/octaves, 1-0.5/octaves, octaves)[None, None, :]
          norm  = 2 * l1[:, :, None] / sz 
-         if invert:
-            v = 1 - abs(norm - dist)
-         else:
+         if mode == 'contract':
             v = 1 - abs(1 - norm - dist)
+         elif mode == 'expand':
+            v = 1 - abs(norm - dist)
 
          v   = (2*octaves-1) * (v - 1) + 1
          v   = np.clip(v, 0, 1)
       
          v  /= np.sum(v, -1)[:, :, None]
          val = np.sum(v*val, -1)
+         l1  = 1 - 2*l1/sz
 
-      #Paint borders and center
-      val[l1 > sz//2 - border]  = config.TERRAIN_LAVA 
-      val[l1 == sz//2 - border] = config.TERRAIN_GRASS
-      val[l2 < 6]               = config.TERRAIN_GRASS
-      val[l2 < 3.5]             = config.TERRAIN_WATER
+      #Compute distance from the edges inward
+      if mode == 'contract':
+         l1 = 1 - l1
 
-      #Clip l1
-      if octaves > 1:
-         l1 = 2 * l1 / sz
-         l1[l1 <= 0.25] = 0 #Only spawn food near water at edges
-         l1[l1 >= 0.75] = 1 #Only spawn food near rocks at middle
-      else:
-         l1 = 0.5 + l1*0
+      if not lerp:
+         l1 = 0.35 + 0*l1
 
       #Threshold to materials
       matl = np.zeros((sz, sz), dtype=object)
       for y in range(sz):
          for x in range(sz):
             matl[y, x] = self.material(config, val[y, x], l1[y, x])
- 
+
+      #Lava border and center crop
+      matl[thresh > sz//2 - border] = Terrain.LAVA
+
+      #Grass border or center spawn region
+      if mode == 'expand':
+         matl[thresh <= spawnRegion]              = Terrain.GRASS
+         matl[thresh <= spawnRegion-spawnWidth]   = Terrain.STONE
+         matl[thresh <= spawnRegion-spawnWidth-1] = Terrain.WATER
+      elif mode == 'contract':
+         matl[thresh == sz//2 - border] = Terrain.GRASS
+         matl[l2 < waterRadius + 1]     = Terrain.GRASS
+         matl[l2 < waterRadius]         = Terrain.WATER
+
       return val, matl

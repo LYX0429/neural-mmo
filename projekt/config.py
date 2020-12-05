@@ -10,19 +10,27 @@ class Config(core.Config):
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
+
    MODEL        = 'current'
    SCRIPTED_BFS = False
    SCRIPTED_DP  = False
    EVALUATE     = False
+   LOCAL_MODE   = False
 
    # Model dimensions
    EMBED  = 64
    HIDDEN = 64
 
    # Environment parameters
+<<<<<<< HEAD
    NENT = 64  # Maximum population size
    NPOP = 1    # Number of populations
    NMOB = 0   # Number of NPCS
+=======
+   NPOP = 1    # Number of populations
+   NENT = 256  # Maximum population size
+   NMOB = 32   # Number of NPCS
+>>>>>>> 0e4ce1b07736b3160621338d2a7f0b48db2c862b
 
    NMAPS = 256 # Number maps to generate
 
@@ -58,43 +66,29 @@ class Config(core.Config):
    PLOT_TOOLS = False
    PLOT_INTERACTIVE = False
 
-#Map Size Presets
+#Small map preset
 class SmallMap(Config):
-   TERRAIN_SIZE       = 64 
-   TERRAIN_OCTAVES    = 1
-   TERRAIN_FOREST_LOW = 0.30
+   MODEL                   = 'small-map'
 
-#  MODEL              = 'small-map'
-   TERRAIN_DIR        = Config.TERRAIN_DIR_SMALL
-   ROOT               = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
+   NENT                    = 128
+   NMOB                    = 32
 
-   NPC_LEVEL_MAX      = 40
-   NPC_LEVEL_SPREAD   = 10
+   TERRAIN_MODE            = 'contract'
+   TERRAIN_LERP            = False
 
-class LargeMap(Config):
-   MODEL              = 'large-map'
-   TERRAIN_DIR        = Config.TERRAIN_DIR_LARGE
-   ROOT               = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
+   TERRAIN_SIZE            = 80 
+   TERRAIN_OCTAVES         = 1
+   TERRAIN_FOREST_LOW      = 0.375
+   TERRAIN_GRASS           = 0.7
 
-#Battle Royale Presets
-class BattleRoyale(Config):
-   pass
+   TERRAIN_DIR             = Config.TERRAIN_DIR_SMALL
+   ROOT                    = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
 
-class SmallBR(SmallMap, BattleRoyale):
-   pass
+   INVERT_WILDERNESS       = True
+   WILDERNESS              = False
 
-class LargeBR(LargeMap, BattleRoyale):
-   pass
-
-#MMO Presets
-class MMO(Config):
-   TERRAIN_INVERT    = True
-
-class SmallMMO(SmallMap, MMO):
-   pass
-
-class LargeMMO(LargeMap, MMO):
-   pass
+   NPC_LEVEL_MAX           = 30
+   NPC_LEVEL_SPREAD        = 5
 
 class ResourcesTest(Config):
    NMOB                 = 0
@@ -126,4 +120,3 @@ class EvoNMMO(ResourcesTest):
    MAX_STEPS = 100
    MATURE_AGE = 3
    TERRAIN_RENDER = True
-
