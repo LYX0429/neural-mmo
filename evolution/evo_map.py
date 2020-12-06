@@ -10,6 +10,8 @@ from shutil import copyfile
 from typing import Dict
 
 import numpy as np
+import neat
+import neat.nn
 import projekt
 import ray
 import scipy
@@ -126,7 +128,6 @@ def createPolicies(config):
 
     return policies
 
-
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
       super().__init__(save_path, n_proc=n_proc, n_pop=n_pop)
@@ -147,15 +148,167 @@ class EvolverNMMO(LambdaMuEvolver):
       self.skill_idxs = {}
       self.idx_skills = {}
       self.global_stats = ray.get_actor("global_stats")
+      self.CPPN = True
+      if self.CPPN:
+         self.global_counter = ray.get_actor("global_counter")
+         self.neat_config = neat.config.Config(neat.genome.DefaultGenome, neat.reproduction.DefaultReproduction,
+                            neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
+                            'config_cppn_nmmo')
+         self.neat_pop = neat.population.Population(self.neat_config)
+         stats = neat.statistics.StatisticsReporter()
+         self.neat_pop.add_reporter(stats)
+         self.neat_pop.add_reporter(neat.reporting.StdOutReporter(True))
+         self.neat_config.pop_size = self.config['config'].N_EVO_MAPS
+#        winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
+
+
+
+   def neat_eval_fitness(self, genomes, neat_config):
+      self.n_epoch += 1
+      maps = {}
+      global_counter = ray.get_actor("global_counter")
+      print(sorted([idx for idx, _ in genomes]))
+      global_counter.set_idxs.remote([idx for idx, _ in genomes])
+      for idx, g in genomes:
+
+         cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
+         map_arr = np.zeros((self.map_width, self.map_height))
+         for x in range(self.map_width):
+            for y in range(self.map_height):
+               x_i, y_i = x / self.map_width, y / self.map_width
+               v = cppn.activate((x_i, y_i))
+               assert len(v) == 1
+               v = v[0]
+               v = (v + 1) / 2
+               v = self.map_generator.material(self.config['config'], v)
+               map_arr[x, y] = v
+               map_arr = self.add_border(map_arr)
+               maps[idx] = map_arr
+      self.saveMaps(maps)
+      global_stats = self.global_stats
+      self.send_genes(global_stats)
+      print('training')
+      train_stats = self.trainer.train()
+      print('train_stats', train_stats)
+      stats = ray.get(global_stats.get.remote())
+      headers = ray.get(global_stats.get_headers.remote())
+      n_epis = train_stats['episodes_this_iter']
+      assert n_epis == self.n_pop
+      global_stats.reset.remote()
+
+      for idx, g in genomes:
+#        idx -= 1
+         score = calc_differential_entropy(stats[idx])
+#        self.population[g_hash] = (game, score, age)
+         print(headers)
+         print(stats[idx][0])
+         print('diversity score: ', score)
+         g.fitness = score
+
+   def evolve(self):
+
+      """
+      Runs NEAT's genetic algorithm for at most n generations.  If n
+      is None, run until solution is found or extinction occurs.
+
+      The user-provided fitness_function must take only two arguments:
+          1. The population as a list of (genome id, genome) tuples.
+          2. The current configuration object.
+
+      The return value of the fitness function is ignored, but it must assign
+      a Python float to the `fitness` member of each genome.
+
+      The fitness function is free to maintain external state, perform
+      evaluations in parallel, etc.
+
+      It is assumed that fitness_function does not modify the list of genomes,
+      the genomes themselves (apart from updating the fitness member),
+      or the configuration object.
+      """
+      self.init_pop()
+      winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
+      return
+      n = None
+      if self.neat_pop.config.no_fitness_termination and (n is None):
+          raise RuntimeError("Cannot have no generational limit with no fitness termination")
+
+      k = 0
+      while n is None or k < n:
+         k += 1
+
+         self.neat_pop.reporters.start_generation(self.neat_pop.generation)
+
+         # Evaluate all genomes using the user-provided function.
+         self.neat_eval_fitness(list(self.neat_pop.population.items()), self.neat_pop.config)
+
+         # Gather and report statistics.
+         best = None
+         for g in self.neat_eval_fitness():
+             if g.fitness is None:
+                 raise RuntimeError("Fitness not assigned to genome {}".format(g.key))
+
+             if best is None or g.fitness > best.fitness:
+                 best = g
+         self.neat_pop.reporters.post_evaluate(self.neat_pop.config, self.neat_pop.population, self.neat_pop.species, best)
+
+         # Track the best genome ever seen.
+         if self.neat_pop.best_genome is None or best.fitness > self.neat_pop.best_genome.fitness:
+             self.neat_pop.best_genome = best
+
+         if not self.neat_pop.config.no_fitness_termination:
+             # End if the fitness threshold is reached.
+             fv = self.neat_pop.fitness_criterion(g.fitness for g in self.neat_pop.population.values())
+             if fv >= self.neat_pop.config.fitness_threshold:
+                 self.neat_pop.reporters.found_solution(self.neat_pop.config, self.neat_pop.generation, best)
+                 break
+
+         # Create the next generation from the current generation.
+         self.neat_pop.population = self.neat_pop.reproduction.reproduce(self.neat_pop.config, self.neat_pop.species,
+                                                       self.neat_pop.config.pop_size, self.neat_pop.generation)
+
+         # Check for complete extinction.
+         if not self.neat_pop.species.species:
+             self.neat_pop.reporters.complete_extinction()
+
+             # If requested by the user, create a completely new population,
+             # otherwise raise an exception.
+             if self.neat_pop.config.reset_on_extinction:
+                 self.neat_pop.population = self.neat_pop.reproduction.create_new(self.neat_pop.config.genome_type,
+                                                                self.neat_pop.config.genome_config,
+                                                                self.neat_pop.config.pop_size)
+             else:
+                 raise CompleteExtinctionException()
+
+         # Divide the new population into species.
+         self.neat_pop.species.speciate(self.neat_pop.config, self.neat_pop.population, self.neat_pop.generation)
+
+         self.neat_pop.reporters.end_generation(self.neat_pop.config, self.neat_pop.population, self.neat_pop.species)
+
+         self.neat_pop.generation += 1
+
+      if self.neat_pop.config.no_fitness_termination:
+         self.neat_pop.reporters.found_solution(self.neat_pop.config, self.neat_pop.generation, self.neat_pop.best_genome)
+
+      return self.neat_pop.best_genome
 
    def saveMaps(self, maps, mutated=None):
+      if self.CPPN:
+         mutated = list(maps.keys())
+         #FIXME: hack
+         if self.n_epoch == 0:
+            return
      #for i, map_arr in maps.items():
       if mutated is None:
          mutated = list(self.population.keys())
 
       for i in mutated:
-         map_arr, atk_mults = maps[i]
-         print('Generating map ' + str(i))
+         if self.CPPN:
+            # TODO: find a way to mutate this alongside the map-generating CPPNs?
+            atk_mults = (1, 1, 1)
+            map_arr = maps[i]
+         else:
+            map_arr, atk_mults = maps[i]
+         print('Saving map ' + str(i))
          path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
          try:
             os.mkdir(path)
@@ -200,16 +353,16 @@ class EvolverNMMO(LambdaMuEvolver):
             env="custom",
             path=model_path,
             config={
-            'num_workers': 6, # normally: 4
+            'num_workers': 4, # normally: 4
            #'num_gpus_per_worker': 0.083,  # hack fix
             'num_gpus': 1,
            #'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
-            'num_envs_per_worker': 1,
+            'num_envs_per_worker': 3,
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
             'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
             'rollout_fragment_length': 100,
-            'sgd_minibatch_size': 100,  # normally: 128
+            'sgd_minibatch_size': 128,  # normally: 128
             'num_sgd_iter': 1,
             'framework': 'torch',
             'horizon': np.inf,
@@ -263,11 +416,16 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.n_epoch > 0:
          print('generating new random map when I probably should not be... \n\n')
       # FIXME: hack: ignore lava
-      map_arr= np.random.randint(1, self.n_tiles,
-                                  (self.map_width, self.map_height))
-      map_arr = np.random.choice(np.arange(1, self.n_tiles), (self.map_width, self.map_height),
-            p=TILE_PROBS[1:])
-      self.add_border(map_arr)
+#     map_arr= np.random.randint(1, self.n_tiles,
+#                                 (self.map_width, self.map_height))
+      if self.CPPN:
+         return None, None
+#        cpnn = neat.nn.FeedForwardNetwork.create(g, config)
+#        T()
+      else:
+         map_arr = np.random.choice(np.arange(1, self.n_tiles), (self.map_width, self.map_height),
+               p=TILE_PROBS[1:])
+         self.add_border(map_arr)
       atk_mults = self.gen_mults()
 
       return map_arr, atk_mults
@@ -327,10 +485,10 @@ class EvolverNMMO(LambdaMuEvolver):
        b = self.config['config'].TERRAIN_BORDER
        # agents should not spawn and die immediately, as this may crash the env
        a = 1
-       map_arr[b:b+a, :]= enums.Material.GRASS.value.index
-       map_arr[:, b:b+a]= enums.Material.GRASS.value.index
-       map_arr[:, -b-a:-b]= enums.Material.GRASS.value.index
-       map_arr[-b-a:-b, :]= enums.Material.GRASS.value.index
+       map_arr[b:b+a, :]= enums.Material.FOREST.value.index
+       map_arr[:, b:b+a]= enums.Material.FOREST.value.index
+       map_arr[:, -b-a:-b]= enums.Material.FOREST.value.index
+       map_arr[-b-a:-b, :]= enums.Material.FOREST.value.index
        # the border must be lava
        map_arr[0:b, :]= enums.Material.LAVA.value.index
        map_arr[:, 0:b]= enums.Material.LAVA.value.index

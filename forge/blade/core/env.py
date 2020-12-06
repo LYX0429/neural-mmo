@@ -208,13 +208,15 @@ class Env(Timed):
          if self.config.EVO_MAP:
             counter = ray.get_actor("global_counter")
             idx = ray.get(counter.get.remote())
+            print('got idx', idx)
          else:
             idx = np.random.randint(self.config.NMAPS)
       if self.config.EVO_MAP:
          global_stats = ray.get_actor("global_stats")
          atk_mults = ray.get(global_stats.get_mults.remote(idx))
-         for k, v in atk_mults.items():
-            setattr(self.config, k, v)
+         if atk_mults:
+            for k, v in atk_mults.items():
+               setattr(self.config, k, v)
 
       self.worldIdx = idx
       self.dead     = {}
@@ -310,13 +312,14 @@ class Env(Timed):
 
          rewards[entID] = self.reward(entID)
          dones[entID]   = False
+         self.dummi_ob = ob
 
       for entID, ent in dead.items():
          #Why do we have to provide an ob for the last timestep?
          #Currently just copying one over
          dones[ent.entID]   = True
          rewards[ent.entID] = self.reward(ent)
-         obs[ent.entID]     = ob
+         obs[ent.entID]     = self.dummi_ob
 
       return obs, rewards, dones
 

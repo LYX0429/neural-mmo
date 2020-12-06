@@ -11,7 +11,8 @@ from fire import Fire
 from ray import rllib
 
 import projekt
-from evolution.evo_map import EvolverNMMO, calc_differential_entropy
+import evolution
+from evolution import EvolverNMMO, calc_differential_entropy
 from forge.ethyr.torch import utils
 from pcg import TILE_TYPES
 from projekt import env, rlutils
@@ -53,6 +54,22 @@ def createPolicies(config):
 
     return policies
 
+#@ray.remote
+#class Counter:
+#   ''' When using rllib trainer to train and simulate on evolved maps, this global object will be
+#   responsible for providing unique indexes to parallel environments.'''
+#   def __init__(self, config):
+#      self.count = 0
+#   def get(self):
+#      self.count += 1
+#
+#      if self.count == config.N_EVO_MAPS:
+#          self.count = 0
+#
+#      return self.count
+#   def set(self, i):
+#      self.count = i - 1
+
 @ray.remote
 class Counter:
    ''' When using rllib trainer to train and simulate on evolved maps, this global object will be
@@ -60,14 +77,17 @@ class Counter:
    def __init__(self, config):
       self.count = 0
    def get(self):
+      idx = self.idxs[self.count % len(self.idxs)]
       self.count += 1
 
-      if self.count == config.N_EVO_MAPS:
-          self.count = 0
+      return idx
 
-      return self.count
-   def set(self, i):
-      self.count = i - 1
+#  def set(self, i):
+#     self.count = i - 1
+
+   def set_idxs(self, idxs):
+      self.count = 0
+      self.idxs = idxs
 
 @ray.remote
 class Stats:
@@ -77,6 +97,7 @@ class Stats:
       self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'wilderness']
       self.config = config
    def add(self, stats, mapIdx):
+      print('adding stats for {}'.format(mapIdx))
       if config.RENDER:
          print(self.headers)
          print(stats)
@@ -103,6 +124,8 @@ class Stats:
    def add_mults(self, g_hash, mults):
       self.mults[g_hash] = mults
    def get_mults(self, g_hash):
+      if g_hash not in self.mults:
+         return None
       return self.mults[g_hash]
 
 if __name__ == '__main__':
@@ -123,7 +146,6 @@ if __name__ == '__main__':
    # on the driver
    counter = Counter.options(name="global_counter").remote(config)
    stats = Stats.options(name="global_stats").remote(config)
-   print(ray.get(counter.get.remote()))  # get the latest count
 
    # RLlib registry
    rllib.models.ModelCatalog.register_custom_model('test_model',

@@ -4,9 +4,9 @@ import os
 
 class Config(core.Config):
    EVO_MAP = False
-   MELEE_MULT = 0.5
-   RANGE_MULT = 0.5
-   MAGE_MULT = 0.5
+   MELEE_MULT = 45 / 99
+   RANGE_MULT = 32 / 99
+   MAGE_MULT =  24 / 99
    # Model to load. None will train from scratch
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
@@ -93,14 +93,10 @@ class ResourcesTest(Config):
 #  TERRAIN_RENDER       = True
    TERRAIN_LAVA         = 0.0
    TERRAIN_WATER        = 0.25
-#  TERRAIN_WATER        = -1
    TERRAIN_GRASS        = 0.6
-   TERRAIN_FOREST_HIGH  = 0.635
-#  TERRAIN_GRASS        = -1
-#  TERRAIN_FOREST_HIGH  = 0.4
-   TERRAIN_TREE         = 0.67
-   TERRAIN_OREROCK      = 0.75
-#  TERRAIN_OREROCK      = 1
+   TERRAIN_FOREST_HIGH  = 0.8
+   TERRAIN_TREE         = 0.9
+   TERRAIN_OREROCK      = 0.95
 
 class EvoNMMO(ResourcesTest):
    EVO_MAP = True
@@ -110,7 +106,7 @@ class EvoNMMO(ResourcesTest):
    TERRAIN_SIZE = 64
    EVO_DIR = 'cppn_scratch'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
-   N_EVO_MAPS = 42
+   N_EVO_MAPS = 24
    MAX_STEPS = 100
    MATURE_AGE = 3
    TERRAIN_RENDER = True
