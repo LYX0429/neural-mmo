@@ -72,8 +72,11 @@ class SmallMap(Config):
 
    TERRAIN_SIZE            = 80 
    TERRAIN_OCTAVES         = 1
-   TERRAIN_FOREST_LOW      = 0.375
-   TERRAIN_GRASS           = 0.7
+   TERRAIN_FOREST_LOW      = 0.30
+   TERRAIN_FOREST_HIGH     = 0.75
+   TERRAIN_GRASS           = 0.715
+   TERRAIN_ALPHA           = -0.025
+   TERRAIN_BETA            = 0.035
 
    TERRAIN_DIR             = Config.TERRAIN_DIR_SMALL
    ROOT                    = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
@@ -81,13 +84,17 @@ class SmallMap(Config):
    INVERT_WILDERNESS       = True
    WILDERNESS              = False
 
-   NPC_LEVEL_MAX           = 30
+   NPC_LEVEL_MAX           = 35
    NPC_LEVEL_SPREAD        = 5
+
+   NPC_SPAWN_PASSIVE       = 0.00
+   NPC_SPAWN_NEUTRAL       = 0.60
+   NPC_SPAWN_AGGRESSIVE    = 0.80
 
 class ResourcesTest(Config):
    NMOB                 = 0
    MODEL                = None
-   TERRAIN_SIZE         = 80
+   TERRAIN_SIZE         = 200
    TERRAIN_DIR          = Config.TERRAIN_DIR_SMALL
    ROOT                 = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
 #  TERRAIN_RENDER       = True
@@ -101,16 +108,3 @@ class ResourcesTest(Config):
    TERRAIN_TREE         = 0.67
    TERRAIN_OREROCK      = 0.75
 #  TERRAIN_OREROCK      = 1
-
-class EvoNMMO(ResourcesTest):
-   EVO_MAP = True
-   RENDER = False
-   MODEL = 'current'
-   NENT = 8  # Maximum population size
-   TERRAIN_SIZE = 64
-   EVO_DIR = 'cppn_scratch'
-   ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
-   N_EVO_MAPS = 42
-   MAX_STEPS = 100
-   MATURE_AGE = 3
-   TERRAIN_RENDER = True
