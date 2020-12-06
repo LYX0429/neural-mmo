@@ -187,23 +187,25 @@ class EvolverNMMO(LambdaMuEvolver):
       self.saveMaps(maps)
       global_stats = self.global_stats
       self.send_genes(global_stats)
-      print('training')
       train_stats = self.trainer.train()
-      print('train_stats', train_stats)
       stats = ray.get(global_stats.get.remote())
       headers = ray.get(global_stats.get_headers.remote())
       n_epis = train_stats['episodes_this_iter']
-      assert n_epis == self.n_pop
-      global_stats.reset.remote()
+     #assert n_epis == self.n_pop
 
       for idx, g in genomes:
-#        idx -= 1
+         #FIXME: hack
+         if idx not in stats:
+            print('training again for some fucking reason')
+            self.trainer.train()
+            stats = ray.get(global_stats.get.remote())
          score = calc_differential_entropy(stats[idx])
 #        self.population[g_hash] = (game, score, age)
          print(headers)
          print(stats[idx][0])
          print('diversity score: ', score)
          g.fitness = score
+      global_stats.reset.remote()
 
    def evolve(self):
 
@@ -355,12 +357,14 @@ class EvolverNMMO(LambdaMuEvolver):
             config={
             'num_workers': 4, # normally: 4
            #'num_gpus_per_worker': 0.083,  # hack fix
+            'num_gpus_per_worker': 0,
             'num_gpus': 1,
            #'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
-            'num_envs_per_worker': 3,
+            'num_envs_per_worker': 1,
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
-            'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
+           #'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
+            'train_batch_size': 4000,
             'rollout_fragment_length': 100,
             'sgd_minibatch_size': 128,  # normally: 128
             'num_sgd_iter': 1,
