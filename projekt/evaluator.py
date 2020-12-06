@@ -40,7 +40,9 @@ class Evaluator:
          self.model    = self.trainer.get_policy('policy_0').model
          self.env      = projekt.RLLibEnv({'config': config})
 
-         self.env.reset(idx=0, step=False)
+         # So evo_map can pick map to load
+#        self.env.reset(idx=0, step=False)
+         self.env.reset(idx=None, step=False)
          self.registry = OverlayRegistry(self.env, self.model, trainer, config)
          self.obs      = self.env.step({})[0]
 

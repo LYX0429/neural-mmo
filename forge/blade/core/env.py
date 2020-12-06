@@ -208,7 +208,6 @@ class Env(Timed):
          if self.config.EVO_MAP:
             counter = ray.get_actor("global_counter")
             idx = ray.get(counter.get.remote())
-            print('got idx', idx)
          else:
             idx = np.random.randint(self.config.NMAPS)
       if self.config.EVO_MAP:

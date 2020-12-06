@@ -91,22 +91,24 @@ class ResourcesTest(Config):
    TERRAIN_DIR          = Config.TERRAIN_DIR_SMALL
    ROOT                 = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
 #  TERRAIN_RENDER       = True
-   TERRAIN_LAVA         = 0.0
-   TERRAIN_WATER        = 0.25
-   TERRAIN_GRASS        = 0.6
-   TERRAIN_FOREST_HIGH  = 0.8
-   TERRAIN_TREE         = 0.9
-   TERRAIN_OREROCK      = 0.95
+   TERRAIN_WATER        = 0.15
+   TERRAIN_GRASS        = 0.35
+   TERRAIN_LAVA         = 0.45
+   TERRAIN_FOREST_LOW   = 0.55
+   TERRAIN_FOREST_HIGH  = 0.7
+   TERRAIN_TREE         = 0.8
+   TERRAIN_OREROCK      = 0.9
 
 class EvoNMMO(ResourcesTest):
+   TERRAIN_MODE = 'contract'
    EVO_MAP = True
    RENDER = False
    MODEL = 'current'
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = 'cppn_scratch'
+   EVO_DIR = 'cppn_0'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
-   N_EVO_MAPS = 24
+   N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 3
    TERRAIN_RENDER = True

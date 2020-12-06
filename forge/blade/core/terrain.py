@@ -74,6 +74,26 @@ class MapGenerator:
          return Terrain.IRON_ORE
       return Terrain.STONE
 
+   def material_evo(self, config, val):
+
+      if val <= config.TERRAIN_WATER:
+         return Terrain.WATER
+      if val <= config.TERRAIN_GRASS:
+         return Terrain.GRASS
+      if val <= config.TERRAIN_LAVA:
+         return Terrain.LAVA
+      if val <= config.TERRAIN_FOREST_LOW:
+         return Terrain.FOREST
+      if val <= config.TERRAIN_FOREST_HIGH:
+         return Terrain.FOREST
+      if val <= config.TERRAIN_TREE:
+         return Terrain.TREE
+      if val <= config.TERRAIN_OREROCK:
+         return Terrain.IRON_ORE
+      return Terrain.STONE
+
+
+
    def generate(self):
       print('Generating {} game maps. This may take a moment'.format(self.config.NMAPS))
       for seed in tqdm(range(self.config.NMAPS)):

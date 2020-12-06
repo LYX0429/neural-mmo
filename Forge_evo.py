@@ -76,14 +76,20 @@ class Counter:
    responsible for providing unique indexes to parallel environments.'''
    def __init__(self, config):
       self.count = 0
+      self.idxs = None
    def get(self):
+
+      if not self.idxs:
+         # Then we are doing inference and have set the idx directly
+         return self.count
       idx = self.idxs[self.count % len(self.idxs)]
       self.count += 1
 
       return idx
 
-#  def set(self, i):
-#     self.count = i - 1
+   def set(self, i):
+      # For inference
+      self.count = i
 
    def set_idxs(self, idxs):
       self.count = 0
@@ -97,7 +103,6 @@ class Stats:
       self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'wilderness']
       self.config = config
    def add(self, stats, mapIdx):
-      print('adding stats for {}'.format(mapIdx))
       if config.RENDER:
          print(self.headers)
          print(stats)

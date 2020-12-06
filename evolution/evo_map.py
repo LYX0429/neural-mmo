@@ -41,6 +41,9 @@ np.set_printoptions(threshold=sys.maxsize,
 global TRAINER
 TRAINER = None
 
+INFER_IDX = 70
+THRESHOLD = False
+
 def calc_diversity_l2(agent_skills):
    assert len(agent_skills) == 1
    a = agent_skills[0]
@@ -52,8 +55,14 @@ def calc_diversity_l2(agent_skills):
 
    return score
 
-def calc_differential_entropy(agent_skills):
-   # in future we will process multiple matrices from multiple simulations. Noy yet though.
+def calc_differential_entropy(agent_skills, max_pop=8):
+   # Penalize if under max pop agents living
+   for i, a_skill in enumerate(agent_skills):
+      if a_skill.shape[0] < max_pop:
+         a = np.mean(a_skill, axis=0)
+         a_skill = np.vstack(np.array([a_skill] + [a for _ in range(max_pop - a_skill.shape[0])]))
+         agent_skills[i] = a_skill
+   # if there are stats from multiple simulations, we consider agents from all simulations together
    a_skills = np.vstack(agent_skills)
 #  assert len(agent_skills) == 1
   #a_skills = agent_skills[0]
@@ -150,6 +159,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.global_stats = ray.get_actor("global_stats")
       self.CPPN = True
       if self.CPPN:
+         self.n_epoch = -1
          self.global_counter = ray.get_actor("global_counter")
          self.neat_config = neat.config.Config(neat.genome.DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
@@ -164,26 +174,47 @@ class EvolverNMMO(LambdaMuEvolver):
 
 
    def neat_eval_fitness(self, genomes, neat_config):
-      self.n_epoch += 1
+      if self.n_epoch == 0:
+         self.last_map_idx = 0
       maps = {}
       global_counter = ray.get_actor("global_counter")
-      print(sorted([idx for idx, _ in genomes]))
-      global_counter.set_idxs.remote([idx for idx, _ in genomes])
+      g_idxs = set([idx for idx, _ in genomes])
+      print('current map IDs: {}'.format(sorted(list(g_idxs))))
+      skip_idxs = set()
       for idx, g in genomes:
-
+         if idx <= self.last_map_idx:
+            continue
          cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
-         map_arr = np.zeros((self.map_width, self.map_height))
+         map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
          for x in range(self.map_width):
             for y in range(self.map_height):
                x_i, y_i = x / self.map_width, y / self.map_width
                v = cppn.activate((x_i, y_i))
-               assert len(v) == 1
-               v = v[0]
-               v = (v + 1) / 2
-               v = self.map_generator.material(self.config['config'], v)
-               map_arr[x, y] = v
-               map_arr = self.add_border(map_arr)
-               maps[idx] = map_arr
+               if THRESHOLD:
+                  # use NMMO's threshold logic
+                  assert len(v) == 1
+                  v = v[0]
+                  v = self.map_generator.material_evo(self.config['config'], v)
+               else:
+                  # CPPN has output channel for each tile type
+                  assert len(v) == self.n_tiles
+                  v = np.argmax(v)
+                  map_arr[x, y] = v
+         map_arr = self.add_border(map_arr)
+         # Impossible maps are no good
+         tile_counts = np.bincount(map_arr.reshape(-1))
+         if len(tile_counts) <= enums.Material.FOREST.value.index or \
+               tile_counts[enums.Material.FOREST.value.index] <= self.config['config'].NENT * 3 or \
+               tile_counts[enums.Material.WATER.value.index] <= self.config['config'].NENT * 3:
+            print('map {} rejected'.format(idx))
+            g.fitness = 0
+            g_idxs.remove(idx)
+            skip_idxs.add(idx)
+         else:
+            maps[idx] = map_arr
+      g_idxs = list(g_idxs)
+      self.last_map_idx = g_idxs[-1]
+      global_counter.set_idxs.remote(g_idxs)
       self.saveMaps(maps)
       global_stats = self.global_stats
       self.send_genes(global_stats)
@@ -195,109 +226,36 @@ class EvolverNMMO(LambdaMuEvolver):
 
       for idx, g in genomes:
          #FIXME: hack
+         if idx in skip_idxs:
+            continue
          if idx not in stats:
-            print('training again for some fucking reason')
+            print('Missing stats for map {}, training again.'.format(idx))
             self.trainer.train()
             stats = ray.get(global_stats.get.remote())
          score = calc_differential_entropy(stats[idx])
 #        self.population[g_hash] = (game, score, age)
          print(headers)
          print(stats[idx][0])
-         print('diversity score: ', score)
+         print('Map {}, diversity score: {}'.format(idx, score))
          g.fitness = score
       global_stats.reset.remote()
+      if self.n_epoch % 10 == 0:
+         self.save()
+      self.n_epoch += 1
 
    def evolve(self):
-
-      """
-      Runs NEAT's genetic algorithm for at most n generations.  If n
-      is None, run until solution is found or extinction occurs.
-
-      The user-provided fitness_function must take only two arguments:
-          1. The population as a list of (genome id, genome) tuples.
-          2. The current configuration object.
-
-      The return value of the fitness function is ignored, but it must assign
-      a Python float to the `fitness` member of each genome.
-
-      The fitness function is free to maintain external state, perform
-      evaluations in parallel, etc.
-
-      It is assumed that fitness_function does not modify the list of genomes,
-      the genomes themselves (apart from updating the fitness member),
-      or the configuration object.
-      """
-      self.init_pop()
+      if self.n_epoch == -1:
+         self.init_pop()
+      else:
+         self.map_generator = MapGenerator(self.config['config'])
       winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
-      return
-      n = None
-      if self.neat_pop.config.no_fitness_termination and (n is None):
-          raise RuntimeError("Cannot have no generational limit with no fitness termination")
-
-      k = 0
-      while n is None or k < n:
-         k += 1
-
-         self.neat_pop.reporters.start_generation(self.neat_pop.generation)
-
-         # Evaluate all genomes using the user-provided function.
-         self.neat_eval_fitness(list(self.neat_pop.population.items()), self.neat_pop.config)
-
-         # Gather and report statistics.
-         best = None
-         for g in self.neat_eval_fitness():
-             if g.fitness is None:
-                 raise RuntimeError("Fitness not assigned to genome {}".format(g.key))
-
-             if best is None or g.fitness > best.fitness:
-                 best = g
-         self.neat_pop.reporters.post_evaluate(self.neat_pop.config, self.neat_pop.population, self.neat_pop.species, best)
-
-         # Track the best genome ever seen.
-         if self.neat_pop.best_genome is None or best.fitness > self.neat_pop.best_genome.fitness:
-             self.neat_pop.best_genome = best
-
-         if not self.neat_pop.config.no_fitness_termination:
-             # End if the fitness threshold is reached.
-             fv = self.neat_pop.fitness_criterion(g.fitness for g in self.neat_pop.population.values())
-             if fv >= self.neat_pop.config.fitness_threshold:
-                 self.neat_pop.reporters.found_solution(self.neat_pop.config, self.neat_pop.generation, best)
-                 break
-
-         # Create the next generation from the current generation.
-         self.neat_pop.population = self.neat_pop.reproduction.reproduce(self.neat_pop.config, self.neat_pop.species,
-                                                       self.neat_pop.config.pop_size, self.neat_pop.generation)
-
-         # Check for complete extinction.
-         if not self.neat_pop.species.species:
-             self.neat_pop.reporters.complete_extinction()
-
-             # If requested by the user, create a completely new population,
-             # otherwise raise an exception.
-             if self.neat_pop.config.reset_on_extinction:
-                 self.neat_pop.population = self.neat_pop.reproduction.create_new(self.neat_pop.config.genome_type,
-                                                                self.neat_pop.config.genome_config,
-                                                                self.neat_pop.config.pop_size)
-             else:
-                 raise CompleteExtinctionException()
-
-         # Divide the new population into species.
-         self.neat_pop.species.speciate(self.neat_pop.config, self.neat_pop.population, self.neat_pop.generation)
-
-         self.neat_pop.reporters.end_generation(self.neat_pop.config, self.neat_pop.population, self.neat_pop.species)
-
-         self.neat_pop.generation += 1
-
-      if self.neat_pop.config.no_fitness_termination:
-         self.neat_pop.reporters.found_solution(self.neat_pop.config, self.neat_pop.generation, self.neat_pop.best_genome)
-
-      return self.neat_pop.best_genome
 
    def saveMaps(self, maps, mutated=None):
       if self.CPPN:
          mutated = list(maps.keys())
          #FIXME: hack
-         if self.n_epoch == 0:
+         if self.n_epoch == -1:
+            self.n_epoch += 1
             return
      #for i, map_arr in maps.items():
       if mutated is None:
@@ -305,8 +263,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
       for i in mutated:
          if self.CPPN:
-            # TODO: find a way to mutate this alongside the map-generating CPPNs?
-            atk_mults = (1, 1, 1)
+            # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
             map_arr = maps[i]
          else:
             map_arr, atk_mults = maps[i]
@@ -321,9 +278,11 @@ class EvolverNMMO(LambdaMuEvolver):
          if self.config['config'].TERRAIN_RENDER:
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
             Save.render(map_arr, self.map_generator.textures, png_path)
-         json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
-         with open(json_path, 'w') as json_file:
-            json.dump(atk_mults, json_file)
+
+         if not self.CPPN:
+            json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
+            with open(json_path, 'w') as json_file:
+               json.dump(atk_mults, json_file)
 
    def make_game(self, child_map):
       config = self.config
@@ -355,7 +314,7 @@ class EvolverNMMO(LambdaMuEvolver):
             env="custom",
             path=model_path,
             config={
-            'num_workers': 4, # normally: 4
+            'num_workers': 6, # normally: 4
            #'num_gpus_per_worker': 0.083,  # hack fix
             'num_gpus_per_worker': 0,
             'num_gpus': 1,
@@ -363,8 +322,8 @@ class EvolverNMMO(LambdaMuEvolver):
             'num_envs_per_worker': 1,
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
-           #'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
-            'train_batch_size': 4000,
+            'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
+           #'train_batch_size': 4000,
             'rollout_fragment_length': 100,
             'sgd_minibatch_size': 128,  # normally: 128
             'num_sgd_iter': 1,
@@ -401,16 +360,17 @@ class EvolverNMMO(LambdaMuEvolver):
       ''' Do inference, just on the top individual for now.'''
       global_counter = ray.get_actor("global_counter")
       self.send_genes(self.global_stats)
-      best_g, best_score = None, -999
+     #best_g, best_score = None, -999
 
-      for g_hash, (_, score, age) in self.population.items():
-          if score and score > best_score and age > self.mature_age:
-              print('new best', score)
-              best_g, best_score = g_hash, score
+     #for g_hash, (_, score, age) in self.population.items():
+     #    if score and score > best_score and age > self.mature_age:
+     #        print('new best', score)
+     #        best_g, best_score = g_hash, score
 
-      if not best_g:
-          raise Exception('No population found for inference.')
-      print("Loading map {} for inference.".format(best_g))
+     #if not best_g:
+     #    raise Exception('No population found for inference.')
+     #print("Loading map {} for inference.".format(best_g))
+      best_g = INFER_IDX
       global_counter.set.remote(best_g)
       self.config['config'].EVALUATE = True
       evaluator = Evaluator(self.config['config'], self.trainer)
@@ -424,8 +384,6 @@ class EvolverNMMO(LambdaMuEvolver):
 #                                 (self.map_width, self.map_height))
       if self.CPPN:
          return None, None
-#        cpnn = neat.nn.FeedForwardNetwork.create(g, config)
-#        T()
       else:
          map_arr = np.random.choice(np.arange(1, self.n_tiles), (self.map_width, self.map_height),
                p=TILE_PROBS[1:])
@@ -489,10 +447,10 @@ class EvolverNMMO(LambdaMuEvolver):
        b = self.config['config'].TERRAIN_BORDER
        # agents should not spawn and die immediately, as this may crash the env
        a = 1
-       map_arr[b:b+a, :]= enums.Material.FOREST.value.index
-       map_arr[:, b:b+a]= enums.Material.FOREST.value.index
-       map_arr[:, -b-a:-b]= enums.Material.FOREST.value.index
-       map_arr[-b-a:-b, :]= enums.Material.FOREST.value.index
+       map_arr[b:b+a, :]= enums.Material.GRASS.value.index
+       map_arr[:, b:b+a]= enums.Material.GRASS.value.index
+       map_arr[:, -b-a:-b]= enums.Material.GRASS.value.index
+       map_arr[-b-a:-b, :]= enums.Material.GRASS.value.index
        # the border must be lava
        map_arr[0:b, :]= enums.Material.LAVA.value.index
        map_arr[:, 0:b]= enums.Material.LAVA.value.index
