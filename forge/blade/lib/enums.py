@@ -43,7 +43,7 @@ class Stone(Tile):
    tex = 'stone'
 class Orerock(Tile):
    index = 6
-   degen = Stone
+   degen = Grass
    tex = 'iron_ore'
    capacity = 1
    respawnprob = 0.05

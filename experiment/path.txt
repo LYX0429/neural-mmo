@@ -1,1 +1,1 @@
-evo_experiment/cppn_0/models/checkpoint_21/checkpoint-21
+evo_experiment/cppn_0/models/checkpoint_970/checkpoint-970

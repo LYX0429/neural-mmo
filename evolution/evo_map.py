@@ -41,27 +41,25 @@ np.set_printoptions(threshold=sys.maxsize,
 global TRAINER
 TRAINER = None
 
-INFER_IDX = 70
-THRESHOLD = False
 
 def calc_diversity_l2(agent_skills):
    assert len(agent_skills) == 1
    a = agent_skills[0]
    b = a.reshape(a.shape[0], 1, a.shape[1])
    score = np.sum(np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b)))/2
-   print('agent skills:\n{}'.format(a))
-   print('score:\n{}\n'.format(
-       score))
+#  print('agent skills:\n{}'.format(a))
+#  print('score:\n{}\n'.format(
+#      score))
 
    return score
 
 def calc_differential_entropy(agent_skills, max_pop=8):
    # Penalize if under max pop agents living
-   for i, a_skill in enumerate(agent_skills):
-      if a_skill.shape[0] < max_pop:
-         a = np.mean(a_skill, axis=0)
-         a_skill = np.vstack(np.array([a_skill] + [a for _ in range(max_pop - a_skill.shape[0])]))
-         agent_skills[i] = a_skill
+  #for i, a_skill in enumerate(agent_skills):
+  #   if a_skill.shape[0] < max_pop:
+  #      a = np.mean(a_skill, axis=0)
+  #      a_skill = np.vstack(np.array([a_skill] + [a for _ in range(max_pop - a_skill.shape[0])]))
+  #      agent_skills[i] = a_skill
    # if there are stats from multiple simulations, we consider agents from all simulations together
    a_skills = np.vstack(agent_skills)
 #  assert len(agent_skills) == 1
@@ -190,13 +188,13 @@ class EvolverNMMO(LambdaMuEvolver):
             for y in range(self.map_height):
                x_i, y_i = x / self.map_width, y / self.map_width
                v = cppn.activate((x_i, y_i))
-               if THRESHOLD:
+               if self.config['config'].THRESHOLD:
                   # use NMMO's threshold logic
                   assert len(v) == 1
                   v = v[0]
                   v = self.map_generator.material_evo(self.config['config'], v)
                else:
-                  # CPPN has output channel for each tile type
+                  # CPPN has output channel for each tile type; take argmax over channels
                   assert len(v) == self.n_tiles
                   v = np.argmax(v)
                   map_arr[x, y] = v
@@ -370,7 +368,7 @@ class EvolverNMMO(LambdaMuEvolver):
      #if not best_g:
      #    raise Exception('No population found for inference.')
      #print("Loading map {} for inference.".format(best_g))
-      best_g = INFER_IDX
+      best_g = self.config['config'].INFER_IDX
       global_counter.set.remote(best_g)
       self.config['config'].EVALUATE = True
       evaluator = Evaluator(self.config['config'], self.trainer)

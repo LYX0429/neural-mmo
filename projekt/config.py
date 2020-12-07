@@ -100,6 +100,11 @@ class ResourcesTest(Config):
    TERRAIN_OREROCK      = 0.9
 
 class EvoNMMO(ResourcesTest):
+
+#INFER_IDX = 3526
+   INFER_IDX = 28700
+   FITNESS = 'L2'
+   THRESHOLD = False
    TERRAIN_MODE = 'contract'
    EVO_MAP = True
    RENDER = False
