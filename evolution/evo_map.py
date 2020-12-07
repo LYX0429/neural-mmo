@@ -45,11 +45,13 @@ TRAINER = None
 def calc_diversity_l2(agent_skills):
    assert len(agent_skills) == 1
    a = agent_skills[0]
-   b = a.reshape(a.shape[0], 1, a.shape[1])
+   n_agents = a.shape[0]
+   b = a.reshape(n_agents, 1, a.shape[1])
    score = np.sum(np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b)))/2
 #  print('agent skills:\n{}'.format(a))
 #  print('score:\n{}\n'.format(
 #      score))
+   score = score / (n_agents**2)
 
    return score
 
@@ -149,12 +151,18 @@ class EvolverNMMO(LambdaMuEvolver):
       self.state = {}
       self.done = {}
       self.map_generator = MapGenerator(config)
-      config = {'config': config, #'map_arr': map_arr
-              }
       self.config = config
       self.skill_idxs = {}
       self.idx_skills = {}
       self.global_stats = ray.get_actor("global_stats")
+      if self.config.FITNESS_METRIC == 'L2':
+         self.calc_diversity = calc_diversity_l2
+      elif self.config.FITNESS_METRIC == 'Differential':
+         self.calc_diversity = calc_differential_entropy
+      elif self.config.FITNESS_METRIC == 'Discrete':
+         self.calc_diversity = calc_discrete_entropy
+      else:
+         raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
       self.CPPN = True
       if self.CPPN:
          self.n_epoch = -1
@@ -166,7 +174,7 @@ class EvolverNMMO(LambdaMuEvolver):
          stats = neat.statistics.StatisticsReporter()
          self.neat_pop.add_reporter(stats)
          self.neat_pop.add_reporter(neat.reporting.StdOutReporter(True))
-         self.neat_config.pop_size = self.config['config'].N_EVO_MAPS
+         self.neat_config.pop_size = self.config.N_EVO_MAPS
 #        winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
 
 
@@ -186,13 +194,14 @@ class EvolverNMMO(LambdaMuEvolver):
          map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
          for x in range(self.map_width):
             for y in range(self.map_height):
-               x_i, y_i = x / self.map_width, y / self.map_width
+               x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
+               x_i, y_i = x_i * 2, y_i * 2
                v = cppn.activate((x_i, y_i))
-               if self.config['config'].THRESHOLD:
+               if self.config.THRESHOLD:
                   # use NMMO's threshold logic
                   assert len(v) == 1
                   v = v[0]
-                  v = self.map_generator.material_evo(self.config['config'], v)
+                  v = self.map_generator.material_evo(self.config, v)
                else:
                   # CPPN has output channel for each tile type; take argmax over channels
                   assert len(v) == self.n_tiles
@@ -201,9 +210,9 @@ class EvolverNMMO(LambdaMuEvolver):
          map_arr = self.add_border(map_arr)
          # Impossible maps are no good
          tile_counts = np.bincount(map_arr.reshape(-1))
-         if len(tile_counts) <= enums.Material.FOREST.value.index or \
-               tile_counts[enums.Material.FOREST.value.index] <= self.config['config'].NENT * 3 or \
-               tile_counts[enums.Material.WATER.value.index] <= self.config['config'].NENT * 3:
+         if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
+               tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
+               tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
             print('map {} rejected'.format(idx))
             g.fitness = 0
             g_idxs.remove(idx)
@@ -221,8 +230,7 @@ class EvolverNMMO(LambdaMuEvolver):
       headers = ray.get(global_stats.get_headers.remote())
       n_epis = train_stats['episodes_this_iter']
      #assert n_epis == self.n_pop
-
-      for idx, g in genomes:
+      for idx, _ in genomes:
          #FIXME: hack
          if idx in skip_idxs:
             continue
@@ -230,7 +238,12 @@ class EvolverNMMO(LambdaMuEvolver):
             print('Missing stats for map {}, training again.'.format(idx))
             self.trainer.train()
             stats = ray.get(global_stats.get.remote())
-         score = calc_differential_entropy(stats[idx])
+
+      for idx, g in genomes:
+         #FIXME: hack
+         if idx in skip_idxs:
+            continue
+         score = self.calc_diversity(stats[idx])
 #        self.population[g_hash] = (game, score, age)
          print(headers)
          print(stats[idx][0])
@@ -245,7 +258,7 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.n_epoch == -1:
          self.init_pop()
       else:
-         self.map_generator = MapGenerator(self.config['config'])
+         self.map_generator = MapGenerator(self.config)
       winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
 
    def saveMaps(self, maps, mutated=None):
@@ -273,7 +286,7 @@ class EvolverNMMO(LambdaMuEvolver):
             pass
          Save.np(map_arr, path)
 
-         if self.config['config'].TERRAIN_RENDER:
+         if self.config.TERRAIN_RENDER:
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
             Save.render(map_arr, self.map_generator.textures, png_path)
 
@@ -299,9 +312,9 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.trainer is None:
 
          # Create policies
-         policies = createPolicies(self.config['config'])
+         policies = createPolicies(self.config)
 
-         conf = self.config['config']
+         conf = self.config
          model_path = os.path.join(self.save_path, 'models')
          try:
             os.mkdir(model_path)
@@ -333,7 +346,7 @@ class EvolverNMMO(LambdaMuEvolver):
             'callbacks': LogCallbacks,
             'env_config': {
                 'config':
-                self.config['config'],
+                self.config,
             },
             'multiagent': {
                 "policies": policies,
@@ -344,14 +357,14 @@ class EvolverNMMO(LambdaMuEvolver):
                 'custom_model': 'test_model',
                 'custom_model_config': {
                     'config':
-                    self.config['config']
+                    self.config
                 }
             },
           })
 
          # Print model size
          utils.modelSize(trainer.defaultModel())
-         trainer.restore(self.config['config'].MODEL)
+         trainer.restore(self.config.MODEL)
          self.trainer = trainer
 
    def infer(self):
@@ -368,10 +381,10 @@ class EvolverNMMO(LambdaMuEvolver):
      #if not best_g:
      #    raise Exception('No population found for inference.')
      #print("Loading map {} for inference.".format(best_g))
-      best_g = self.config['config'].INFER_IDX
+      best_g = self.config.INFER_IDX
       global_counter.set.remote(best_g)
-      self.config['config'].EVALUATE = True
-      evaluator = Evaluator(self.config['config'], self.trainer)
+      self.config.EVALUATE = True
+      evaluator = Evaluator(self.config, self.trainer)
       evaluator.render()
 
    def genRandMap(self):
@@ -442,7 +455,7 @@ class EvolverNMMO(LambdaMuEvolver):
       return map_arr, atk_mults
 
    def add_border(self, map_arr):
-       b = self.config['config'].TERRAIN_BORDER
+       b = self.config.TERRAIN_BORDER
        # agents should not spawn and die immediately, as this may crash the env
        a = 1
        map_arr[b:b+a, :]= enums.Material.GRASS.value.index
@@ -541,7 +554,7 @@ class EvolverNMMO(LambdaMuEvolver):
       global_stats.reset.remote()
 
       for g_hash, (game, score, age) in self.population.items():
-         score = calc_differential_entropy(stats[g_hash])
+         score = self.calc_diversity(stats[g_hash])
          self.population[g_hash] = (game, score, age)
          print(headers)
          print(stats[g_hash][0])
@@ -633,9 +646,9 @@ class EvolverNMMO(LambdaMuEvolver):
        self.restore()
 
    def init_pop(self):
-       self.config['config'].MODEL = None
+       self.config.MODEL = None
        super().init_pop()
-       self.config['config'].MODEL = 'current'
+       self.config.MODEL = 'current'
 
 def update_entropy_skills(skill_dict):
     agent_skills = [[] for _ in range(len(skill_dict))]
@@ -655,7 +668,7 @@ def update_entropy_skills(skill_dict):
 
     return calc_diversity_l2(agent_skills)
 
-def calc_diversity(agent_skills, alpha, skill_idxs=None):
+def calc_discrete_entropy(agent_skills, alpha, skill_idxs=None):
     BASE_VAL = 0.0001
     # split between skill and agent entropy
     n_skills = len(agent_skills[0])

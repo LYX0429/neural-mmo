@@ -103,7 +103,8 @@ class EvoNMMO(ResourcesTest):
 
 #INFER_IDX = 3526
    INFER_IDX = 28700
-   FITNESS = 'L2'
+   # How to measure diversity of agents on generated map.
+   FITNESS_METRIC = 'L2' # 'Differential', 'Discrete'
    THRESHOLD = False
    TERRAIN_MODE = 'contract'
    EVO_MAP = True
@@ -111,7 +112,7 @@ class EvoNMMO(ResourcesTest):
    MODEL = 'current'
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = 'cppn_0'
+   EVO_DIR = 'cppn_l2'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
