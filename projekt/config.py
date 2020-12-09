@@ -84,13 +84,45 @@ class SmallMap(Config):
    NPC_LEVEL_MAX           = 30
    NPC_LEVEL_SPREAD        = 5
 
-class ResourcesTest(Config):
+class ResourcesTest(SmallMap):
+   NENT                 = 8
    NMOB                 = 0
-   MODEL                = None
+   MODEL                = 'current'
    TERRAIN_SIZE         = 80
    TERRAIN_DIR          = Config.TERRAIN_DIR_SMALL
    ROOT                 = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
 #  TERRAIN_RENDER       = True
+   TERRAIN_ALPHA = 0
+   TERRAIN_BETA = 0
+   TERRAIN_LAVA         = 0.0
+   TERRAIN_WATER        = 0.25
+   TERRAIN_FOREST_LOW   = 0.35
+   TERRAIN_GRASS        = 0.7
+   TERRAIN_FOREST_HIGH  = 0.75
+   TERRAIN_TREE         = 0.8
+   TERRAIN_OREROCK      = 0.9
+
+class EvoNMMO(ResourcesTest):
+
+#  INFER_IDX = 3526
+#  INFER_IDX = 28700
+#  INFER_IDX = 37133
+#  INFER_IDX = 41049
+   INFER_IDX = 196
+   FITNESS = 'L2'
+   THRESHOLD = False
+   TERRAIN_MODE = 'contract'
+   EVO_MAP = True
+   RENDER = False
+   MODEL = 'current'
+   NENT = 64  # Maximum population size
+   TERRAIN_SIZE = 64
+   EVO_DIR = 'no_disparity'
+   ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
+   N_EVO_MAPS = 48
+   MAX_STEPS = 100
+   MATURE_AGE = 3
+   TERRAIN_RENDER = False
    TERRAIN_WATER        = 0.15
    TERRAIN_GRASS        = 0.35
    TERRAIN_LAVA         = 0.45
@@ -98,22 +130,3 @@ class ResourcesTest(Config):
    TERRAIN_FOREST_HIGH  = 0.7
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.9
-
-class EvoNMMO(ResourcesTest):
-
-#INFER_IDX = 3526
-   INFER_IDX = 28700
-   FITNESS = 'L2'
-   THRESHOLD = False
-   TERRAIN_MODE = 'contract'
-   EVO_MAP = True
-   RENDER = False
-   MODEL = 'current'
-   NENT = 8  # Maximum population size
-   TERRAIN_SIZE = 64
-   EVO_DIR = 'cppn_0'
-   ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
-   N_EVO_MAPS = 48
-   MAX_STEPS = 100
-   MATURE_AGE = 3
-   TERRAIN_RENDER = True

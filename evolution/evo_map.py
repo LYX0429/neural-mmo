@@ -64,7 +64,8 @@ def calc_differential_entropy(agent_skills, max_pop=8):
    a_skills = np.vstack(agent_skills)
 #  assert len(agent_skills) == 1
   #a_skills = agent_skills[0]
-   mean = np.mean(a_skills, axis=0)
+   weights = np.sum(a_skills, axis=1)
+   mean = np.average(a_skills, axis=0, weights=weights)
    cov = np.cov(a_skills,rowvar=0)
    gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
    score = gaussian.entropy()
@@ -368,9 +369,9 @@ class EvolverNMMO(LambdaMuEvolver):
      #if not best_g:
      #    raise Exception('No population found for inference.')
      #print("Loading map {} for inference.".format(best_g))
-      best_g = self.config['config'].INFER_IDX
+      best_g = self.config.INFER_IDX
       global_counter.set.remote(best_g)
-      self.config['config'].EVALUATE = True
+      self.config.EVALUATE = True
       evaluator = Evaluator(self.config['config'], self.trainer)
       evaluator.render()
 
