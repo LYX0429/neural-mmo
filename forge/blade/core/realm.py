@@ -3,6 +3,7 @@
 #interaction by agents. Also defines an accurate stimulus that
 #encapsulates the world as seen by a particular agent
 
+import random
 import numpy as np
 from collections import defaultdict
 
@@ -136,7 +137,10 @@ class PlayerManager(EntityGroup):
          if len(self.entities) >= self.config.NENT:
             break
 
-         r, c   = self.config.SPAWN()
+         if self.config.EVO_MAP:
+            r, c = self.evo_spawn()
+         else:
+            r, c   = self.config.SPAWN()
          if not self.realm.map.tiles[r, c].habitable:
             continue
 
@@ -146,6 +150,11 @@ class PlayerManager(EntityGroup):
 
          super().spawn(player)
          self.idx += 1
+
+   def evo_spawn(self):
+      T()
+      assert len(self.realm.spawn_points) != 0
+      return self.realm.config.TERRAIN_BORDER + random.choice(self.realm.spawn_points)
 
 class Realm:
    def __init__(self, config, iden):

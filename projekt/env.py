@@ -117,7 +117,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       self.n_step += 1
       # are we doing evolution? 
       if self.config.EVO_MAP:
-         if self.n_step == self.config.MAX_STEPS or self.config.RENDER:
+         if self.n_step >= self.config.MAX_STEPS or self.config.RENDER:
             global_stats = ray.get_actor('global_stats')
             # reset the env manually, to load from the new updated population of maps
             dones['__all__'] = True
@@ -129,27 +129,37 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                for k, v in a_skills.items():
                   if not isinstance(v, dict):
                      continue
-                  if k in ['cooking', 'smithing', 'level']:
+                  if k in ['exploration']:
+       #          if k in ['cooking', 'smithing', 'level']:
                      continue
                   a_skill_vals[k] = v['exp']
                   if k in ['fishing', 'hunting', 'constitution']:
                      # FIXME: hack -- just easier on the eyes, mostly. Don't change config.RESOURCE !
                      a_skill_vals[k] -= 1154
-               a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 10
+               # a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 10
+               a_skill_vals['exploration'] = player.exploration_grid.sum()
                # timeAlive will only add expressivity if we fit more than one gaussian.
-               # a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
+               a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
                skills[d] = a_skill_vals
             if a_skills:
                if not self.headers:
                   headers = list(a_skill_vals.keys())
                   self.headers = ray.get(global_stats.get_headers.remote(headers))
-               stats = np.zeros((len(skills), len(self.headers)))
+              #stats = np.zeros((len(skills), len(self.headers)))
+               stats = np.zeros((len(skills), 1))
+               lifespans = np.zeros((len(skills)))
                # over agents
                for i, a_skills in enumerate(skills.values()):
                   # over skills
                   for j, k in enumerate(self.headers):
-                     if k not in ['level', 'cooking', 'smithing']:
+       #             if k not in ['level', 'cooking', 'smithing']:
+                     if k in ['exploration']:
                         stats[i, j] = a_skills[k]
+                  lifespans[i] = a_skills['time_alive']
+               stats = {
+                     'skills': stats,
+                     'lifespans': lifespans,
+                     }
                global_stats.add.remote(stats, self.worldIdx)
       return obs, rewards, dones, infos
 

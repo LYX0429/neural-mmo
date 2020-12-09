@@ -8,21 +8,21 @@ import os
 import time
 
 def loadTiled(tiles, fPath, materials):
-    idxMap = np.load(fPath)
-    for r, row in enumerate(idxMap):
-       for c, idx in enumerate(row):
-          mat  = materials[idx]
-          tile = tiles[r, c]
+   idxMap = np.load(fPath)
+   for r, row in enumerate(idxMap):
+      for c, idx in enumerate(row):
+         mat  = materials[idx]
+         tile = tiles[r, c]
 
-          tile.mat      = mat()
-          tile.ents     = {}
+         tile.mat      = mat()
+         tile.ents     = {}
 
-          tile.state    = mat()
-          tile.capacity = tile.mat.capacity
-          tile.tex      = mat.tex
+         tile.state    = mat()
+         tile.capacity = tile.mat.capacity
+         tile.tex      = mat.tex
 
-          tile.nEnts.update(0)
-          tile.index.update(tile.state.index)
+         tile.nEnts.update(0)
+         tile.index.update(tile.state.index)
 
 class Map:
    def __init__(self, realm, config):

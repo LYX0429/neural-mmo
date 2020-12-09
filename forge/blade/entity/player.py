@@ -26,6 +26,7 @@ class Player(entity.Entity):
       #self.chat      = Chat(dataframe)
 
       self.dataframe.init(Static.Entity, self.entID, self.pos)
+      self.exploration_grid = np.zeros(realm.shape, dtype=np.bool)
 
    def applyDamage(self, dmg, style):
       self.resources.food.increment(dmg)
@@ -77,6 +78,7 @@ class Player(entity.Entity):
       self.resources.update(realm, self, actions)
       self.skills.update(realm, self, actions)
       #self.inventory.update(world, actions)
+      self.exploration_grid[self.pos] = 1
 
    def act(self, world, atnArgs):
       #Right now we only support one arg. So *args for future update

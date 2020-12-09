@@ -10,6 +10,7 @@ TILE_PROB_DICT = {
       'forest':    0.2,
       'tree':      0.03,
       'iron_ore':  0.03,
+      'spawn':     0.01,
       }
 TILE_TYPES = [None for _ in range(len(Material))]
 TILE_PROBS = [None for _ in range(len(Material))]

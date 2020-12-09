@@ -11,7 +11,7 @@ from forge.blade.io import stimulus
 from forge.blade.io.stimulus import Static
 from forge.blade.systems import combat
 
-from forge.blade.lib.enums import Palette
+from forge.blade.lib.enums import Palette, Material
 from forge.blade.lib import log
 from forge.trinity.ascend import runtime, Timed
 import ray
@@ -220,7 +220,11 @@ class Env(Timed):
       self.worldIdx = idx
       self.dead     = {}
 
+      if self.config.EVO_MAP:
+     #   self.realm.spawn_points = ray.get(global_stats.get_spawn_points.remote(idx))
+         self.realm.spawn_points = np.vstack(np.where(self.realm.map.np() == Material.SPAWN.value.index)).transpose()
       self.realm.reset(idx)
+
       if step:
          return self.step({})[0]
 

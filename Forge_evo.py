@@ -100,7 +100,8 @@ class Stats:
    def __init__(self, config):
       self.stats = {}
       self.mults = {}
-      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'wilderness']
+      self.spawn_points = {}
+      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'exploration']
       self.config = config
    def add(self, stats, mapIdx):
       if config.RENDER:
@@ -113,7 +114,8 @@ class Stats:
       if mapIdx not in self.stats:
          self.stats[mapIdx] = [stats]
       else:
-         self.stats[mapIdx].append(stats)
+         self.stats[mapIdx]['skills'].append(stats['skills'])
+         self.stats[mapIdx]['lifespans'].append(stats['lifespans'])
    def get(self):
       return self.stats
    def reset(self):
@@ -132,6 +134,10 @@ class Stats:
       if g_hash not in self.mults:
          return None
       return self.mults[g_hash]
+   def add_spawn_points(self, g_hash, spawn_points):
+      self.spawn_points[g_hash] = spawn_points
+   def get_spawn_points(self, g_hash):
+      return self.spawn_points[g_hash]
 
 if __name__ == '__main__':
    # Setup ray

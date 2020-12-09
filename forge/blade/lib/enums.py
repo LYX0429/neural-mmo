@@ -61,6 +61,9 @@ class Tree(Tile):
    def __init__(self):
       super().__init__()
       self.harvestable = True
+class Spawn(Tile):
+   index = 8
+   tex = 'spawn'
 
 class Material(Enum):
    LAVA     = Lava
@@ -71,9 +74,10 @@ class Material(Enum):
    STONE    = Stone
    OREROCK  = Orerock
    TREE     = Tree
+   SPAWN    = Spawn
 
-IMPASSIBLE = (1, 5, 6, 7)
-HABITABLE  = (2, 3, 4)
+IMPASSIBLE = (1, 5) # 6, 7)
+HABITABLE  = (2, 3, 4, 8)
 
 class Defaults:
    BLACK    = (0, 0, 0)

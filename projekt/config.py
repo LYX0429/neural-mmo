@@ -108,8 +108,9 @@ class EvoNMMO(ResourcesTest):
 #  INFER_IDX = 28700
 #  INFER_IDX = 37133
 #  INFER_IDX = 41049
-   INFER_IDX = 196
-   FITNESS = 'L2'
+   INFER_IDX = 1
+   # How to measure diversity of agents on generated map.
+   FITNESS_METRIC = 'Differential' # 'Differential', 'Discrete'
    THRESHOLD = False
    TERRAIN_MODE = 'contract'
    EVO_MAP = True
@@ -122,7 +123,7 @@ class EvoNMMO(ResourcesTest):
    N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 3
-   TERRAIN_RENDER = False
+#  TERRAIN_RENDER = True
    TERRAIN_WATER        = 0.15
    TERRAIN_GRASS        = 0.35
    TERRAIN_LAVA         = 0.45
