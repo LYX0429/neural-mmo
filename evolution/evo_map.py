@@ -42,7 +42,7 @@ global TRAINER
 TRAINER = None
 
 
-def calc_diversity_l2(agent_skills):
+def calc_diversity_l2(agent_skills71G):
    assert len(agent_skills) == 1
    a = agent_skills[0]
    n_agents = a.shape[0]
@@ -55,6 +55,9 @@ def calc_diversity_l2(agent_skills):
 
    return score
 
+def sigmoid_lifespan(x):
+   return 3 / (1 + np.exp(0.1*(-x+20)))
+
 def calc_differential_entropy(agent_stats, max_pop=8):
    # Penalize if under max pop agents living
   #for i, a_skill in enumerate(agent_skills):
@@ -64,13 +67,14 @@ def calc_differential_entropy(agent_stats, max_pop=8):
   #      agent_skills[i] = a_skill
    # if there are stats from multiple simulations, we consider agents from all simulations together
    #FIXME: why
-   assert len(agent_stats) == 1
-   agent_stats = agent_stats[0]
    agent_skills = agent_stats['skills']
-   weights = agent_stats['lifespans']
-   print('lifespans')
-   print(weights)
+   lifespans = agent_stats['lifespans']
+   if not len(agent_skills) == 1:
+      pass
+   assert len(agent_skills) == len(lifespans)
    a_skills = np.vstack(agent_skills)
+   a_lifespans = np.hstack(lifespans)
+   weights = sigmoid_lifespan(a_lifespans)
 #  assert len(agent_skills) == 1
   #a_skills = agent_skills[0]
    mean = np.average(a_skills, axis=0, weights=weights)
@@ -79,6 +83,12 @@ def calc_differential_entropy(agent_stats, max_pop=8):
    score = gaussian.entropy()
 #  print(np.array(a_skills))
 #  print(score)
+   # FIXME: Only applies to exploration-only experiment
+   print(a_skills.transpose()[0])
+   print('lifespans')
+   print(a_lifespans)
+   print(len(agent_skills), 'populations')
+
    return score
 
 class LogCallbacks(DefaultCallbacks):
@@ -170,18 +180,18 @@ class EvolverNMMO(LambdaMuEvolver):
          self.calc_diversity = calc_discrete_entropy
       else:
          raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
-      self.CPPN = True
+      self.CPPN = config.GENE == 'CPPN'
       if self.CPPN:
          self.n_epoch = -1
          self.global_counter = ray.get_actor("global_counter")
          self.neat_config = neat.config.Config(neat.genome.DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                             'config_cppn_nmmo')
+         self.neat_config.pop_size = self.config.N_EVO_MAPS
          self.neat_pop = neat.population.Population(self.neat_config)
          stats = neat.statistics.StatisticsReporter()
          self.neat_pop.add_reporter(stats)
          self.neat_pop.add_reporter(neat.reporting.StdOutReporter(True))
-         self.neat_config.pop_size = self.config.N_EVO_MAPS
 #        winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
 
 
@@ -217,7 +227,7 @@ class EvolverNMMO(LambdaMuEvolver):
                   assert len(v) == self.n_tiles
                   v = np.argmax(v)
                   map_arr[x, y] = v
-         spawn_points = self.add_spawn(idx, map_arr)
+         self.add_spawn(idx, map_arr)
         #map_arr = self.add_border(map_arr)
          # Impossible maps are no good
          tile_counts = np.bincount(map_arr.reshape(-1))
@@ -229,7 +239,7 @@ class EvolverNMMO(LambdaMuEvolver):
             g_idxs.remove(idx)
             skip_idxs.add(idx)
          else:
-            maps[idx] = map_arr, spawn_points
+            maps[idx] = map_arr#, spawn_points
       g_idxs = list(g_idxs)
       self.last_map_idx = g_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
@@ -254,11 +264,10 @@ class EvolverNMMO(LambdaMuEvolver):
          #FIXME: hack
          if idx in skip_idxs:
             continue
+         print(headers)
          score = self.calc_diversity(stats[idx])
 #        self.population[g_hash] = (game, score, age)
-         print(headers)
-         print(stats[idx][0])
-         print('Map {}, diversity score: {}'.format(idx, score))
+         print('Map {}, diversity score: {}\n'.format(idx, score))
          g.fitness = score
       global_stats.reset.remote()
       if self.n_epoch % 10 == 0:
@@ -286,7 +295,7 @@ class EvolverNMMO(LambdaMuEvolver):
       for i in mutated:
          if self.CPPN:
             # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
-            map_arr, spawn_points = maps[i]
+            map_arr = maps[i]
          else:
             map_arr, atk_mults = maps[i]
          print('Saving map ' + str(i))
@@ -305,11 +314,6 @@ class EvolverNMMO(LambdaMuEvolver):
             json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
             with open(json_path, 'w') as json_file:
                json.dump(atk_mults, json_file)
-         #FIXME: shit hack
-        #else:
-        #   json_path = os.path.join(self.save_path, 'maps', 'map' + str(i), 'spawn' + str(i) + 'json')
-        #   with open(json_path, 'w') as json_file:
-        #      json.dump({'spawns': spawn_points.tolist()}, json_file)
 
    def make_game(self, child_map):
       config = self.config
@@ -473,14 +477,14 @@ class EvolverNMMO(LambdaMuEvolver):
 
       return map_arr, atk_mults
 
-   def add_border(self, map_arr):
+   def add_border(self, map_arr, border_mat_index):
       b = self.config.TERRAIN_BORDER
       # agents should not spawn and die immediately, as this may crash the env
       a = 1
-      map_arr[b:b+a, :]= enums.Material.SPAWN.value.index
-      map_arr[:, b:b+a]= enums.Material.SPAWN.value.index
-      map_arr[:, -b-a:-b]= enums.Material.SPAWN.value.index
-      map_arr[-b-a:-b, :]= enums.Material.SPAWN.value.index
+      map_arr[b:b+a, :]= border_mat_index
+      map_arr[:, b:b+a]=   border_mat_index
+      map_arr[:, -b-a:-b]=  border_mat_index
+      map_arr[-b-a:-b, :]=  border_mat_index
       # the border must be lava
       map_arr[0:b, :]= enums.Material.LAVA.value.index
       map_arr[:, 0:b]= enums.Material.LAVA.value.index
@@ -490,16 +494,16 @@ class EvolverNMMO(LambdaMuEvolver):
       return map_arr
 
    def add_spawn(self, g_hash, map_arr):
-      b = self.config.TERRAIN_BORDER
+      self.add_border(map_arr, enums.Material.GRASS.value.index)
       idxs = map_arr == enums.Material.SPAWN.value.index
       spawn_points = np.vstack(np.where(idxs)).transpose()
       if len(spawn_points) == 0:
-         self.add_border(map_arr)
+         self.add_border(map_arr, enums.Material.SPAWN.value.index)
 #        spawn_points = [(b, j) for j in range(map_arr.shape[1])] + [(i, b) for i in range(map_arr.shape[0])] + [(i, -b) for i in range(map_arr.shape[0])] + [(-b, j) for j in range(map_arr.shape[1])]
      #else:
      #   map_arr[idxs] = enums.Material.GRASS.value.index
      #self.global_stats.add_spawn_points.remote(g_hash, spawn_points)
-      return spawn_points
+#     return spawn_points
 
    def update_max_skills(self, ent):
        skills = ent.skills.packet()

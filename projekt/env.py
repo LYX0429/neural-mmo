@@ -151,10 +151,12 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                # over agents
                for i, a_skills in enumerate(skills.values()):
                   # over skills
-                  for j, k in enumerate(self.headers):
+                  j = 0
+                  for k in self.headers:
        #             if k not in ['level', 'cooking', 'smithing']:
                      if k in ['exploration']:
                         stats[i, j] = a_skills[k]
+                        j += 1
                   lifespans[i] = a_skills['time_alive']
                stats = {
                      'skills': stats,

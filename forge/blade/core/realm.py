@@ -152,9 +152,8 @@ class PlayerManager(EntityGroup):
          self.idx += 1
 
    def evo_spawn(self):
-      T()
       assert len(self.realm.spawn_points) != 0
-      return self.realm.config.TERRAIN_BORDER + random.choice(self.realm.spawn_points)
+      return random.choice(self.realm.spawn_points)
 
 class Realm:
    def __init__(self, config, iden):

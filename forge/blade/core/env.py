@@ -220,10 +220,11 @@ class Env(Timed):
       self.worldIdx = idx
       self.dead     = {}
 
+      self.realm.reset(idx)
+
       if self.config.EVO_MAP:
      #   self.realm.spawn_points = ray.get(global_stats.get_spawn_points.remote(idx))
          self.realm.spawn_points = np.vstack(np.where(self.realm.map.np() == Material.SPAWN.value.index)).transpose()
-      self.realm.reset(idx)
 
       if step:
          return self.step({})[0]

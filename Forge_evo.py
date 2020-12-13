@@ -101,7 +101,8 @@ class Stats:
       self.stats = {}
       self.mults = {}
       self.spawn_points = {}
-      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'exploration']
+     #self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'exploration']
+      self.headers = ['exploration']
       self.config = config
    def add(self, stats, mapIdx):
       if config.RENDER:
@@ -112,7 +113,9 @@ class Stats:
          return
 
       if mapIdx not in self.stats:
-         self.stats[mapIdx] = [stats]
+         self.stats[mapIdx] = {}
+         self.stats[mapIdx]['skills'] = [stats['skills']]
+         self.stats[mapIdx]['lifespans'] = [stats['lifespans']]
       else:
          self.stats[mapIdx]['skills'].append(stats['skills'])
          self.stats[mapIdx]['lifespans'].append(stats['lifespans'])
