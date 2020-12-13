@@ -77,17 +77,20 @@ def calc_differential_entropy(agent_stats, max_pop=8):
    weights = sigmoid_lifespan(a_lifespans)
 #  assert len(agent_skills) == 1
   #a_skills = agent_skills[0]
+   # FIXME: Only applies to exploration-only experiment
    print(a_skills.transpose()[0])
    print('lifespans')
    print(a_lifespans)
    print(len(agent_skills), 'populations')
-   mean = np.average(a_skills, axis=0, weights=weights)
-   cov = np.cov(a_skills,rowvar=0, aweights=weights)
-   gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
-   score = gaussian.entropy()
+   if len(lifespans) == 1:
+      score = 0
+   else:
+      mean = np.average(a_skills, axis=0, weights=weights)
+      cov = np.cov(a_skills,rowvar=0, aweights=weights)
+      gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
+      score = gaussian.entropy()
 #  print(np.array(a_skills))
 #  print(score)
-   # FIXME: Only applies to exploration-only experiment
 
 
    return score
