@@ -1,1 +1,1 @@
-evo_experiment/no_disparity/models/checkpoint_36/checkpoint-36
+evo_experiment/no_disparity_0/models/checkpoint_1/checkpoint-1

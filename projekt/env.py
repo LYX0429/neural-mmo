@@ -116,7 +116,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       skills = {}
       self.n_step += 1
       # are we doing evolution? 
-      if self.config.EVO_MAP:
+      if self.config.EVO_MAP and not self.config.RENDER:
          if self.n_step >= self.config.MAX_STEPS or self.config.RENDER:
             global_stats = ray.get_actor('global_stats')
             # reset the env manually, to load from the new updated population of maps

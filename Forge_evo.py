@@ -106,9 +106,9 @@ class Stats:
       self.config = config
    def add(self, stats, mapIdx):
       if config.RENDER:
-         print(self.headers)
-         print(stats)
-         print(calc_differential_entropy(stats))
+#        print(self.headers)
+#        print(stats)
+         calc_differential_entropy(stats)
 
          return
 
@@ -166,9 +166,9 @@ if __name__ == '__main__':
                                                    projekt.Policy)
    ray.tune.registry.register_env("custom", createEnv)
 
-   save_path = 'evo_experiment/skill_entropy_life'
-   save_path = 'evo_experiment/scratch'
-   save_path = 'evo_experiment/skill_ent_0'
+ # save_path = 'evo_experiment/skill_entropy_life'
+ # save_path = 'evo_experiment/scratch'
+ # save_path = 'evo_experiment/skill_ent_0'
 
    save_path = os.path.join('evo_experiment', '{}'.format(config.EVO_DIR))
 
@@ -181,13 +181,19 @@ if __name__ == '__main__':
          evolver = pickle.load(save_file)
          print('loading evolver from save file')
       # change params on reload here
+      evolver.config.ROOT = config.ROOT
+      evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
+      evolver.config.INFER_IDX = config.INFER_IDX
 #     evolver.config['config'].MAX_STEPS = 200
 #     evolver.n_epochs = 15000
+      evolver.reloading = True
+      evolver.epoch_reloaded = evolver.n_epoch
       evolver.restore(trash_data=True)
+      evolver.trainer.reset()
 
    except FileNotFoundError as e:
       print(e)
-      print('no save file to load')
+      print('Cannot load; missing evolver and/or model checkpoint. Evolving from scratch.')
 
       evolver = EvolverNMMO(save_path,
                             createEnv,

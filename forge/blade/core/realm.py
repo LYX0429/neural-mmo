@@ -153,7 +153,9 @@ class PlayerManager(EntityGroup):
 
    def evo_spawn(self):
       assert len(self.realm.spawn_points) != 0
-      return random.choice(self.realm.spawn_points)
+      r, c = random.choice(self.realm.spawn_points)
+      r, c = int(r), int(c)
+      return r, c
 
 class Realm:
    def __init__(self, config, iden):

@@ -1,3 +1,4 @@
+import os
 from pdb import set_trace as T
 import numpy as np
 
@@ -6,16 +7,18 @@ from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID
 
 
 class EvoPPOTrainer(ppo.PPOTrainer):
-   '''Small utility class on top of RLlib's base trainer'''
+   '''Small utility class on top of RLlib's base trainer. Evolution edition.'''
    def __init__(self, env, path, config):
       super().__init__(env=env, config=config)
       self.saveDir = path
       self.n_epoch = 0
+      self.pathDir = '/'.join(path.split(os.sep)[:-1])
 
    def save(self):
       '''Save model to file. Note: RLlib does not let us chose save paths'''
       savedir = super().save(self.saveDir)
-      with open('experiment/path.txt', 'w') as f:
+     #with open('evo_experiment/path.txt', 'w') as f:
+      with open(os.path.join(self.pathDir, 'path.txt'), 'w') as f:
          f.write(savedir)
       print('Saved to: {}'.format(savedir))
       return savedir
@@ -26,9 +29,11 @@ class EvoPPOTrainer(ppo.PPOTrainer):
          print('Training from scratch...')
          return
       if model == 'current':
-         with open('experiment/path.txt') as f:
+        #with open('experiment/path.txt') as f:
+         with open(os.path.join(self.pathDir, 'path.txt')) as f:
             path = f.read().splitlines()[0]
       else:
+         raise Exception("Shouldn't the config.MODEL = 'current', for evolution?")
          path = 'experiment/{}/checkpoint'.format(model)
 
       print('Loading from: {}'.format(path))
@@ -71,10 +76,10 @@ class EvoPPOTrainer(ppo.PPOTrainer):
      self.n_epoch += 1
      return stats
 
-   def reset(self, new_remote_workers):
-      print('sane reset evoTrainer \n')
-      print(self.workers.local_worker, self.workers.remote_workers)
-      self.workers.reset(new_remote_workers)
+   def reset(self):
+     #print('sane reset evoTrainer \n')
+     #print(self.workers.local_worker, self.workers.remote_workers)
+      super().reset(self.config)
 #     raise Exception
 
 

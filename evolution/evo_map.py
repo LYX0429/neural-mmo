@@ -12,6 +12,7 @@ from typing import Dict
 import numpy as np
 import neat
 import neat.nn
+from pureples.shared.visualize import draw_net
 import projekt
 import ray
 import scipy
@@ -78,6 +79,7 @@ def calc_differential_entropy(agent_stats, max_pop=8):
 #  assert len(agent_skills) == 1
   #a_skills = agent_skills[0]
    # FIXME: Only applies to exploration-only experiment
+   print('exploration')
    print(a_skills.transpose()[0])
    print('lifespans')
    print(a_lifespans)
@@ -90,7 +92,7 @@ def calc_differential_entropy(agent_stats, max_pop=8):
       gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
       score = gaussian.entropy()
 #  print(np.array(a_skills))
-#  print(score)
+   print('score:', score)
 
 
    return score
@@ -197,12 +199,20 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_pop.add_reporter(stats)
          self.neat_pop.add_reporter(neat.reporting.StdOutReporter(True))
 #        winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
-
+      self.reloading = False  # Have we just reloaded? For re-saving elite maps when reloading.
+      self.epoch_reloaded = None
 
 
    def neat_eval_fitness(self, genomes, neat_config):
       if self.n_epoch == 0:
          self.last_map_idx = 0
+      if self.reloading:
+         # Turn off reloading after 1 epoch.
+         if not self.epoch_reloaded:
+            self.epoch_reloaded = self.n_epoch
+         elif self.epoch_reloaded < self.n_epoch:
+            self.reloading = False
+
       maps = {}
       global_counter = ray.get_actor("global_counter")
       g_idxs = set([idx for idx, _ in genomes])
@@ -211,9 +221,11 @@ class EvolverNMMO(LambdaMuEvolver):
       self.save()
       skip_idxs = set()
       for idx, g in genomes:
-         if idx <= self.last_map_idx:
+         if idx <= self.last_map_idx and not self.reloading:
             continue
          cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
+#        if self.config.NET_RENDER:
+#           with open('nmmo_cppn.pkl', 'wb') a
          map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
          for x in range(self.map_width):
             for y in range(self.map_height):
@@ -244,6 +256,7 @@ class EvolverNMMO(LambdaMuEvolver):
             skip_idxs.add(idx)
          else:
             maps[idx] = map_arr#, spawn_points
+      self.maps = maps
       g_idxs = list(g_idxs)
       self.last_map_idx = g_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
@@ -270,15 +283,22 @@ class EvolverNMMO(LambdaMuEvolver):
             continue
          print(headers)
          score = self.calc_diversity(stats[idx])
-#        self.population[g_hash] = (game, score, age)
+        #self.population[g_hash] = (None, score, None)
          print('Map {}, diversity score: {}\n'.format(idx, score))
          g.fitness = score
       global_stats.reset.remote()
+      if self.reloading:
+         self.reloading = False
       if self.n_epoch % 10 == 0:
          self.save()
+      self.neat_pop.reporters.reporters[0].save_genome_fitness(
+            delimiter=',',
+            filename=os.path.join(self.save_path, 'genome_fitness.csv'))
       self.n_epoch += 1
 
    def evolve(self):
+      if not self.CPPN:
+         return super().evolve()
       if self.n_epoch == -1:
          self.init_pop()
       else:

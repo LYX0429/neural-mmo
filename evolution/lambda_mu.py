@@ -105,6 +105,34 @@ class LambdaMuEvolver():
 
       return self.mutate_gen()
 
+   def log(self):
+      pop_list = [(g_hash, game, score, age) for g_hash, (game, score, age) in self.population.items() if score is not None] 
+      ranked_pop = sorted(pop_list, key=lambda tpl: tpl[2])
+      print('Ranked population: (id, running_mean_score, last_score, age)')
+
+      with open(self.log_path, mode='a') as log_file:
+          log_writer = csv.writer(
+                  log_file, delimiter=',',
+                  quotechar='"',
+                  quoting=csv.QUOTE_MINIMAL)
+          log_writer.writerow(['epoch {}'.format(self.n_epoch)])
+          log_writer.writerow(
+                  ['id', 'running_score', 'last_score', 'age'])
+
+          for g_hash, game, score, age in ranked_pop:
+
+              if g_hash in self.score_hists:
+                  score_hist = self.score_hists[g_hash]
+                  if len(score_hist) > 0:
+                      last_score = self.score_hists[g_hash][-1]
+                  else:
+                      last_score = 0
+              else:
+                  last_score = -1
+              print('{}, {:2f}, {:2f}, {}'.format(
+                  g_hash, score, last_score, age))
+              log_writer.writerow([g_hash, score, last_score, age])
+
    def mutate_gen(self):
       population = self.population
       n_cull = int(self.n_pop * self.mu)
