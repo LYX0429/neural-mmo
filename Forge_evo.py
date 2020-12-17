@@ -101,8 +101,9 @@ class Stats:
       self.stats = {}
       self.mults = {}
       self.spawn_points = {}
-     #self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'exploration']
-      self.headers = ['exploration']
+      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'exploration']
+     #self.headers = ['mining', 'woodcutting']
+     #self.headers = ['exploration']
       self.config = config
    def add(self, stats, mapIdx):
       if config.RENDER:

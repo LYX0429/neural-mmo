@@ -42,6 +42,10 @@ np.set_printoptions(threshold=sys.maxsize,
 global TRAINER
 TRAINER = None
 
+def k_largest_index_argsort(a, k):
+    idx = np.argsort(a.ravel())[:-k-1:-1]
+    return np.column_stack(np.unravel_index(idx, a.shape))
+
 
 def calc_diversity_l2(agent_skills71G):
    assert len(agent_skills) == 1
@@ -57,7 +61,7 @@ def calc_diversity_l2(agent_skills71G):
    return score
 
 def sigmoid_lifespan(x):
-   return 3 / (1 + np.exp(0.1*(-x+20)))
+   return 1 / (1 + np.exp(0.1*(-x+50)))
 
 def calc_differential_entropy(agent_stats, max_pop=8):
    # Penalize if under max pop agents living
@@ -70,6 +74,7 @@ def calc_differential_entropy(agent_stats, max_pop=8):
    #FIXME: why
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
+
    if not len(agent_skills) == 1:
       pass
    assert len(agent_skills) == len(lifespans)
@@ -84,6 +89,7 @@ def calc_differential_entropy(agent_stats, max_pop=8):
    print('lifespans')
    print(a_lifespans)
    print(len(agent_skills), 'populations')
+
    if len(lifespans) == 1:
       score = 0
    else:
@@ -177,7 +183,11 @@ class EvolverNMMO(LambdaMuEvolver):
       self.config = config
       self.skill_idxs = {}
       self.idx_skills = {}
+      self.reloading = False  # Have we just reloaded? For re-saving elite maps when reloading.
+      self.epoch_reloaded = None
       self.global_stats = ray.get_actor("global_stats")
+      self.global_counter = ray.get_actor("global_counter")
+
       if self.config.FITNESS_METRIC == 'L2':
          self.calc_diversity = calc_diversity_l2
       elif self.config.FITNESS_METRIC == 'Differential':
@@ -187,9 +197,16 @@ class EvolverNMMO(LambdaMuEvolver):
       else:
          raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
       self.CPPN = config.GENE == 'CPPN'
-      if self.CPPN:
+      self.PATTERN_GEN = config.GENE == 'Pattern'
+      self.RAND_GEN = config.GENE == 'Random'
+
+      if self.PATTERN_GEN:
+         from evolution.paint_terrain import Chromosome
+         self.Chromosome = Chromosome
+         self.chromosomes = {}
+         self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
+      elif self.CPPN:
          self.n_epoch = -1
-         self.global_counter = ray.get_actor("global_counter")
          self.neat_config = neat.config.Config(neat.genome.DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                             'config_cppn_nmmo')
@@ -199,15 +216,17 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_pop.add_reporter(stats)
          self.neat_pop.add_reporter(neat.reporting.StdOutReporter(True))
 #        winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
-      self.reloading = False  # Have we just reloaded? For re-saving elite maps when reloading.
-      self.epoch_reloaded = None
+      else:
+         pass
 
 
    def neat_eval_fitness(self, genomes, neat_config):
       if self.n_epoch == 0:
          self.last_map_idx = 0
+
       if self.reloading:
          # Turn off reloading after 1 epoch.
+
          if not self.epoch_reloaded:
             self.epoch_reloaded = self.n_epoch
          elif self.epoch_reloaded < self.n_epoch:
@@ -220,18 +239,22 @@ class EvolverNMMO(LambdaMuEvolver):
       # FIXME NOPE
       self.save()
       skip_idxs = set()
+
       for idx, g in genomes:
          if idx <= self.last_map_idx and not self.reloading:
             continue
          cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
 #        if self.config.NET_RENDER:
 #           with open('nmmo_cppn.pkl', 'wb') a
+         multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
          map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
+
          for x in range(self.map_width):
             for y in range(self.map_height):
                x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
                x_i, y_i = x_i * 2, y_i * 2
                v = cppn.activate((x_i, y_i))
+
                if self.config.THRESHOLD:
                   # use NMMO's threshold logic
                   assert len(v) == 1
@@ -241,12 +264,14 @@ class EvolverNMMO(LambdaMuEvolver):
                   # CPPN has output channel for each tile type; take argmax over channels
                   # also a spawn-point tile
                   assert len(v) == self.n_tiles
+                  multi_hot[:, x, y] = v
                   v = np.argmax(v)
                   map_arr[x, y] = v
-         self.add_spawn(idx, map_arr)
+         self.validate_spawns(idx, map_arr, multi_hot)
         #map_arr = self.add_border(map_arr)
          # Impossible maps are no good
          tile_counts = np.bincount(map_arr.reshape(-1))
+
          if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
                tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
                tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
@@ -270,8 +295,10 @@ class EvolverNMMO(LambdaMuEvolver):
      #assert n_epis == self.n_pop
       for idx, _ in genomes:
          #FIXME: hack
+
          if idx in skip_idxs:
             continue
+
          if idx not in stats:
             print('Missing stats for map {}, training again.'.format(idx))
             self.trainer.train()
@@ -279,6 +306,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
       for idx, g in genomes:
          #FIXME: hack
+
          if idx in skip_idxs:
             continue
          print(headers)
@@ -287,8 +315,10 @@ class EvolverNMMO(LambdaMuEvolver):
          print('Map {}, diversity score: {}\n'.format(idx, score))
          g.fitness = score
       global_stats.reset.remote()
+
       if self.reloading:
          self.reloading = False
+
       if self.n_epoch % 10 == 0:
          self.save()
       self.neat_pop.reporters.reporters[0].save_genome_fitness(
@@ -299,6 +329,7 @@ class EvolverNMMO(LambdaMuEvolver):
    def evolve(self):
       if not self.CPPN:
          return super().evolve()
+
       if self.n_epoch == -1:
          self.init_pop()
       else:
@@ -309,8 +340,10 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.CPPN:
          mutated = list(maps.keys())
          #FIXME: hack
+
          if self.n_epoch == -1:
             self.n_epoch += 1
+
             return
      #for i, map_arr in maps.items():
       if mutated is None:
@@ -334,7 +367,7 @@ class EvolverNMMO(LambdaMuEvolver):
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
             Save.render(map_arr, self.map_generator.textures, png_path)
 
-         if not self.CPPN:
+         if self.RAND_GEN:
             json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
             with open(json_path, 'w') as json_file:
                json.dump(atk_mults, json_file)
@@ -350,6 +383,7 @@ class EvolverNMMO(LambdaMuEvolver):
       '''
       trash_data: to avoid undetermined weirdness when reloading
       '''
+
       if inference:
          #TODO: avoid loading redundant envs, provide policy rather than trainer to Evaluator if possible
          pass
@@ -434,18 +468,28 @@ class EvolverNMMO(LambdaMuEvolver):
       evaluator = Evaluator(self.config, self.trainer)
       evaluator.render()
 
-   def genRandMap(self):
+   def genRandMap(self, g_hash):
       if self.n_epoch > 0:
          print('generating new random map when I probably should not be... \n\n')
-      # FIXME: hack: ignore lava
 #     map_arr= np.random.randint(1, self.n_tiles,
 #                                 (self.map_width, self.map_height))
       if self.CPPN:
-         return None, None
+         raise Exception('CPPN maps should be generated inside neat_eval_fitness function')
+      elif self.PATTERN_GEN:
+         chromosome = self.Chromosome(
+               self.map_width, 
+               self.n_tiles, 
+               self.map_width**2 / 4, 
+               enums.Material.GRASS.value.index)
+         self.chromosomes[g_hash] = chromosome
+         map_arr, multi_hot = chromosome.generate()
+         self.validate_spawns(map_arr, multi_hot)
       else:
+         # FIXME: hack: ignore lava
          map_arr = np.random.choice(np.arange(1, self.n_tiles), (self.map_width, self.map_height),
                p=TILE_PROBS[1:])
-         self.add_border(map_arr)
+         self.validate_spawns(map_arr)
+#        self.add_border(map_arr)
       atk_mults = self.gen_mults()
 
       return map_arr, atk_mults
@@ -472,21 +516,32 @@ class EvolverNMMO(LambdaMuEvolver):
 
       return atk_mults
 
-   def mutate(self, gene):
-      map_arr, atk_mults = gene
-      map_arr= map_arr.copy()
+   def mutate(self, g_hash):
+      if self.CPPN:
+         raise Exception('CPPN-generated maps should be mutated inside NEAT code.')
+      elif self.PATTERN_GEN:
+         _, atk_mults = self.genes[g_hash]
+         chromosome = self.chromosomes[g_hash]
+         map_arr, multi_hot = chromosome.mutate()
+         self.validate_spawns(map_arr, multi_hot)
+      else:
+         map_arr, atk_mults = self.genes[g_hash]
+         map_arr= map_arr.copy()
 
-      for i in range(random.randint(0, self.n_mutate_actions)):
-         x= random.randint(0, self.map_width - 1)
-         y= random.randint(0, self.map_height - 1)
-         # FIXME: hack: ignore lava
-         t= np.random.randint(1, self.n_tiles)
-         map_arr[x, y]= t
-      map_arr = self.add_border(map_arr)
-      # kind of arbitrary, no?
-     #atk_mults = dict([(atk, max(min(mult + (np.random.random() * 2 - 1) / 3, 1), 0.2)) for atk, mult in atk_mults.items()])
+         for i in range(random.randint(0, self.n_mutate_actions)):
+            x= random.randint(0, self.map_width - 1)
+            y= random.randint(0, self.map_height - 1)
+            # FIXME: hack: ignore lava
+            t= np.random.randint(1, self.n_tiles)
+            map_arr[x, y]= t
+   #     map_arr = self.add_border(map_arr)
+         map_arr = self.validate_spawns(map_arr)
+      atk_mults = self.mutate_mults(atk_mults)
+
+      return map_arr, atk_mults
+
+   def mutate_mults(self, atk_mults):
       rand = np.random.random()
-
       if rand < 0.2:
          atk_mults = self.gen_mults()
       else:
@@ -498,29 +553,44 @@ class EvolverNMMO(LambdaMuEvolver):
             'RANGE_MULT': max(min(atk_mults['RANGE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
                                   self.RANGE_MAX), self.RANGE_MIN),
                }
+      return atk_mults
 
-      return map_arr, atk_mults
 
-   def add_border(self, map_arr, border_mat_index):
+   def validate_spawns(self, map_arr, multi_hot=None):
+      self.add_border(map_arr, multi_hot)
+      idxs = map_arr == enums.Material.SPAWN.value.index
+      spawn_points = np.vstack(np.where(idxs)).transpose()
+      n_spawns = len(spawn_points)
+      if n_spawns >= self.config.NENT: 
+         return
+      n_new_spawns = self.config.NENT - n_spawns
+      if multi_hot is not None:
+         spawn_idxs = k_largest_index_argsort(
+               multi_hot[enums.Material.SPAWN.value.index, :, :],
+               n_new_spawns)
+      else:
+         spawn_idxs = np.random.randint(self.map_width, (2, n_new_spawns))
+      map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
+         
+
+   def add_border(self, map_arr, multi_hot=None):
       b = self.config.TERRAIN_BORDER
-      # agents should not spawn and die immediately, as this may crash the env
-      a = 1
-      map_arr[b:b+a, :]= border_mat_index
-      map_arr[:, b:b+a]=   border_mat_index
-      map_arr[:, -b-a:-b]=  border_mat_index
-      map_arr[-b-a:-b, :]=  border_mat_index
       # the border must be lava
       map_arr[0:b, :]= enums.Material.LAVA.value.index
       map_arr[:, 0:b]= enums.Material.LAVA.value.index
       map_arr[-b:, :]= enums.Material.LAVA.value.index
       map_arr[:, -b:]= enums.Material.LAVA.value.index
-
-      return map_arr
+      if multi_hot is not None:
+         multi_hot[:, 0:b, :]= -1
+         multi_hot[:, :, 0:b]= -1
+         multi_hot[:, -b:, :]= -1
+         multi_hot[:, :, -b:]= -1
 
    def add_spawn(self, g_hash, map_arr):
       self.add_border(map_arr, enums.Material.GRASS.value.index)
       idxs = map_arr == enums.Material.SPAWN.value.index
       spawn_points = np.vstack(np.where(idxs)).transpose()
+
       if len(spawn_points) == 0:
          self.add_border(map_arr, enums.Material.SPAWN.value.index)
 #        spawn_points = [(b, j) for j in range(map_arr.shape[1])] + [(i, b) for i in range(map_arr.shape[0])] + [(i, -b) for i in range(map_arr.shape[0])] + [(-b, j) for j in range(map_arr.shape[1])]
@@ -615,7 +685,7 @@ class EvolverNMMO(LambdaMuEvolver):
          score = self.calc_diversity(stats[g_hash])
          self.population[g_hash] = (game, score, age)
          print(headers)
-         print(stats[g_hash][0])
+         print(stats[g_hash])
          print('diversity score: ', score)
 
       for g_hash, (game, score_t, age) in self.population.items():

@@ -194,7 +194,7 @@ class LambdaMuEvolver():
               mutated.append(g_hash)
               population.pop(g_hash)
              #self.score_var.pop(g_hash)
-              child_map = self.mutate(par_map)
+              child_map = self.mutate(par_hash)
              #child_game = self.make_game(child_map)
               child_game = None
               population[g_hash] = (child_game, None, 0)
@@ -224,7 +224,7 @@ class LambdaMuEvolver():
           #if rank in self.genes:
           #    map_arr = self.genes[rank]
           #else:
-           map_arr = self.genRandMap()
+           map_arr = self.genRandMap(rank)
            game = None
            self.population[rank]= (game, None, 0)
            self.genes[rank]= map_arr
@@ -257,7 +257,7 @@ class LambdaMuEvolver():
            print("time elapsed: {:0>2}:{:0>2}:{:05.2f}".format(
                int(hours), int(minutes), seconds))
 
-   def genRandMap(self):
+   def genRandMap(self, g_hash):
        raise NotImplementedError()
 
    def mutate(self, map_arr):
