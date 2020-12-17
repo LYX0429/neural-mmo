@@ -84,8 +84,8 @@ def calc_differential_entropy(agent_stats, max_pop=8):
 #  assert len(agent_skills) == 1
   #a_skills = agent_skills[0]
    # FIXME: Only applies to exploration-only experiment
-   print('exploration')
-   print(a_skills.transpose()[0])
+  #print('exploration')
+  #print(a_skills.transpose()[0])
    print('lifespans')
    print(a_lifespans)
    print(len(agent_skills), 'populations')

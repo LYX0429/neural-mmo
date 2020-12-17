@@ -56,6 +56,8 @@ class Chromosome():
       self.n_tiles = n_tiles
       self.max_patterns = max_patterns
       self.default_tile = default_tile
+      self.pattern_templates = [Line, Rectangle]
+      self.weights =  [2/3,  1/3]
 
    def init_endpoint_pattern(self, p):
       p = p(
@@ -69,10 +71,8 @@ class Chromosome():
       return p
 
    def generate(self):
-      patterns = [Line, Rectangle]
-      weights =  [2/3,  1/3]
-      self.patterns = np.random.choice(patterns, 
-            np.random.randint(self.max_patterns), weights)
+      self.patterns = np.random.choice(self.pattern_templates, 
+            np.random.randint(self.max_patterns), self.weights).tolist()
 
       for i, p in enumerate(self.patterns):
          if p in [Line, Rectangle]:
@@ -89,6 +89,14 @@ class Chromosome():
 
          if rand < 0.3:
             p.mutate()
+
+      n_patterns = len(self.patterns)
+      if np.random.random() < 0.3 and n_patterns > 0:
+         self.patterns.pop(np.random.randint(n_patterns))
+      if np.random.random() < 0.3 and n_patterns < self.max_patterns:
+         p = np.random.choice(self.pattern_templates)
+         self.init_endpoint_pattern(p)
+         self.patterns.append(p)
 
       return self.paint_map()
 
