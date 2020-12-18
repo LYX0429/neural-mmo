@@ -47,8 +47,8 @@ class LambdaMuEvolver():
          # get score from latest simulation
          # cull score history
 
-         if len(self.score_hists[g_hash]) >= 100:
-            while len(self.score_hists[g_hash]) >= 100:
+         if len(self.score_hists[g_hash]) >= 5:
+            while len(self.score_hists[g_hash]) >= 5:
                  self.score_hists[g_hash].pop(0)
          # hack
          if score_t is None:

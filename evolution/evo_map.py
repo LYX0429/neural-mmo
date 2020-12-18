@@ -383,6 +383,7 @@ class EvolverNMMO(LambdaMuEvolver):
       '''
       trash_data: to avoid undetermined weirdness when reloading
       '''
+      self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
 
       if inference:
          #TODO: avoid loading redundant envs, provide policy rather than trainer to Evaluator if possible
@@ -681,6 +682,12 @@ class EvolverNMMO(LambdaMuEvolver):
 
       global_stats.reset.remote()
 
+      for g_hash in self.population.keys():
+         if g_hash not in stats:
+            print('Missing simulation stats for map {}. I assume this is the 0th generation, or re-load? Re-running the training step.'.format(g_hash))
+            self.trainer.train()
+            stats = ray.get(global_stats.get.remote())
+            break
       for g_hash, (game, score, age) in self.population.items():
          score = self.calc_diversity(stats[g_hash])
          self.population[g_hash] = (game, score, age)

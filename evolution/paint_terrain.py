@@ -95,7 +95,7 @@ class Chromosome():
          self.patterns.pop(np.random.randint(n_patterns))
       if np.random.random() < 0.3 and n_patterns < self.max_patterns:
          p = np.random.choice(self.pattern_templates)
-         self.init_endpoint_pattern(p)
+         p = self.init_endpoint_pattern(p)
          self.patterns.append(p)
 
       return self.paint_map()
