@@ -46,7 +46,7 @@ class Orerock(Tile):
    degen = Grass
    tex = 'iron_ore'
    capacity = 1
-   respawnprob = 0.05
+   respawnprob = 0.025
    def __init__(self):
       super().__init__()
       self.harvestable = True
@@ -57,7 +57,7 @@ class Tree(Tile):
    degen = Forest
    tex = 'tree'
    capacity = 1
-   respawnProb = 0.05
+   respawnProb = 0.025
    def __init__(self):
       super().__init__()
       self.harvestable = True
@@ -77,7 +77,7 @@ class Material(Enum):
    SPAWN    = Spawn
 
 IMPASSIBLE = (1, 5) # 6, 7)
-HABITABLE  = (2, 3, 4, 8)
+HABITABLE  = (2, 3, 4, 6, 7, 8)
 
 class Defaults:
    BLACK    = (0, 0, 0)

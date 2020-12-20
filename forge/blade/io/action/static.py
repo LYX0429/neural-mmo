@@ -56,26 +56,30 @@ class Move(Node):
       rDelta, cDelta = direction.delta
       rNew, cNew = r+rDelta, c+cDelta
 
+      trg_pos = rNew, cNew
+      tile = env.map.tiles[trg_pos]
+      dest_idx = tile.mat.index
       #One agent per cell
-      if len(env.map.tiles[rNew, cNew].ents) != 0:
+      if len(env.map.tiles[trg_pos].ents) != 0:
          return
-      if env.map.tiles[rNew, cNew].state.index in enums.IMPASSIBLE:
-         trg = rNew, cNew
-         dest_tex = env.map.tiles[trg].state.tex
-         if dest_tex == 'tree':
-             return Woodcut.call(env, entity, trg)
-         if dest_tex == 'iron_ore':
-             return Mine.call(env, entity, trg)
+      if tile.impassible:
          return
+      if entity.status.freeze > 0:
+         return
+      #FIXME: hack. Check if tile is degenerated and thus passible.
+      hack_passible = tile.capacity == 0
+      if dest_idx == enums.Tree.index and not hack_passible:
+         return Woodcut.call(env, entity, trg_pos)
+      if dest_idx == enums.Orerock.index:
+         if not hack_passible:
+            return Mine.call(env, entity, trg_pos)
+         else: 
+            pass
 
       if not utils.inBounds(rNew, cNew, env.shape):
          return
-      tile = env.map.tiles[rNew, cNew] 
 
       if not tile.habitable and not tile.lava:
-         return
-
-      if entity.status.freeze > 0:
          return
 
       env.dataframe.move(Static.Entity, entID, (r, c), (rNew, cNew))

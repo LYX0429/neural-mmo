@@ -11,8 +11,8 @@ from pdb import set_trace as T
 
 import numpy as np
 
-# NOTE: to prevent "relative import" error, run `python -m evolution.skill_evolver.py`
-from .evo_map import (calc_differential_entropy, calc_diversity,
+# NOTE: to prevent "relative import" error, run `python -m evolution.skill_evolver
+from .evo_map import (calc_differential_entropy, calc_discrete_entropy,
                       calc_diversity_l2)
 from .lambda_mu import LambdaMuEvolver
 
@@ -29,7 +29,7 @@ class SkillEvolver(LambdaMuEvolver):
           print(np.array(agent_skills))
           print('score: {}, age: {}'.format(score, age))
 
-   def genRandMap(self):
+   def genRandMap(self, g_hash):
      # agent_skills = [
      #     [1200.,   0.,   0.,   0.,   0.,1500.,1500.,   0.,   0.],
      #     [1200.,   0.,   0.,   0.,   0.,1500.,1500.,   0.,   0.],
@@ -40,24 +40,33 @@ class SkillEvolver(LambdaMuEvolver):
      #     [1200.,   0.,   0.,   0.,   0.,1500.,1500.,   0.,   0.],
      #     [1200.,   0.,   0.,   0.,   0.,1500.,1500.,   0.,   0.], ]
        agent_skills = [[0 for i in range(3)] for j in range(8)]
+       agent_lifespans = [0 for j in range(8)]
+       agent_stats = {
+             'skills': agent_skills,
+             'lifespans': agent_lifespans,
+             }
 
-       return agent_skills
+       return agent_stats
 
    def simulate_game(self,
                        game,
-                       agent_skills,
+                       agent_stats,
                        n_sim_ticks,
                        child_conn,):
-#      score = calc_diversity_l2(agent_skills, self.alpha)
-       score = calc_differential_entropy([agent_skills])
+#     score = calc_diversity_l2(agent_skills, self.alpha)
+      score = calc_differential_entropy(agent_stats)
 
-       if child_conn:
-           child_conn.send(score)
+      if child_conn:
+          child_conn.send(score)
 
-       return score
+      return score
 
-   def mutate(self, gene):
-      agent_skills = copy.deepcopy(gene)
+   def mutate(self, g_hash):
+      gene = self.genes[g_hash]
+      agent_skills = gene['skills']
+      agent_lifespans = gene['lifespans']
+      agent_skills = copy.deepcopy(agent_skills)
+      agent_lifespans = copy.deepcopy(agent_lifespans)
       n_agents = len(agent_skills)
 
       for i in range(random.randint(1, 5)):
@@ -68,19 +77,33 @@ class SkillEvolver(LambdaMuEvolver):
            #    min_xp = 1000
            #else:
             min_xp = 0
+            max_xp = 20000
             agent_skills[a_i][s_i] = \
-                    min(max(min_xp, agent_skills[a_i][s_i] + random.randint(-100, 100)), 20000)
+                  min(max(min_xp, agent_skills[a_i][s_i] + random.randint(-100, 100)), max_xp)
+            l_i = random.randint(0, n_agents - 1)
+            max_lifespan = 100
+            agent_lifespans[l_i] = \
+                  min(max(0, agent_lifespans[l_i] + random.randint(-10, 10)), max_lifespan)
 
       if n_agents > 1 and random.random() < 0.05:
          # remove agent
-         agent_skills.pop(random.randint(0, n_agents - 1))
+         i = random.randint(0, n_agents - 1)
+         agent_skills.pop(i)
+         agent_lifespans.pop(i)
          n_agents -= 1
 
       if 8 > n_agents > 0 and random.random() < 0.05:
          # add agent
-         agent_skills.append(copy.deepcopy(agent_skills[random.randint(0, n_agents - 1)]))
+         i = random.randint(0, n_agents - 1)
+         agent_skills.append(copy.deepcopy(agent_skills[i]))
+         agent_lifespans.append(copy.deepcopy(agent_lifespans[i]))
 
-      return agent_skills
+      stats = {
+            'skills': agent_skills,
+            'lifespans': agent_lifespans,
+            }
+
+      return stats
 
    def make_game(self, agent_skills):
       return None
@@ -116,6 +139,7 @@ class SkillEvolver(LambdaMuEvolver):
             game, _, age = self.population[g_hash]
             self.population[g_hash] = (game, score, age + 1)
       processes = {}   
+
       return processes
 
 

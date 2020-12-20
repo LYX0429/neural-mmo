@@ -86,9 +86,10 @@ def calc_differential_entropy(agent_stats, max_pop=8):
    # FIXME: Only applies to exploration-only experiment
   #print('exploration')
   #print(a_skills.transpose()[0])
+   print(a_skills.transpose())
+   print(len(agent_skills), 'populations')
    print('lifespans')
    print(a_lifespans)
-   print(len(agent_skills), 'populations')
 
    if len(lifespans) == 1:
       score = 0
@@ -290,7 +291,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.send_genes(global_stats)
       train_stats = self.trainer.train()
       stats = ray.get(global_stats.get.remote())
-      headers = ray.get(global_stats.get_headers.remote())
+#     headers = ray.get(global_stats.get_headers.remote())
       n_epis = train_stats['episodes_this_iter']
      #assert n_epis == self.n_pop
       for idx, _ in genomes:
@@ -309,7 +310,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
          if idx in skip_idxs:
             continue
-         print(headers)
+         print(self.config.SKILLS)
          score = self.calc_diversity(stats[idx])
         #self.population[g_hash] = (None, score, None)
          print('Map {}, diversity score: {}\n'.format(idx, score))
@@ -346,8 +347,9 @@ class EvolverNMMO(LambdaMuEvolver):
 
             return
      #for i, map_arr in maps.items():
-      if mutated is None:
+      if mutated is None or self.reloading:
          mutated = list(self.population.keys())
+         self.reloading = False
 
       for i in mutated:
          if self.CPPN:
@@ -672,7 +674,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.send_genes(global_stats)
       train_stats = self.trainer.train()
       stats = ray.get(global_stats.get.remote())
-      headers = ray.get(global_stats.get_headers.remote())
+     #headers = ray.get(global_stats.get_headers.remote())
       n_epis = train_stats['episodes_this_iter']
 
       if n_epis == 0:
@@ -689,11 +691,9 @@ class EvolverNMMO(LambdaMuEvolver):
             stats = ray.get(global_stats.get.remote())
             break
       for g_hash, (game, score, age) in self.population.items():
+         print(self.config.SKILLS)
          score = self.calc_diversity(stats[g_hash])
          self.population[g_hash] = (game, score, age)
-         print(headers)
-         print(stats[g_hash])
-         print('diversity score: ', score)
 
       for g_hash, (game, score_t, age) in self.population.items():
          # get score from latest simulation

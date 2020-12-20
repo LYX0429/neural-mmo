@@ -122,7 +122,7 @@ class EvoNMMO(ResourcesTest):
    N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 1
-#  TERRAIN_RENDER = True
+   TERRAIN_RENDER = True
    TERRAIN_WATER        = 0.15
    TERRAIN_GRASS        = 0.35
    TERRAIN_LAVA         = 0.45
@@ -131,3 +131,7 @@ class EvoNMMO(ResourcesTest):
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.9
    NET_RENDER = False
+#  SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
+#  SKILLS = ['exploration']
+   SKILLS = ['woodcutting', 'mining']
+#  SKILLS = ['range', 'mage', 'melee']

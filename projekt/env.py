@@ -32,7 +32,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       self.skill_headers = []
       self.n_epi = 0
       # names of per-agent stats used by evolution
-      self.headers = None
+      self.headers = self.config.SKILLS
       super().__init__(self.config)
 
    def init_skill_log(self):
@@ -143,17 +143,13 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
                skills[d] = a_skill_vals
             if a_skills:
-               if not self.headers:
-                  headers = list(a_skill_vals.keys())
-                  self.headers = ray.get(global_stats.get_headers.remote(headers))
                stats = np.zeros((len(skills), len(self.headers)))
               #stats = np.zeros((len(skills), 1))
                lifespans = np.zeros((len(skills)))
                # over agents
                for i, a_skills in enumerate(skills.values()):
                   # over skills
-                  j = 0
-                  for k in self.headers:
+                  for j, k in enumerate(self.headers):
                      if k not in ['level', 'cooking', 'smithing']:
        #             if k in ['exploration']:
                         stats[i, j] = a_skills[k]

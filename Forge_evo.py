@@ -81,6 +81,7 @@ class Counter:
 
       if not self.idxs:
          # Then we are doing inference and have set the idx directly
+
          return self.count
       idx = self.idxs[self.count % len(self.idxs)]
       self.count += 1
@@ -101,9 +102,6 @@ class Stats:
       self.stats = {}
       self.mults = {}
       self.spawn_points = {}
-      self.headers = ['hunting', 'fishing', 'constitution', 'range', 'mage', 'melee', 'defense', 'mining', 'woodcutting', 'exploration']
-     #self.headers = ['mining', 'woodcutting']
-     #self.headers = ['exploration']
       self.config = config
    def add(self, stats, mapIdx):
       if config.RENDER:
@@ -124,19 +122,12 @@ class Stats:
       return self.stats
    def reset(self):
       self.stats = {}
-   def get_headers(self, headers=None):
-      if not headers:
-         return self.headers
-
-      if not self.headers:
-         self.headers = headers
-
-      return self.headers
    def add_mults(self, g_hash, mults):
       self.mults[g_hash] = mults
    def get_mults(self, g_hash):
       if g_hash not in self.mults:
          return None
+
       return self.mults[g_hash]
    def add_spawn_points(self, g_hash, spawn_points):
       self.spawn_points[g_hash] = spawn_points
@@ -185,6 +176,8 @@ if __name__ == '__main__':
       evolver.config.ROOT = config.ROOT
       evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
       evolver.config.INFER_IDX = config.INFER_IDX
+#     evolver.config.SKILLS = config.SKILLS
+#     evolver.config.MODEL = config.MODEL
 #     evolver.config['config'].MAX_STEPS = 200
 #     evolver.n_epochs = 15000
       evolver.reloading = True
