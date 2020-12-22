@@ -699,8 +699,8 @@ class EvolverNMMO(LambdaMuEvolver):
          # get score from latest simulation
          # cull score history
 
-         if len(self.score_hists[g_hash]) >= 10:
-            while len(self.score_hists[g_hash]) >= 10:
+         if len(self.score_hists[g_hash]) >= self.config.ROLLING_FITNESS:
+            while len(self.score_hists[g_hash]) >= config.ROLLING_FITNESS:
                self.score_hists[g_hash].pop(0)
           # hack
 
