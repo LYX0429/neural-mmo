@@ -61,7 +61,7 @@ def calc_diversity_l2(agent_skills71G):
    return score
 
 def sigmoid_lifespan(x):
-   return 1 / (1 + np.exp(0.1*(-x+50)))
+   return 3 / (1 + np.exp(0.1*(-x+50)))
 
 def calc_differential_entropy(agent_stats, max_pop=8):
    # Penalize if under max pop agents living
@@ -700,7 +700,7 @@ class EvolverNMMO(LambdaMuEvolver):
          # cull score history
 
          if len(self.score_hists[g_hash]) >= self.config.ROLLING_FITNESS:
-            while len(self.score_hists[g_hash]) >= config.ROLLING_FITNESS:
+            while len(self.score_hists[g_hash]) >= self.config.ROLLING_FITNESS:
                self.score_hists[g_hash].pop(0)
           # hack
 
