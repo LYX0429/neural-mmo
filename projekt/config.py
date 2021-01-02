@@ -136,3 +136,4 @@ class EvoNMMO(ResourcesTest):
    SKILLS = ['exploration']
 #  SKILLS = ['woodcutting', 'mining']
 #  SKILLS = ['range', 'mage', 'melee']
+

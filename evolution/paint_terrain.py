@@ -1,6 +1,6 @@
 from pdb import set_trace as T
 import numpy as np
-from skimage.draw import line, rectangle
+from skimage.draw import line, rectangle, rectangle_perimeter, circle, circle_perimeter
 from scipy.stats import multivariate_normal
 
 class PaintPattern():
@@ -36,7 +36,7 @@ class EndpointPattern(PaintPattern):
       rand = np.random.random()
 
       if rand < 0.3:
-         e += np.random.randint(10)
+         e += np.random.randint(-10, 10)
          e = min(max(0, e), self.map_width-1)
       elif rand < 0.35:
          e = np.random.randint(self.map_width)
@@ -47,7 +47,7 @@ class Distribution(PaintPattern):
    def generate(pattern_class, n_tiles, map_width):
       p = pattern_class(
             mean=np.random.randint(0, map_width, 2),
-            std_devs=np.random.randint(0, map_width, 2),
+            std_devs=np.random.randint(1, map_width, 2),
             tile_i=np.random.randint(0, n_tiles),
             intensity=np.random.random(),
             map_width=map_width,
@@ -61,9 +61,32 @@ class Distribution(PaintPattern):
       self.std_devs = std_devs
 
    def mutate(self):
-      self.mean = np.clip(0, self.map_width-1, self.mean + np.random.randint(0, 10, len(self.mean)))
-      self.std_devs = np.clip(0, self.map_width-1, self.std_devs + np.random.randint(0, 10, len(self.std_devs)))
+      self.mean = np.clip(self.mean + np.random.randint(-10, 10, len(self.mean)), 0, self.map_width-1)
+      self.std_devs = np.clip(self.std_devs + np.random.randint(-10, 10, len(self.std_devs)), 1, self.map_width-1)
 
+class CircleType(PaintPattern):
+   def generate(pattern_class, n_tiles, map_width):
+      p = pattern_class(
+            r=np.random.randint(0, map_width),
+            c=np.random.randint(0, map_width),
+            radius=np.random.randint(1, map_width/2), 
+            tile_i=np.random.randint(0, n_tiles),
+            intensity=np.random.random(),
+            map_width=map_width,
+            )
+
+      return p
+
+   def __init__(self, r, c, radius, tile_i, intensity, map_width):
+      super().__init__(tile_i, intensity, map_width)
+      self.r = r
+      self.c = c
+      self.radius = radius
+
+   def mutate(self):
+      self.r = np.clip(self.r + np.random.randint(-10, 10), 0, self.map_width-1)
+      self.c = np.clip(self.c + np.random.randint(-10, 10), 0, self.map_width-1)
+      self.radius = np.clip(self.radius + np.random.randint(-10, 10), 1, self.map_width-1)
 
 class Line(EndpointPattern):
    def __init__(self, *args):
@@ -87,6 +110,18 @@ class Rectangle(EndpointPattern):
       rr, cc = rectangle((x_0, y_0), (x_1, y_1))
       map_arr[tile_i, rr, cc] += intensity
 
+class RectanglePerimeter(EndpointPattern):
+   def __init__(self, *args):
+      super(RectanglePerimeter, self).__init__(*args)
+
+   def paint(self, map_arr):
+      y_0, y_1 = self.y_0, self.y_1
+      x_0, x_1 = self.x_0, self.x_1
+      tile_i, intensity = self.tile_i, self.intensity
+      rr, cc = rectangle_perimeter((x_0, y_0), (x_1, y_1), shape=(self.map_width, self.map_width))
+      map_arr[tile_i, rr, cc] += intensity
+
+
 class Gaussian(Distribution):
    def __init__(self, mean, std_devs, tile_i, intensity, map_width):
       super().__init__(mean, std_devs, tile_i, intensity, map_width)
@@ -99,15 +134,35 @@ class Gaussian(Distribution):
       pos = np.dstack((x, y))
       map_arr[tile_i] += dist.pdf(pos) * intensity
 
+class Circle(CircleType):
+   def __init__(self, r, c, radius, tile_i, intensity, map_width):
+      super(Circle, self).__init__(r, c, radius, tile_i, intensity, map_width)
+
+   def paint(self, map_arr):
+      rr, cc = circle(self.r, self.c, self.radius, shape=(self.map_width, self.map_width))
+      map_arr[self.tile_i, rr, cc] += self.intensity
+
+
+class CirclePerimeter(CircleType):
+   def __init__(self, r, c, radius, tile_i, intensity, map_width):
+      super(CirclePerimeter, self).__init__(r, c, radius, tile_i, intensity, map_width)
+
+   def paint(self, map_arr):
+      rr, cc = circle_perimeter(self.r, self.c, self.radius, shape=(self.map_width, self.map_width))
+      map_arr[self.tile_i, rr, cc] += self.intensity
+
+
 class Chromosome():
    def __init__(self, map_width, n_tiles, max_patterns, default_tile):
       self.map_width = map_width
       self.n_tiles = n_tiles
       self.max_patterns = max_patterns
       self.default_tile = default_tile
-      self.pattern_templates = [Line, Rectangle, Gaussian]
+      self.pattern_templates = [Line, Rectangle, RectanglePerimeter, Gaussian, Circle, CirclePerimeter]
 #     self.pattern_templates = [Gaussian]
       self.weights =  [2/3,  1/3]
+      # some MAP-Elites dimensions
+      self.features = None
 
 #  def init_endpoint_pattern(self, p):
 #     p = p(
@@ -123,15 +178,23 @@ class Chromosome():
    def generate(self):
       self.patterns = np.random.choice(self.pattern_templates, 
             np.random.randint(self.max_patterns), self.weights).tolist()
+      self.features = [0, 0]  # Number of lines, circle perimeters
 
       for i, p in enumerate(self.patterns):
         #if p in [Line, Rectangle]:
          p = p.generate(p, self.n_tiles, self.map_width)
          self.patterns[i] = p
-        #else:
-        #   raise Exception
+      self.update_features()
 
       return self.paint_map()
+
+   def update_features(self):
+      self.features = [0, 0]
+      for p in self.patterns:
+         if p == Line:
+            self.features[0] += 1
+         elif p == CirclePerimeter:
+            self.features[1] += 1
 
    def mutate(self):
       for p in self.patterns:
@@ -147,6 +210,7 @@ class Chromosome():
          p = np.random.choice(self.pattern_templates)
          p = p.generate(p, self.n_tiles, self.map_width)
          self.patterns.append(p)
+      self.update_features()
 
       return self.paint_map()
 

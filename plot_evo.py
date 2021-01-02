@@ -88,5 +88,5 @@ if __name__ == '__main__':
     #[bar.set_alpha(0.03) for bar in bars]
     plt.ylabel('fitness')
     plt.xlabel('generation')
-    plt.show()
     plt.savefig(im_path, dpi=my_dpi)
+    plt.show()
