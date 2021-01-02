@@ -8,6 +8,7 @@ import time
 from pdb import set_trace as T
 from shutil import copyfile
 from typing import Dict
+from evolution.pattern_map_elites import MapElites
 
 import numpy as np
 import neat
@@ -202,10 +203,30 @@ class EvolverNMMO(LambdaMuEvolver):
       self.RAND_GEN = config.GENE == 'Random'
 
       if self.PATTERN_GEN:
+         self.max_primitives = 25
+         self.me = MapElites(
+               evolver=self,
+               save_path=self.save_path
+               )
+#        # Do MAP-Elites using qdpy
          from evolution.paint_terrain import Chromosome
          self.Chromosome = Chromosome
          self.chromosomes = {}
+         self.init_pop()
          self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
+#        from qdpy import algorithms, containers, benchmarks, plots
+#        from deap import base
+#        toolbox = base.Toolbox()
+#        toolbox.register("mutate", self.me_pattern_mutate)
+
+#        # Create container and algorithm. Here we use MAP-Elites, by illuminating a Grid container by evolution.
+#        self.me_grid = containers.Grid(shape=(64,64), max_items_per_bin=1, fitness_domain=((0., 1.),), features_domain=((0., 1.), (0., 1.)))
+#        self.me_algo = algorithms.RandomSearchMutPolyBounded(self.me_grid, budget=60000, batch_size=config.N_EVO_MAPS,
+#                dimension=3, optimisation_task="maximisation")
+
+#        # Create a logger to pretty-print everything and generate output data files
+#        self.me_logger = algorithms.AlgorithmLogger(self.me_algo)
+
       elif self.CPPN:
          self.n_epoch = -1
          self.neat_config = neat.config.Config(neat.genome.DefaultGenome, neat.reproduction.DefaultReproduction,
@@ -327,15 +348,25 @@ class EvolverNMMO(LambdaMuEvolver):
             filename=os.path.join(self.save_path, 'genome_fitness.csv'))
       self.n_epoch += 1
 
+   def map_elites_eval_fn(self, chromosome):
+      T()
+
+   def me_pattern_mutate(self, x):
+      T()
+
    def evolve(self):
-      if not self.CPPN:
+      if self.PATTERN_GEN:
+         self.me.evolve()
+
+      elif self.CPPN:
+         if self.n_epoch == -1:
+            self.init_pop()
+         else:
+            self.map_generator = MapGenerator(self.config)
+         winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
+      else:
          return super().evolve()
 
-      if self.n_epoch == -1:
-         self.init_pop()
-      else:
-         self.map_generator = MapGenerator(self.config)
-      winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
 
    def saveMaps(self, maps, mutated=None):
       if self.CPPN:
@@ -471,7 +502,7 @@ class EvolverNMMO(LambdaMuEvolver):
       evaluator = Evaluator(self.config, self.trainer)
       evaluator.render()
 
-   def genRandMap(self, g_hash):
+   def genRandMap(self, g_hash=None):
       if self.n_epoch > 0:
          print('generating new random map when I probably should not be... \n\n')
 #     map_arr= np.random.randint(1, self.n_tiles,
@@ -479,14 +510,18 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.CPPN:
          raise Exception('CPPN maps should be generated inside neat_eval_fitness function')
       elif self.PATTERN_GEN:
+         if g_hash is None:
+            g_hash = ray.get(self.global_counter.get.remote())
          chromosome = self.Chromosome(
                self.map_width, 
                self.n_tiles, 
-               self.map_width**2 / 4, 
+               self.max_primitives, 
                enums.Material.GRASS.value.index)
          self.chromosomes[g_hash] = chromosome
          map_arr, multi_hot = chromosome.generate()
          self.validate_spawns(map_arr, multi_hot)
+         atk_mults = self.gen_mults()
+         return g_hash, map_arr, atk_mults
       else:
          # FIXME: hack: ignore lava
          map_arr = np.random.choice(np.arange(1, self.n_tiles), (self.map_width, self.map_height),
@@ -523,6 +558,7 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.CPPN:
          raise Exception('CPPN-generated maps should be mutated inside NEAT code.')
       elif self.PATTERN_GEN:
+         T()
          _, atk_mults = self.genes[g_hash]
          chromosome = self.chromosomes[g_hash]
          map_arr, multi_hot = chromosome.mutate()
@@ -783,6 +819,8 @@ class EvolverNMMO(LambdaMuEvolver):
    def init_pop(self):
        self.config.MODEL = None
        super().init_pop()
+       if not self.PATTERN_GEN:
+          self.saveMaps(self.genes, list(self.genes.keys()))
        self.config.MODEL = 'current'
 
 def update_entropy_skills(skill_dict):

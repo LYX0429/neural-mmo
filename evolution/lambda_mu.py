@@ -234,7 +234,6 @@ class LambdaMuEvolver():
            os.mkdir(os.path.join(self.save_path, 'maps'))
        except FileExistsError:
            print('Overwriting evolved maps at {}.'.format(self.save_path))
-       self.saveMaps(self.genes, list(self.genes.keys()))
        print('restoring')
        self.restore()
        print('restoring')
