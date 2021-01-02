@@ -121,7 +121,8 @@ class EvoNMMO(ResourcesTest):
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
-   MATURE_AGE = 1
+   MATURE_AGE = 3
+   ROLLING_FITNESS = 25  # Size of window to use while calculating mean rolling fitness
    TERRAIN_RENDER = True
    TERRAIN_WATER        = 0.15
    TERRAIN_GRASS        = 0.35
@@ -132,7 +133,7 @@ class EvoNMMO(ResourcesTest):
    TERRAIN_OREROCK      = 0.9
    NET_RENDER = False
 #  SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
-#  SKILLS = ['exploration']
-   SKILLS = ['woodcutting', 'mining']
+   SKILLS = ['exploration']
+#  SKILLS = ['woodcutting', 'mining']
 #  SKILLS = ['range', 'mage', 'melee']
 
