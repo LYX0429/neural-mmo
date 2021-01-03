@@ -138,8 +138,8 @@ class EvoNMMO(ResourcesTest):
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.9
    NET_RENDER = False
-   SKILLS = ['exploration']
+#  SKILLS = ['exploration']
 #  SKILLS = ['woodcutting', 'mining']
 #  SKILLS = ['range', 'mage', 'melee']
-#  SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
+   SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 
