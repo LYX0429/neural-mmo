@@ -23,8 +23,8 @@ class Config(core.Config):
 
    # Environment parameters
    NPOP = 1    # Number of populations
-   NENT = 256  # Maximum population size
-   NMOB = 32   # Number of NPCS
+   NENT = 1024 # Maximum population size
+   NMOB = 1024 # Number of NPCS
 
    NMAPS = 256 # Number maps to generate
 
@@ -32,7 +32,7 @@ class Config(core.Config):
    EVALUATION_HORIZON = 2048
 
    #Agent vision range
-   STIM    = 4
+   STIM    = 7
 
    #Maximum number of observed agents
    N_AGENT_OBS = 100
@@ -72,8 +72,11 @@ class SmallMap(Config):
 
    TERRAIN_SIZE            = 80 
    TERRAIN_OCTAVES         = 1
-   TERRAIN_FOREST_LOW      = 0.375
-   TERRAIN_GRASS           = 0.7
+   TERRAIN_FOREST_LOW      = 0.30
+   TERRAIN_FOREST_HIGH     = 0.75
+   TERRAIN_GRASS           = 0.715
+   TERRAIN_ALPHA           = -0.025
+   TERRAIN_BETA            = 0.035
 
    TERRAIN_DIR             = Config.TERRAIN_DIR_SMALL
    ROOT                    = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
@@ -81,8 +84,11 @@ class SmallMap(Config):
    INVERT_WILDERNESS       = True
    WILDERNESS              = False
 
-   NPC_LEVEL_MAX           = 30
+   NPC_LEVEL_MAX           = 35
    NPC_LEVEL_SPREAD        = 5
+   NPC_SPAWN_PASSIVE       = 0.00
+   NPC_SPAWN_NEUTRAL       = 0.60
+   NPC_SPAWN_AGGRESSIVE    = 0.80
 
 class ResourcesTest(SmallMap):
    NENT                 = 8
