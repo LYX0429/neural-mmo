@@ -1,11 +1,13 @@
-from pdb import set_trace as T
-import os
-from shutil import copyfile
-import pickle
-import numpy as np
-from multiprocessing import Pipe, Process
 import csv
+import os
+import pickle
 import time
+from multiprocessing import Pipe, Process
+from pdb import set_trace as T
+from shutil import copyfile
+
+import numpy as np
+
 
 class LambdaMuEvolver():
    def __init__(
@@ -51,6 +53,7 @@ class LambdaMuEvolver():
             while len(self.score_hists[g_hash]) >= 5:
                  self.score_hists[g_hash].pop(0)
          # hack
+
          if score_t is None:
             score_t = 0
          else:
@@ -105,10 +108,14 @@ class LambdaMuEvolver():
 
       return self.mutate_gen()
 
-   def log(self):
-      pop_list = [(g_hash, game, score, age) for g_hash, (game, score, age) in self.population.items() if score is not None] 
-      ranked_pop = sorted(pop_list, key=lambda tpl: tpl[2])
-      print('Ranked population: (id, running_mean_score, last_score, age)')
+   def log(self, ranked_pop=None):
+      if ranked_pop is None:
+         pop_list = [(g_hash, game, score, age) for g_hash, (game, score, age) in self.population.items() if score is not None]
+         ranked_pop = sorted(pop_list, key=lambda tpl: tpl[2])
+      VERBOSE = False
+
+      if VERBOSE:
+         print('Ranked population: (id, running_mean_score, last_score, age)')
 
       with open(self.log_path, mode='a') as log_file:
           log_writer = csv.writer(
@@ -119,51 +126,59 @@ class LambdaMuEvolver():
           log_writer.writerow(
                   ['id', 'running_score', 'last_score', 'age'])
 
-          for g_hash, game, score, age in ranked_pop:
+          scores = []
 
-              if g_hash in self.score_hists:
-                  score_hist = self.score_hists[g_hash]
-                  if len(score_hist) > 0:
-                      last_score = self.score_hists[g_hash][-1]
-                  else:
-                      last_score = 0
-              else:
-                  last_score = -1
-              print('{}, {:2f}, {:2f}, {}'.format(
-                  g_hash, score, last_score, age))
-              log_writer.writerow([g_hash, score, last_score, age])
+          for g_hash, game, score, age in ranked_pop:
+             scores.append(score)
+
+             if g_hash in self.score_hists:
+                score_hist = self.score_hists[g_hash]
+
+                if len(score_hist) > 0:
+                   last_score = self.score_hists[g_hash][-1]
+                else:
+                   last_score = 0
+             else:
+                last_score = -1
+
+             if VERBOSE:
+                print('{}, {:2f}, {:2f}, {}'.format(
+                   g_hash, score, last_score, age))
+             log_writer.writerow([g_hash, score, last_score, age])
+      print('mean score: {}'.format(np.mean(scores)))
 
    def mutate_gen(self):
       population = self.population
       n_cull = int(self.n_pop * self.mu)
       n_parents = int(self.n_pop * self.lam)
       dead_hashes = []
-      pop_list = [(g_hash, game, score, age) for g_hash, (game, score, age) in self.population.items() if score is not None] 
+      pop_list = [(g_hash, game, score, age) for g_hash, (game, score, age) in self.population.items() if score is not None]
       ranked_pop = sorted(pop_list, key=lambda tpl: tpl[2])
-      print('Ranked population: (id, running_mean_score, last_score, age)')
+      self.log(ranked_pop)
+ #    print('Ranked population: (id, running_mean_score, last_score, age)')
 
-      with open(self.log_path, mode='a') as log_file:
-          log_writer = csv.writer(
-                  log_file, delimiter=',',
-                  quotechar='"',
-                  quoting=csv.QUOTE_MINIMAL)
-          log_writer.writerow(['epoch {}'.format(self.n_epoch)])
-          log_writer.writerow(
-                  ['id', 'running_score', 'last_score', 'age'])
+ #    with open(self.log_path, mode='a') as log_file:
+ #        log_writer = csv.writer(
+ #                log_file, delimiter=',',
+ #                quotechar='"',
+ #                quoting=csv.QUOTE_MINIMAL)
+ #        log_writer.writerow(['epoch {}'.format(self.n_epoch)])
+ #        log_writer.writerow(
+ #                ['id', 'running_score', 'last_score', 'age'])
 
-          for g_hash, game, score, age in ranked_pop:
+ #        for g_hash, game, score, age in ranked_pop:
 
-              if g_hash in self.score_hists:
-                  score_hist = self.score_hists[g_hash]
-                  if len(score_hist) > 0:
-                      last_score = self.score_hists[g_hash][-1]
-                  else:
-                      last_score = 0
-              else:
-                  last_score = -1
-              print('{}, {:2f}, {:2f}, {}'.format(
-                  g_hash, score, last_score, age))
-              log_writer.writerow([g_hash, score, last_score, age])
+ #            if g_hash in self.score_hists:
+ #                score_hist = self.score_hists[g_hash]
+ #                if len(score_hist) > 0:
+ #                    last_score = self.score_hists[g_hash][-1]
+ #                else:
+ #                    last_score = 0
+ #            else:
+ #                last_score = -1
+ #            print('{}, {:2f}, {:2f}, {}'.format(
+ #                g_hash, score, last_score, age))
+ #            log_writer.writerow([g_hash, score, last_score, age])
 
       for j in range(n_cull):
           dead_hash = ranked_pop[j][0]
@@ -183,6 +198,7 @@ class LambdaMuEvolver():
       j = 0
 
       mutated = []
+
       if par_hashes:
           while dead_hashes:
               n_parent = j % len(par_hashes)
@@ -234,15 +250,14 @@ class LambdaMuEvolver():
            os.mkdir(os.path.join(self.save_path, 'maps'))
        except FileExistsError:
            print('Overwriting evolved maps at {}.'.format(self.save_path))
-       print('restoring')
        self.restore()
-       print('restoring')
 
    def evolve(self, n_epochs=None):
    #   self.save()
    #   raise Exception
        if n_epochs:
            self.n_epochs = n_epochs
+
        if self.n_epoch == 0:
            self.init_pop()
 
@@ -268,5 +283,3 @@ class LambdaMuEvolver():
 
    def infer(self):
        raise NotImplementedError()
-
-

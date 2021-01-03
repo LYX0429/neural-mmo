@@ -120,6 +120,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
          if self.n_step >= self.config.MAX_STEPS or self.config.RENDER:
             global_stats = ray.get_actor('global_stats')
             # reset the env manually, to load from the new updated population of maps
+#           print('resetting env {} after {} steps'.format(self.worldIdx, self.n_step))
             dones['__all__'] = True
             a_skills = None
             for d, player in self.realm.players.items():

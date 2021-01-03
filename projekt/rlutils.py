@@ -56,25 +56,28 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       ):
      
 #     self.maps = maps
-     stats = super().train()
-     self.save()
+      stats = super().train()
+      self.save()
 
-     nSteps = stats['info']['num_steps_trained']
-     print('Epoch: {}, Samples: {}'.format(self.n_epoch, nSteps))
-     hist = stats['hist_stats']
-     for key, stat in hist.items():
-        if len(stat) == 0 or key == 'map_fitness':
-           continue
+      nSteps = stats['info']['num_steps_trained']
+      VERBOSE = False
+      if VERBOSE:
+         print('Epoch: {}, Samples: {}'.format(self.n_epoch, nSteps))
+      hist = stats['hist_stats']
+      for key, stat in hist.items():
+         if len(stat) == 0 or key == 'map_fitness':
+            continue
 
-        print('{}:: Total: {:.4f}, N: {:.4f}, Mean: {:.4f}, Std: {:.4f}, Min: {:.4f}, Max: {:.4f}'.format(
-              key, np.sum(stat), len(stat), np.mean(stat), np.std(stat), np.min(stat), np.max(stat)))
-       #if key == 'map_fitness':
-       #    print('DEBUG MAP FITNESS PRINTOUT')
-       #    print(hist[key])
-        hist[key] = []
+         if VERBOSE:   
+            print('{}:: Total: {:.4f}, N: {:.4f}, Mean: {:.4f}, Std: {:.4f}, Min: {:.4f}, Max: {:.4f}'.format(
+                  key, np.sum(stat), len(stat), np.mean(stat), np.std(stat), np.min(stat), np.max(stat)))
+        #if key == 'map_fitness':
+        #    print('DEBUG MAP FITNESS PRINTOUT')
+        #    print(hist[key])
+         hist[key] = []
    
-     self.n_epoch += 1
-     return stats
+      self.n_epoch += 1
+      return stats
 
    def reset(self):
      #print('sane reset evoTrainer \n')

@@ -1,8 +1,6 @@
-import operator
 import copy
-import ray
-from qdpy.plots import *
-from pcg import TILE_PROBS
+import inspect
+import operator
 import os
 import random
 import warnings
@@ -11,14 +9,18 @@ from pdb import set_trace as TT
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import ray
 import scipy
 
 from deap import algorithms, base, creator, gp, tools
 from forge.blade.lib import enums
+from pcg import TILE_PROBS
 from qdpy.algorithms.deap import DEAPQDAlgorithm
 from qdpy.base import ParallelismManager
 # from qdpy.benchmarks import *
 from qdpy.containers import Grid
+from qdpy.plots import *
+from timeit import default_timer as timer
 
 # from qdpy.plots import *
 
@@ -46,9 +48,15 @@ class Fitness():
       self.values = None
       self.valid = False
 
+   def dominates(self, fitness):
+      assert len(self.values) == 1 and len(fitness.values) == 1
+      my_fit = self.values[0]
+      their_fit = fitness.values[0]
+
+      return my_fit > their_fit
+
 class Individual():
    def __init__(self, rank=None, evolver=None, mysterious_class=None):
-#     TT()
       ind_idx, map_arr, atk_mults = evolver.genRandMap()
       self.fitness = Fitness()
       assert rank is not None
@@ -69,22 +77,38 @@ class MapElites():
    def mutate(self, individual):
       evo = self.evolver
       idx = individual.data['ind_idx']
-      chrom = evo.chromosomes[idx]
+      chrom, atk_mults = evo.chromosomes[idx]
+      atk_mults = self.evolver.mutate_mults(atk_mults)
       chrom.mutate()
+
       if not hasattr(individual.fitness, 'values'):
          individual.fitness.values = None
       individual.fitness.valid = False
+
       return (individual, )
 
    def mate(self, parent_0, parent_1):
       evo = self.evolver
       idx_0 = parent_0.data['ind_idx']
       idx_1 = parent_1.data['ind_idx']
-      chrom_0 = evo.chromosomes[idx_0]
-      chrom_1 = evo.chromosomes[idx_1]
+      chrom_0, atk_mults_0 = evo.chromosomes[idx_0]
+      chrom_1, atk_mults_1 = evo.chromosomes[idx_1]
       prims_0 = chrom_0.patterns
       prims_1 = chrom_1.patterns
+      new_atk_mults_0, new_atk_mults_1 = {}, {}
+
+      for k, v in atk_mults_0.items():
+         if np.random.random() < 0.5:
+            new_atk_mults_0[k] = atk_mults_1[k]
+         else:
+            new_atk_mults_0[k] = atk_mults_0[k]
+
+         if np.random.random() < 0.5:
+            new_atk_mults_1[k] = atk_mults_0[k]
+         else:
+            new_atk_mults_1[k] = atk_mults_1[k]
       len_0, len_1 = len(prims_0), len(prims_1)
+
       if len_0 < len_1:
          prims_0 = prims_0 + prims_1[-len_1 + len_0 - 1:]
       elif len_1 < len_0:
@@ -93,13 +117,15 @@ class MapElites():
       new_prims_1 = [prims_0[i] if random.random() < 0.5 else prims_1[i] for i in range(len_1)]
       chrom_0.patterns = new_prims_0
       chrom_1.patterns = new_prims_1
-      evo.chromosomes[idx_0] = chrom_0
-      evo.chromosomes[idx_1] = chrom_1
+      evo.chromosomes[idx_0] = chrom_0, new_atk_mults_0
+      evo.chromosomes[idx_1] = chrom_1, new_atk_mults_1
       chrom_0.update_features()
       chrom_1.update_features()
+
       if not hasattr(parent_0.fitness, 'values'):
          parent_0.fitness.values = None
       parent_0.fitness.valid = False
+
       if not hasattr(parent_1.fitness, 'values'):
          parent_1.fitness.values = None
       parent_1.fitness.valid = False
@@ -109,13 +135,15 @@ class MapElites():
       return parent_0, parent_1
 
    def __init__(self, evolver, save_path='./'):
-       self.save_path = save_path
-       self.evolver = evolver
-#      from evolution.paint_terrain import Chromosome
-#      self.Chromosome = Chromosome                                             
-#      self.chromosomes = {}                                                    
-#      evolver.global_counter.set_idxs.remote(range(evolver.config.N_EVO_MAPS))       
-       # Create fitness classes (must NOT be initialised in __main__ if you want to use scoop)
+      self.n_gen = 0
+      self.save_path = save_path
+      self.evolver = evolver
+      # Create fitness classes (must NOT be initialised in __main__ if you want to use scoop)
+      self.init_toolbox()
+      self.idxs = set()
+      self.stats = None
+
+   def init_toolbox(self):
        fitness_weight = -1.0
        creator.create("FitnessMin", base.Fitness, weights=(fitness_weight, ))
        creator.create("Individual",
@@ -123,31 +151,6 @@ class MapElites():
                       evolver=self.evolver)
 #                     fitness=creator.FitnessMin,
 #                     features=list)
-
-       # Compute reference function and stats
-       points = np.array(np.linspace(-1., 1., 1000), dtype=float)
-       dpoints = np.diff(points)
-       self.ref_vals = ref_vals = np.array(
-           [(x**4 + x**3 + x**2 + x) for x in points])
-       dref = np.diff(ref_vals)
-       self.slopes_ref = dref / dpoints
-       spline_ref = scipy.interpolate.splrep(points, ref_vals, k=3)
-       self.spline_dref = scipy.interpolate.splev(points, spline_ref, der=1)
-       self.spline_dref2 = scipy.interpolate.splev(points, spline_ref, der=2)
-
-       # Create primitives
-       #     pset = gp.PrimitiveSet("MAIN", 1)
-       #     pset.addPrimitive(operator.add, 2)
-       #     pset.addPrimitive(operator.sub, 2)
-       #     pset.addPrimitive(operator.mul, 2)
-       #     pset.addPrimitive(protectedDiv, 2)
-       #     pset.addPrimitive(operator.neg, 1)
-       #     pset.addPrimitive(operator.pow, 2)
-       #     #pset.addPrimitive(math.cos, 1)
-       #     #pset.addPrimitive(math.sin, 1)
-       #     #pset.addEphemeralConstant("rand101", lambda: random.uniform(-1.,1.))
-       #     pset.addEphemeralConstant("rand101", lambda: random.randint(-4.,4.))
-       #     pset.renameArguments(ARG0='x')
 
        # Create Toolbox
        self.max_size = max_size = 25
@@ -178,8 +181,6 @@ class MapElites():
        # toolbox.register("mutate", tools.mutPolynomialBounded, low=ind_domain[0], up=ind_domain[1], eta=eta, indpb=mutation_pb)
        # toolbox.register("select", tools.selRandom) # MAP-Elites = random selection on a grid container
        self.toolbox = toolbox
-       self.idxs = set()
-       self.stats = None
 
    def init_pop(self, n):
       return [Individual(rank=i, evolver=self.evolver) for i in range(n)]
@@ -193,82 +194,87 @@ class MapElites():
        except ZeroDivisionError:
            return 1
 
+   def iteration_callback(self, i, batch, container, logbook):
+      print('pattern_map_elites iteration {}'.format(self.n_gen))
+      # FIXME: doesn't work -- sync up these iteration/generation counts
+      self.algo.current_iteration = self.n_gen
+      evo = self.evolver
+      evo.n_epoch = self.n_gen
+      self.n_gen += 1
+      self.idxs = set()
+      self.stats = None
+      evo.global_stats.reset.remote()
+      evo.saveMaps(evo.genes)
+      evo.log()
+
    def evaluate(self, individual):
       evo = self.evolver
       ind_idx = individual.data['ind_idx']
+
       if ind_idx in self.idxs:
-         self.idxs = set()
-         self.stats = None
-         evo.global_stats.reset.remote()
+         pass
       # if we have to run any sims, run the parallelized rllib trainer object
+
       if self.stats is None or ind_idx not in self.stats:
          evo.trainer.train()
          self.stats = ray.get(evo.global_stats.get.remote())
       assert ind_idx in self.stats
       ind_stats = self.stats[ind_idx]
       score = evo.calc_diversity(ind_stats)
-      features = evo.chromosomes[ind_idx].features
+      (game, old_score, age) = evo.population[ind_idx]
+      evo.population[ind_idx] = (game, score, age)
+      features = evo.chromosomes[ind_idx][0].features
       individual.fitness.values = [score]
       individual.fitness.valid = True
       individual.features = features
       self.idxs.add(ind_idx)
-      TT()
+
+      if self.n_gen % 10 == 0:
+         algo = self.algo
+         self.algo = None
+         toolbox = self.toolbox
+         self.toolbox = None
+#        for k, v in inspect.getmembers(self.algo):
+#           if k.startswith('_') and k != '__class__': #or inspect.ismethod(v):
+#              setattr(self, k, lambda x: None)
+         evo.save()
+         algo.save(os.path.join(self.save_path, 'ME_archive.p'))
+         self.algo = algo
+         self.toolbox = toolbox
+
       return [[score], features]
+
+   def load(self):
+      import pickle
+      self.init_toolbox()
+      with open(os.path.join(self.save_path, 'ME_archive.p'), "rb") as f:
+         archive = pickle.load(f)
+         # NOTE: (Elite) individuals saved in the grid will have overlapping indexes.
+         # TODO: Save all elite maps; do inference on one of them.
+         algo = DEAPQDAlgorithm(self.toolbox,
+                               archive['container'],
+                               init_batch_size=archive['init_batch_size'],
+                               batch_size=archive['batch_size'],
+                               niter=archive['nb_iterations'],
+                               cxpb=self.cxpb,
+                               mutpb=self.mutation_pb,
+                               verbose=self.verbose,
+                               show_warnings=self.show_warnings,
+                               results_infos=self.results_infos,
+                               log_base_path=self.log_base_path,
+                               iteration_callback_fn=self.iteration_callback)
+         self.algo = algo
+         algo.current_iteration = archive['current_iteration']
+#        algo.start_time = timer()
+#        algo.run(archive['container'])
+         return algo.run()
+
 
    def expr(self):
       individual = Individual(Individual, evolver=self.evolver)
 
 
       return individual
-
-   def evalSymbReg(self, individual, points):
-       toolbox = self.toolbox
-       # Transform the tree expression in a callable function
-       func = toolbox.compile(expr=individual)
-       # print(individual)
-
-       with warnings.catch_warnings():
-           warnings.simplefilter("ignore")
-           try:
-               # Compute tested function
-               func_vals = np.array([func(x) for x in points])
-               # Evaluate the mean squared error between the expression
-               # and the target function
-               sqerrors = (func_vals - self.ref_vals)**2.
-               fitness = [np.real(np.mean(sqerrors))]
-
-               # Compute slopes
-               # dfunc = np.diff(func_vals)
-               # slopes_func = dfunc / dpoints
-               # slopes_sqerrors = (slopes_func - slopes_ref) ** 2.
-               # slopes_score = np.mean(slopes_sqerrors)
-
-               # Compute derivatives by using scipy B-splines
-               spline_func = scipy.interpolate.splrep(points, func_vals, k=3)
-               spline_dfunc = scipy.interpolate.splev(points,
-                                                      spline_func,
-                                                      der=1)
-               spline_dfunc2 = scipy.interpolate.splev(points,
-                                                       spline_func,
-                                                       der=2)
-               spline_score = np.real(
-                   np.mean((spline_dfunc - self.spline_dref)**2.))
-               spline_score2 = np.real(
-                   np.mean((spline_dfunc2 - self.spline_dref2)**2.))
-
-           except Exception:
-               fitness = [100.]
-               # slopes_score = 100.
-               spline_score = 100.
-               spline_score2 = 100.
-
-       length = len(individual)
-       height = individual.height
-       # features = [len(individual), slopes_score]
-       features = [length, height, spline_score, spline_score2]
-       # print(fitness, features)
-
-       return [fitness, features]
 
    def evolve(self):
 #      import argparse
@@ -291,7 +297,7 @@ class MapElites():
 #                          default=None,
 #                          help="Path of the output log files")
 #      args = parser.parse_args()
-       self.evolver.global_counter.set_idxs.remote(list(range(self.evolver.config.N_EVO_MAPS * 2)))
+       self.evolver.global_counter.set_idxs.remote(list(range(self.evolver.config.N_EVO_MAPS)))
        seed = 420
       # seed = np.random.randint(1000000)
        output_dir = self.save_path
@@ -309,20 +315,20 @@ class MapElites():
        # The domain (min/max values) of the fitness
        fitness_domain = [(-np.inf, np.inf)]
        # The number of evaluations of the initial batch ('batch' = population)
-       init_batch_size = 6
+       init_batch_size = self.evolver.config.N_EVO_MAPS
        # The number of evaluations in each subsequent batch
-       batch_size = 6
+       batch_size = self.evolver.config.N_EVO_MAPS
        # The number of iterations (i.e. times where a new batch is evaluated)
-       nb_iterations = 10
-       cxpb = 0.5
+       nb_iterations = 100
+       self.cxpb = cxpb = 0.5
        # The probability of mutating each value of a genome
-       mutation_pb = 1.0
+       self.mutation_pb = mutation_pb = 1.0
        # The number of items in each bin of the grid
        max_items_per_bin = 1
-       verbose = True
+       self.verbose = verbose = True
        # Display warning and error messages. Set to True if you want to check if some individuals were out-of-bounds
-       show_warnings = True
-       log_base_path = output_dir if output_dir is not None else "."
+       self.show_warnings = show_warnings = True
+       self.log_base_path = log_base_path = output_dir if output_dir is not None else "."
 
        # Update and print seed
        np.random.seed(seed)
@@ -330,7 +336,7 @@ class MapElites():
        print("Seed: %i" % seed)
 
        # Create a dict storing all relevant infos
-       results_infos = {}
+       self.results_infos = results_infos = {}
        #    results_infos['dimension'] = dimension
        #    results_infos['ind_domain'] = ind_domain
        results_infos['features_domain'] = features_domain
@@ -348,7 +354,7 @@ class MapElites():
                    fitness_domain=fitness_domain,
                    features_domain=features_domain,
                    storage_type=list)
-
+       self.grid = grid
        parallelism_type = 'sequential'
 #      parallelism_type = 'multiprocessing'
        with ParallelismManager(parallelism_type,
@@ -364,7 +370,9 @@ class MapElites():
                                   verbose=verbose,
                                   show_warnings=show_warnings,
                                   results_infos=results_infos,
-                                  log_base_path=log_base_path)
+                                  log_base_path=log_base_path,
+                                  iteration_callback_fn=self.iteration_callback)
+           self.algo = algo
            # Run the illumination process !
            algo.run()
 

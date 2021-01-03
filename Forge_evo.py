@@ -171,6 +171,7 @@ if __name__ == '__main__':
       evolver_path = os.path.join(save_path, 'evolver')
       with open(evolver_path, 'rb') as save_file:
          evolver = pickle.load(save_file)
+
          print('loading evolver from save file')
       # change params on reload here
       evolver.config.ROOT = config.ROOT
@@ -184,6 +185,8 @@ if __name__ == '__main__':
       evolver.epoch_reloaded = evolver.n_epoch
       evolver.restore(trash_data=True)
       evolver.trainer.reset()
+      if evolver.PATTERN_GEN:
+         evolver.me.load()
 
    except FileNotFoundError as e:
       print(e)

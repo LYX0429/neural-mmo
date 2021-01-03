@@ -108,8 +108,8 @@ class EvoNMMO(ResourcesTest):
  # INFER_IDX = 79766
  # INFER_IDX = 80117
    # How to measure diversity of agents on generated map.
-   FITNESS_METRIC = 'Differential' # 'Differential', 'Discrete'
-   GENE = 'Pattern'  # CPPN, Pattern, Random
+   FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete'
+   GENE = 'Random'  # CPPN, Pattern, Random
    THRESHOLD = False
    TERRAIN_MODE = 'contract'
    EVO_MAP = True
@@ -132,8 +132,8 @@ class EvoNMMO(ResourcesTest):
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.9
    NET_RENDER = False
-#  SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
    SKILLS = ['exploration']
 #  SKILLS = ['woodcutting', 'mining']
 #  SKILLS = ['range', 'mage', 'melee']
+#  SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 

@@ -1,6 +1,6 @@
 from pdb import set_trace as T
 import numpy as np
-from skimage.draw import line, rectangle, rectangle_perimeter, circle, circle_perimeter
+from skimage.draw import line, rectangle, rectangle_perimeter, disk, circle_perimeter
 from scipy.stats import multivariate_normal
 
 class PaintPattern():
@@ -15,7 +15,7 @@ class EndpointPattern(PaintPattern):
             np.random.randint(0, map_width, 2),
             np.random.randint(0, map_width, 2),
             np.random.randint(0, n_tiles),
-            np.random.random(),
+            np.random.random() * 2 - 1,
             map_width,
             )
 
@@ -139,7 +139,7 @@ class Circle(CircleType):
       super(Circle, self).__init__(r, c, radius, tile_i, intensity, map_width)
 
    def paint(self, map_arr):
-      rr, cc = circle(self.r, self.c, self.radius, shape=(self.map_width, self.map_width))
+      rr, cc = disk((self.r, self.c), self.radius, shape=(self.map_width, self.map_width))
       map_arr[self.tile_i, rr, cc] += self.intensity
 
 
@@ -191,9 +191,9 @@ class Chromosome():
    def update_features(self):
       self.features = [0, 0]
       for p in self.patterns:
-         if p == Line:
+         if isinstance(p, (Line, Rectangle, RectanglePerimeter)):
             self.features[0] += 1
-         elif p == CirclePerimeter:
+         elif isinstance(p, (CirclePerimeter, Circle, Gaussian)):
             self.features[1] += 1
 
    def mutate(self):

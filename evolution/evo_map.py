@@ -1,3 +1,4 @@
+import copy
 import csv
 import json
 import os
@@ -8,22 +9,10 @@ import time
 from pdb import set_trace as T
 from shutil import copyfile
 from typing import Dict
-from evolution.pattern_map_elites import MapElites
 
 import numpy as np
-import neat
-import neat.nn
-from pureples.shared.visualize import draw_net
-import projekt
 import ray
 import scipy
-from forge.blade.core.terrain import MapGenerator, Save
-from forge.blade.lib import enums
-from forge.ethyr.torch import utils
-from pcg import TILE_PROBS, TILE_TYPES
-from projekt import rlutils
-from projekt.evaluator import Evaluator
-from projekt.overlay import OverlayRegistry
 from ray import rllib
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.env import BaseEnv
@@ -31,7 +20,19 @@ from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch
 
+import neat
+import neat.nn
+import projekt
 from evolution.lambda_mu import LambdaMuEvolver
+from evolution.pattern_map_elites import MapElites
+from forge.blade.core.terrain import MapGenerator, Save
+from forge.blade.lib import enums
+from forge.ethyr.torch import utils
+from pcg import TILE_PROBS, TILE_TYPES
+from projekt import rlutils
+from projekt.evaluator import Evaluator
+from projekt.overlay import OverlayRegistry
+from pureples.shared.visualize import draw_net
 
 np.set_printoptions(threshold=sys.maxsize,
                     linewidth=120,
@@ -45,24 +46,37 @@ TRAINER = None
 
 def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
+
     return np.column_stack(np.unravel_index(idx, a.shape))
 
 
-def calc_diversity_l2(agent_skills71G):
-   assert len(agent_skills) == 1
-   a = agent_skills[0]
+def calc_diversity_l2(agent_stats):
+   agent_skills = agent_stats['skills']
+   lifespans = agent_stats['lifespans']
+   assert len(agent_skills) == len(lifespans)
+   a_skills = np.vstack(agent_skills)
+   a_lifespans = np.hstack(lifespans)
+   weights = sigmoid_lifespan(a_lifespans)
+   weight_mat = np.outer(weights, weights)
+  #assert len(agent_skills) == 1
+   a = a_skills
    n_agents = a.shape[0]
    b = a.reshape(n_agents, 1, a.shape[1])
-   score = np.sum(np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b)))/2
+   # https://stackoverflow.com/questions/43367001/how-to-calculate-euclidean-distance-between-pair-of-rows-of-a-numpy-array
+   distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
+   w_dists = weight_mat * distances
+   score = np.sum(w_dists)/2
 #  print('agent skills:\n{}'.format(a))
 #  print('score:\n{}\n'.format(
 #      score))
-   score = score / (n_agents**2)
 
    return score
 
 def sigmoid_lifespan(x):
-   return 3 / (1 + np.exp(0.1*(-x+50)))
+   res = 3 / (1 + np.exp(0.1*(-x+50)))
+   res = scipy.special.softmax(res)
+
+   return res
 
 def calc_differential_entropy(agent_stats, max_pop=8):
    # Penalize if under max pop agents living
@@ -139,8 +153,9 @@ class LogCallbacks(DefaultCallbacks):
 
    def on_train_result(self, *, trainer, result: dict, **kwargs) -> None:
       n_epis = result["episodes_this_iter"]
-      print("trainer.train() result: {} -> {} episodes".format(
-         trainer, n_epis))
+#     print("trainer.train() result: {} -> {} episodes".format(
+#        trainer, n_epis))
+
       # you can mutate the result dict to add new fields to return
       # result['something'] = True
 
@@ -369,7 +384,11 @@ class EvolverNMMO(LambdaMuEvolver):
 
 
    def saveMaps(self, maps, mutated=None):
-      if self.CPPN:
+      if self.PATTERN_GEN:
+         # map index, (map_arr, multi_hot), atk_mults
+         maps = [(i, c[0].generate(), c[1]) for i, c in self.chromosomes.items()]
+         [self.validate_spawns(m[1][0], m[1][1]) for m in maps]
+      elif self.CPPN:
          mutated = list(maps.keys())
          #FIXME: hack
 
@@ -386,21 +405,28 @@ class EvolverNMMO(LambdaMuEvolver):
          if self.CPPN:
             # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
             map_arr = maps[i]
-         else:
+         elif self.RAND_GEN:
             map_arr, atk_mults = maps[i]
-         print('Saving map ' + str(i))
+         else:
+            _, map_arr, atk_mults = maps[i]
+         if self.PATTERN_GEN:
+            # ignore one-hot map
+            map_arr = map_arr[0]
+#        print('Saving map ' + str(i))
          path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
          try:
             os.mkdir(path)
          except FileExistsError:
             pass
+         if map_arr is None:
+            T()
          Save.np(map_arr, path)
 
          if self.config.TERRAIN_RENDER:
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
             Save.render(map_arr, self.map_generator.textures, png_path)
 
-         if self.RAND_GEN:
+         if self.RAND_GEN or self.PATTERN_GEN:
             json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
             with open(json_path, 'w') as json_file:
                json.dump(atk_mults, json_file)
@@ -444,8 +470,8 @@ class EvolverNMMO(LambdaMuEvolver):
            #'num_gpus_per_worker': 0.083,  # hack fix
             'num_gpus_per_worker': 0,
             'num_gpus': 1,
-           #'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
-            'num_envs_per_worker': 1,
+            'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
+           #'num_envs_per_worker': 1,
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
             'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
@@ -513,19 +539,20 @@ class EvolverNMMO(LambdaMuEvolver):
          if g_hash is None:
             g_hash = ray.get(self.global_counter.get.remote())
          chromosome = self.Chromosome(
-               self.map_width, 
-               self.n_tiles, 
-               self.max_primitives, 
+               self.map_width,
+               self.n_tiles,
+               self.max_primitives,
                enums.Material.GRASS.value.index)
-         self.chromosomes[g_hash] = chromosome
          map_arr, multi_hot = chromosome.generate()
          self.validate_spawns(map_arr, multi_hot)
          atk_mults = self.gen_mults()
+         self.chromosomes[g_hash] = chromosome, atk_mults
+
          return g_hash, map_arr, atk_mults
       else:
          # FIXME: hack: ignore lava
-         map_arr = np.random.choice(np.arange(1, self.n_tiles), (self.map_width, self.map_height),
-               p=TILE_PROBS[1:])
+         map_arr = np.random.choice(np.arange(0, self.n_tiles), (self.map_width, self.map_height),
+               p=TILE_PROBS[:])
          self.validate_spawns(map_arr)
 #        self.add_border(map_arr)
       atk_mults = self.gen_mults()
@@ -565,7 +592,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.validate_spawns(map_arr, multi_hot)
       else:
          map_arr, atk_mults = self.genes[g_hash]
-         map_arr= map_arr.copy()
+         map_arr = map_arr.copy()
 
          for i in range(random.randint(0, self.n_mutate_actions)):
             x= random.randint(0, self.map_width - 1)
@@ -574,24 +601,26 @@ class EvolverNMMO(LambdaMuEvolver):
             t= np.random.randint(1, self.n_tiles)
             map_arr[x, y]= t
    #     map_arr = self.add_border(map_arr)
-         map_arr = self.validate_spawns(map_arr)
+         self.validate_spawns(map_arr)
       atk_mults = self.mutate_mults(atk_mults)
 
       return map_arr, atk_mults
 
    def mutate_mults(self, atk_mults):
       rand = np.random.random()
+
       if rand < 0.2:
          atk_mults = self.gen_mults()
       else:
          atk_mults = {
-            'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+            'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
                                   self.MELEE_MAX), self.MELEE_MIN),
-            'MAGE_MULT': max(min(atk_mults['MAGE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+            'MAGE_MULT': max(min(atk_mults['MAGE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
                                  self.MAGE_MAX), self.MAGE_MIN),
-            'RANGE_MULT': max(min(atk_mults['RANGE_MULT'] + (np.random.random() * 2 - 1) * 0.3, 
+            'RANGE_MULT': max(min(atk_mults['RANGE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
                                   self.RANGE_MAX), self.RANGE_MIN),
                }
+
       return atk_mults
 
 
@@ -600,17 +629,20 @@ class EvolverNMMO(LambdaMuEvolver):
       idxs = map_arr == enums.Material.SPAWN.value.index
       spawn_points = np.vstack(np.where(idxs)).transpose()
       n_spawns = len(spawn_points)
-      if n_spawns >= self.config.NENT: 
+
+      if n_spawns >= self.config.NENT:
          return
       n_new_spawns = self.config.NENT - n_spawns
+
       if multi_hot is not None:
          spawn_idxs = k_largest_index_argsort(
                multi_hot[enums.Material.SPAWN.value.index, :, :],
                n_new_spawns)
+         map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
       else:
-         spawn_idxs = np.random.randint(self.map_width, (2, n_new_spawns))
-      map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
-         
+         spawn_idxs = np.random.randint(0, self.map_width, (2, n_new_spawns))
+         map_arr[spawn_idxs[0], spawn_idxs[1]] = enums.Material.SPAWN.value.index
+
 
    def add_border(self, map_arr, multi_hot=None):
       b = self.config.TERRAIN_BORDER
@@ -619,6 +651,7 @@ class EvolverNMMO(LambdaMuEvolver):
       map_arr[:, 0:b]= enums.Material.LAVA.value.index
       map_arr[-b:, :]= enums.Material.LAVA.value.index
       map_arr[:, -b:]= enums.Material.LAVA.value.index
+
       if multi_hot is not None:
          multi_hot[:, 0:b, :]= -1
          multi_hot[:, :, 0:b]= -1
@@ -725,9 +758,11 @@ class EvolverNMMO(LambdaMuEvolver):
             print('Missing simulation stats for map {}. I assume this is the 0th generation, or re-load? Re-running the training step.'.format(g_hash))
             self.trainer.train()
             stats = ray.get(global_stats.get.remote())
+
             break
+
       for g_hash, (game, score, age) in self.population.items():
-         print(self.config.SKILLS)
+        #print(self.config.SKILLS)
          score = self.calc_diversity(stats[g_hash])
          self.population[g_hash] = (game, score, age)
 
@@ -801,6 +836,7 @@ class EvolverNMMO(LambdaMuEvolver):
    def save(self):
        save_file= open(self.evolver_path, 'wb')
 
+       population = copy.deepcopy(self.population)
        for g_hash in self.population:
            game, score, age= self.population[g_hash]
            # FIXME: omething weird is happening after reload. Not the maps though.
@@ -814,13 +850,15 @@ class EvolverNMMO(LambdaMuEvolver):
        # map_arr = self.genes[g_hash]
        copyfile(self.evolver_path, self.evolver_path + '.bkp')
        pickle.dump(self, save_file)
+       self.population = population
        self.restore()
 
    def init_pop(self):
        self.config.MODEL = None
        super().init_pop()
-       if not self.PATTERN_GEN:
-          self.saveMaps(self.genes, list(self.genes.keys()))
+
+      #if not self.PATTERN_GEN:
+       self.saveMaps(self.genes, list(self.genes.keys()))
        self.config.MODEL = 'current'
 
 def update_entropy_skills(skill_dict):
