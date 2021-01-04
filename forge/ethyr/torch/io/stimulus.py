@@ -52,7 +52,6 @@ class Input(nn.Module):
          'Tile': {
             'Discrete':   (1, 2)
          },
-         #   'Continuous': (2, 3),
          #'Entity': {
          #'Continuous': (2, 3),
          #'Discrete':   (2, 3)

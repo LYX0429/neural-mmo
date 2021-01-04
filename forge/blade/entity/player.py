@@ -72,6 +72,7 @@ class Player(entity.Entity):
 
    def update(self, realm, actions):
       '''Post-action update. Do not include history'''
+#     print('player {} position {} health {}'.format(self.entID, self.pos, self.resources.health.val))
       if not super().update(realm, actions):
          return
 

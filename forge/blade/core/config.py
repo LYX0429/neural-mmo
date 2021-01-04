@@ -70,7 +70,7 @@ class Config(Template):
    TERRAIN_SIZE      = 1024
    '''Size of each map (number of tiles along each side)'''
 
-   TERRAIN_BORDER    = 1
+   TERRAIN_BORDER    = 10
    '''Number of lava border tiles surrounding each side of the map'''
 
    TERRAIN_FREQUENCY = (-3, -6)

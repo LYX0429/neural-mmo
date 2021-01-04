@@ -110,7 +110,7 @@ class ResourcesTest(SmallMap):
 
 class EvoNMMO(ResourcesTest):
 
-   INFER_IDX = 77825
+   INFER_IDX = 3
  # INFER_IDX = 79766
  # INFER_IDX = 80117
    # How to measure diversity of agents on generated map.
@@ -121,10 +121,10 @@ class EvoNMMO(ResourcesTest):
    EVO_MAP = True
    RENDER = False
    MODEL = 'current'
-   NENT = 64  # Maximum population size
+   NENT = 8  # Maximum population size
    TERRAIN_SIZE = 64
-   EVO_DIR = 'pattern_test_0'
-   ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
+   EVO_DIR = 'all_random_l2'
+#  ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 3

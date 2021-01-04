@@ -62,6 +62,7 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
    def step(self, decisions):
       '''Action postprocessing; small wrapper to fit RLlib'''
       #start = time.time()
+#     print('step {}'.format(self.n_step))
       self.rllib_compat = time.time()
 
       actions = {}

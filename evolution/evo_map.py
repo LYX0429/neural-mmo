@@ -185,6 +185,7 @@ def createPolicies(config):
 
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
+      config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', config.EVO_DIR, 'maps', 'map')
       super().__init__(save_path, n_proc=n_proc, n_pop=n_pop)
       self.lam = 1/4
       self.mu = 1/4
@@ -462,15 +463,16 @@ class EvolverNMMO(LambdaMuEvolver):
          except FileExistsError:
             print('Model directory already exists.')
          # Instantiate monolithic RLlib Trainer object.
+         num_workers = 12
          trainer = rlutils.EvoPPOTrainer(
             env="custom",
             path=model_path,
             config={
-            'num_workers': 6, # normally: 4
+            'num_workers': num_workers, # normally: 4
            #'num_gpus_per_worker': 0.083,  # hack fix
             'num_gpus_per_worker': 0,
             'num_gpus': 1,
-            'num_envs_per_worker': int(conf.N_EVO_MAPS / 6),
+            'num_envs_per_worker': int(conf.N_EVO_MAPS / num_workers),
            #'num_envs_per_worker': 1,
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
@@ -559,6 +561,42 @@ class EvolverNMMO(LambdaMuEvolver):
 
       return map_arr, atk_mults
 
+   def validate_spawns(self, map_arr, multi_hot=None):
+      self.add_border(map_arr, multi_hot)
+      idxs = map_arr == enums.Material.SPAWN.value.index
+      spawn_points = np.vstack(np.where(idxs)).transpose()
+      n_spawns = len(spawn_points)
+
+      if n_spawns >= self.config.NENT:
+         return
+      n_new_spawns = self.config.NENT - n_spawns
+
+      if multi_hot is not None:
+         spawn_idxs = k_largest_index_argsort(
+               multi_hot[enums.Material.SPAWN.value.index, :, :],
+               n_new_spawns)
+         map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
+      else:
+         border = self.config.TERRAIN_BORDER
+         spawn_idxs = np.random.randint(border, self.map_width - border, (2, n_new_spawns))
+        #map_arr[spawn_idxs[0], spawn_idxs[1]] = enums.Material.SPAWN.value.index
+
+
+   def add_border(self, map_arr, multi_hot=None):
+      b = self.config.TERRAIN_BORDER
+      # the border must be lava
+      map_arr[0:b, :]= enums.Material.LAVA.value.index
+      map_arr[:, 0:b]= enums.Material.LAVA.value.index
+      map_arr[-b:, :]= enums.Material.LAVA.value.index
+      map_arr[:, -b:]= enums.Material.LAVA.value.index
+
+      if multi_hot is not None:
+         multi_hot[:, 0:b, :]= -1
+         multi_hot[:, :, 0:b]= -1
+         multi_hot[:, -b:, :]= -1
+         multi_hot[:, :, -b:]= -1
+
+
    def gen_mults(self):
       # generate melee, range, and mage attack multipliers for automatic game-balancing
      #atks = ['MELEE_MULT', 'RANGE_MULT', 'MAGE_MULT']
@@ -585,7 +623,6 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.CPPN:
          raise Exception('CPPN-generated maps should be mutated inside NEAT code.')
       elif self.PATTERN_GEN:
-         T()
          _, atk_mults = self.genes[g_hash]
          chromosome = self.chromosomes[g_hash]
          map_arr, multi_hot = chromosome.mutate()
@@ -623,40 +660,6 @@ class EvolverNMMO(LambdaMuEvolver):
 
       return atk_mults
 
-
-   def validate_spawns(self, map_arr, multi_hot=None):
-      self.add_border(map_arr, multi_hot)
-      idxs = map_arr == enums.Material.SPAWN.value.index
-      spawn_points = np.vstack(np.where(idxs)).transpose()
-      n_spawns = len(spawn_points)
-
-      if n_spawns >= self.config.NENT:
-         return
-      n_new_spawns = self.config.NENT - n_spawns
-
-      if multi_hot is not None:
-         spawn_idxs = k_largest_index_argsort(
-               multi_hot[enums.Material.SPAWN.value.index, :, :],
-               n_new_spawns)
-         map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
-      else:
-         spawn_idxs = np.random.randint(0, self.map_width, (2, n_new_spawns))
-         map_arr[spawn_idxs[0], spawn_idxs[1]] = enums.Material.SPAWN.value.index
-
-
-   def add_border(self, map_arr, multi_hot=None):
-      b = self.config.TERRAIN_BORDER
-      # the border must be lava
-      map_arr[0:b, :]= enums.Material.LAVA.value.index
-      map_arr[:, 0:b]= enums.Material.LAVA.value.index
-      map_arr[-b:, :]= enums.Material.LAVA.value.index
-      map_arr[:, -b:]= enums.Material.LAVA.value.index
-
-      if multi_hot is not None:
-         multi_hot[:, 0:b, :]= -1
-         multi_hot[:, :, 0:b]= -1
-         multi_hot[:, -b:, :]= -1
-         multi_hot[:, :, -b:]= -1
 
    def add_spawn(self, g_hash, map_arr):
       self.add_border(map_arr, enums.Material.GRASS.value.index)
