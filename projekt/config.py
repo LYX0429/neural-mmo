@@ -115,7 +115,7 @@ class EvoNMMO(ResourcesTest):
  # INFER_IDX = 80117
    # How to measure diversity of agents on generated map.
    FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete'
-   GENE = 'Random'  # CPPN, Pattern, Random
+   GENOME = 'Random'  # CPPN, Pattern, Random
    THRESHOLD = False
    TERRAIN_MODE = 'contract'
    EVO_MAP = True

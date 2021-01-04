@@ -183,6 +183,7 @@ def createPolicies(config):
 
     return policies
 
+
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
       config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', config.EVO_DIR, 'maps', 'map')
@@ -214,9 +215,9 @@ class EvolverNMMO(LambdaMuEvolver):
          self.calc_diversity = calc_discrete_entropy
       else:
          raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
-      self.CPPN = config.GENE == 'CPPN'
-      self.PATTERN_GEN = config.GENE == 'Pattern'
-      self.RAND_GEN = config.GENE == 'Random'
+      self.CPPN = config.GENOME == 'CPPN'
+      self.PATTERN_GEN = config.GENOME == 'Pattern'
+      self.RAND_GEN = config.GENOME == 'Random'
 
       if self.PATTERN_GEN:
          self.max_primitives = 25
@@ -245,7 +246,26 @@ class EvolverNMMO(LambdaMuEvolver):
 
       elif self.CPPN:
          self.n_epoch = -1
-         self.neat_config = neat.config.Config(neat.genome.DefaultGenome, neat.reproduction.DefaultReproduction,
+         evolver = self
+
+         class DefaultGenome(neat.genome.DefaultGenome):
+            ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
+            beyond the map.'''
+            def __init__(self, key):
+               super().__init__(key)
+               self.atk_mults = evolver.gen_mults()
+
+            def configure_crossover(self, parent1, parent2, config):
+               super().configure_crossover(parent1, parent2, config)
+               mults_1, mults_2 = parent1.atk_mults, parent2.atk_mults
+               self.atk_mults, _ = evolver.mate_atk_mults(mults_1, mults_2, single_offspring=True)
+
+            def mutate(self, config):
+               super().mutate(config)
+               self.atk_mults = evolver.mutate_mults(self.atk_mults)
+
+         self.genome_class = DefaultGenome
+         self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                             'config_cppn_nmmo')
          self.neat_config.pop_size = self.config.N_EVO_MAPS
@@ -260,7 +280,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
    def neat_eval_fitness(self, genomes, neat_config):
       if self.n_epoch == 0:
-         self.last_map_idx = 0
+         self.last_map_idx = -1
 
       if self.reloading:
          # Turn off reloading after 1 epoch.
@@ -272,13 +292,14 @@ class EvolverNMMO(LambdaMuEvolver):
 
       maps = {}
       global_counter = ray.get_actor("global_counter")
-      g_idxs = set([idx for idx, _ in genomes])
+      g_idxs = set([idx-1 for idx, _ in genomes])
       print('current map IDs: {}'.format(sorted(list(g_idxs))))
-      # FIXME NOPE
-      self.save()
       skip_idxs = set()
 
       for idx, g in genomes:
+         # neat-python indexes starting from 1
+         idx -= 1
+         self.genes[idx] = (None, g.atk_mults)
          if idx <= self.last_map_idx and not self.reloading:
             continue
          cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
@@ -305,7 +326,7 @@ class EvolverNMMO(LambdaMuEvolver):
                   multi_hot[:, x, y] = v
                   v = np.argmax(v)
                   map_arr[x, y] = v
-         self.validate_spawns(idx, map_arr, multi_hot)
+         self.validate_spawns(map_arr, multi_hot)
         #map_arr = self.add_border(map_arr)
          # Impossible maps are no good
          tile_counts = np.bincount(map_arr.reshape(-1))
@@ -318,7 +339,7 @@ class EvolverNMMO(LambdaMuEvolver):
             g_idxs.remove(idx)
             skip_idxs.add(idx)
          else:
-            maps[idx] = map_arr#, spawn_points
+            maps[idx] = map_arr, g.atk_mults
       self.maps = maps
       g_idxs = list(g_idxs)
       self.last_map_idx = g_idxs[-1]
@@ -332,6 +353,7 @@ class EvolverNMMO(LambdaMuEvolver):
       n_epis = train_stats['episodes_this_iter']
      #assert n_epis == self.n_pop
       for idx, _ in genomes:
+         idx -= 1
          #FIXME: hack
 
          if idx in skip_idxs:
@@ -343,6 +365,7 @@ class EvolverNMMO(LambdaMuEvolver):
             stats = ray.get(global_stats.get.remote())
 
       for idx, g in genomes:
+         idx -= 1
          #FIXME: hack
 
          if idx in skip_idxs:
@@ -364,11 +387,6 @@ class EvolverNMMO(LambdaMuEvolver):
             filename=os.path.join(self.save_path, 'genome_fitness.csv'))
       self.n_epoch += 1
 
-   def map_elites_eval_fn(self, chromosome):
-      T()
-
-   def me_pattern_mutate(self, x):
-      T()
 
    def evolve(self):
       if self.PATTERN_GEN:
@@ -405,11 +423,12 @@ class EvolverNMMO(LambdaMuEvolver):
       for i in mutated:
          if self.CPPN:
             # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
-            map_arr = maps[i]
+            map_arr, atk_mults = maps[i]
          elif self.RAND_GEN:
             map_arr, atk_mults = maps[i]
          else:
             _, map_arr, atk_mults = maps[i]
+
          if self.PATTERN_GEN:
             # ignore one-hot map
             map_arr = map_arr[0]
@@ -419,6 +438,7 @@ class EvolverNMMO(LambdaMuEvolver):
             os.mkdir(path)
          except FileExistsError:
             pass
+
          if map_arr is None:
             T()
          Save.np(map_arr, path)
@@ -536,7 +556,8 @@ class EvolverNMMO(LambdaMuEvolver):
 #     map_arr= np.random.randint(1, self.n_tiles,
 #                                 (self.map_width, self.map_height))
       if self.CPPN:
-         raise Exception('CPPN maps should be generated inside neat_eval_fitness function')
+         return None
+   #     raise Exception('CPPN maps should be generated inside neat_eval_fitness function')
       elif self.PATTERN_GEN:
          if g_hash is None:
             g_hash = ray.get(self.global_counter.get.remote())
@@ -659,6 +680,25 @@ class EvolverNMMO(LambdaMuEvolver):
                }
 
       return atk_mults
+
+
+   def mate_atk_mults(self, atk_mults_0, atk_mults_1, single_offspring=False):
+      new_atk_mults_0, new_atk_mults_1 = {}, {}
+      for k, v in atk_mults_0.items():
+         if np.random.random() < 0.5:
+            new_atk_mults_0[k] = atk_mults_1[k]
+         else:
+            new_atk_mults_0[k] = atk_mults_0[k]
+
+         if single_offspring:
+            continue
+
+         if np.random.random() < 0.5:
+            new_atk_mults_1[k] = atk_mults_0[k]
+         else:
+            new_atk_mults_1[k] = atk_mults_1[k]
+
+      return new_atk_mults_0, new_atk_mults_1
 
 
    def add_spawn(self, g_hash, map_arr):
@@ -840,6 +880,7 @@ class EvolverNMMO(LambdaMuEvolver):
        save_file= open(self.evolver_path, 'wb')
 
        population = copy.deepcopy(self.population)
+
        for g_hash in self.population:
            game, score, age= self.population[g_hash]
            # FIXME: omething weird is happening after reload. Not the maps though.

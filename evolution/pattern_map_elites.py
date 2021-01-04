@@ -87,6 +87,7 @@ class MapElites():
 
       return (individual, )
 
+
    def mate(self, parent_0, parent_1):
       evo = self.evolver
       idx_0 = parent_0.data['ind_idx']
@@ -95,18 +96,7 @@ class MapElites():
       chrom_1, atk_mults_1 = evo.chromosomes[idx_1]
       prims_0 = chrom_0.patterns
       prims_1 = chrom_1.patterns
-      new_atk_mults_0, new_atk_mults_1 = {}, {}
-
-      for k, v in atk_mults_0.items():
-         if np.random.random() < 0.5:
-            new_atk_mults_0[k] = atk_mults_1[k]
-         else:
-            new_atk_mults_0[k] = atk_mults_0[k]
-
-         if np.random.random() < 0.5:
-            new_atk_mults_1[k] = atk_mults_0[k]
-         else:
-            new_atk_mults_1[k] = atk_mults_1[k]
+      new_atk_mults_0, new_atk_mults_1 = evo.mate_atk_mults(atk_mults_0, atk_mults_1)
       len_0, len_1 = len(prims_0), len(prims_1)
 
       if len_0 < len_1:

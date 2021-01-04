@@ -11,7 +11,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
    def __init__(self, env, path, config):
       super().__init__(env=env, config=config)
       self.saveDir = path
-      self.n_epoch = 0
       self.pathDir = '/'.join(path.split(os.sep)[:-1])
 
    def save(self):
@@ -51,18 +50,19 @@ class EvoPPOTrainer(ppo.PPOTrainer):
    def defaultModel(self):
       return self.model(self.policyID(0))
 
-   def train(self, 
-      #maps
-      ):
-     
-#     self.maps = maps
+   def train(self):
       stats = super().train()
-      self.save()
+      if self.training_iteration < 100:
+         save_interval = 10
+      else:
+         save_interval = 100
+      if self.training_iteration % save_interval == 0:
+         self.save()
 
       nSteps = stats['info']['num_steps_trained']
       VERBOSE = False
       if VERBOSE:
-         print('Epoch: {}, Samples: {}'.format(self.n_epoch, nSteps))
+         print('Epoch: {}, Samples: {}'.format(self.training_iteration, nSteps))
       hist = stats['hist_stats']
       for key, stat in hist.items():
          if len(stat) == 0 or key == 'map_fitness':
@@ -76,7 +76,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
         #    print(hist[key])
          hist[key] = []
    
-      self.n_epoch += 1
       return stats
 
    def reset(self):
