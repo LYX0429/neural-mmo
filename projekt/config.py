@@ -122,14 +122,14 @@ class EvoNMMO(ResourcesTest):
    RENDER = False
    MODEL = 'current'
    NENT = 8  # Maximum population size
-   TERRAIN_SIZE = 64
+   TERRAIN_SIZE = 70
    EVO_DIR = 'all_random_l2'
 #  ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 3
    ROLLING_FITNESS = 25  # Size of window to use while calculating mean rolling fitness
-   TERRAIN_RENDER = True
+   TERRAIN_RENDER = False
    TERRAIN_WATER        = 0.15
    TERRAIN_GRASS        = 0.35
    TERRAIN_LAVA         = 0.45
