@@ -141,9 +141,15 @@ if __name__ == '__main__':
    ray.init()
 
 
-   # Built config with CLI overrides
-   config = projekt.config.EvoNMMO()
+   global config
 
+   if 'config' in kwargs:
+      config = kwargs.pop('config')
+      config = getattr(projekt.config, config)()
+   else:
+      config = projekt.config.EvoNMMO()
+
+   # Built config with CLI overrides
    if len(sys.argv) > 1:
        sys.argv.insert(1, 'override')
        Fire(config)
