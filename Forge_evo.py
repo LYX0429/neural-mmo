@@ -134,6 +134,8 @@ class Stats:
    def get_spawn_points(self, g_hash):
       return self.spawn_points[g_hash]
 
+
+
 if __name__ == '__main__':
    # Setup ray
 #  torch.set_num_threads(1)
@@ -143,11 +145,7 @@ if __name__ == '__main__':
 
    global config
 
-   if 'config' in kwargs:
-      config = kwargs.pop('config')
-      config = getattr(projekt.config, config)()
-   else:
-      config = projekt.config.EvoNMMO()
+   config = projekt.config.EvoNMMO()
 
    # Built config with CLI overrides
    if len(sys.argv) > 1:

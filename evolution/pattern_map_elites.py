@@ -78,7 +78,7 @@ class MapElites():
       evo = self.evolver
       idx = individual.data['ind_idx']
       chrom, atk_mults = evo.chromosomes[idx]
-      atk_mults = self.evolver.mutate_mults(atk_mults)
+      atk_mults = evo.mutate_mults(atk_mults)
       chrom.mutate()
 
       if not hasattr(individual.fitness, 'values'):
@@ -96,7 +96,7 @@ class MapElites():
       chrom_1, atk_mults_1 = evo.chromosomes[idx_1]
       prims_0 = chrom_0.patterns
       prims_1 = chrom_1.patterns
-      new_atk_mults_0, new_atk_mults_1 = evo.mate_atk_mults(atk_mults_0, atk_mults_1)
+      new_atk_mults_0, new_atk_mults_1 = evo.mate_mults(atk_mults_0, atk_mults_1)
       len_0, len_1 = len(prims_0), len(prims_1)
 
       if len_0 < len_1:
@@ -309,7 +309,7 @@ class MapElites():
        # The number of evaluations in each subsequent batch
        batch_size = self.evolver.config.N_EVO_MAPS
        # The number of iterations (i.e. times where a new batch is evaluated)
-       nb_iterations = 100
+       nb_iterations = self.evolver.n_epochs
        self.cxpb = cxpb = 0.5
        # The probability of mutating each value of a genome
        self.mutation_pb = mutation_pb = 1.0

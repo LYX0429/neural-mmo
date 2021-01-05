@@ -44,6 +44,71 @@ np.set_printoptions(threshold=sys.maxsize,
 global TRAINER
 TRAINER = None
 
+MELEE_MIN = 0.4
+MELEE_MAX = 1.4
+MAGE_MIN = 0.6
+MAGE_MAX = 1.6
+RANGE_MIN = 0.2
+RANGE_MAX = 1
+
+#NOTE: had to move this multiplier stuff outside of the evolver so the CPPN genome could incorporate them
+# without pickling error.
+#TODO: move these back into evolver class?
+def gen_atk_mults():
+   # generate melee, range, and mage attack multipliers for automatic game-balancing
+  #atks = ['MELEE_MULT', 'RANGE_MULT', 'MAGE_MULT']
+  #mults = [(atks[i], 0.2 + np.random.random() * 0.8) for i in range(3)]
+  #atk_mults = dict(mults)
+   # range is way too dominant, always
+
+   atk_mults = {
+         # b/w 0.2 and 1.0
+         'MELEE_MULT': np.random.random() * (MELEE_MAX - MELEE_MIN) + MELEE_MIN,
+         'MAGE_MULT': np.random.random() * (MAGE_MAX - MAGE_MIN) + MAGE_MIN,
+         # b/w 0.0 and 0.8
+         'RANGE_MULT': np.random.random() * (RANGE_MAX - RANGE_MIN) + RANGE_MIN,
+         }
+
+   return atk_mults
+
+def mutate_atk_mults(atk_mults):
+   rand = np.random.random()
+
+   if rand < 0.2:
+      atk_mults = gen_atk_mults()
+   else:
+      atk_mults = {
+         'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
+                               MELEE_MAX), MELEE_MIN),
+         'MAGE_MULT': max(min(atk_mults['MAGE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
+                              MAGE_MAX), MAGE_MIN),
+         'RANGE_MULT': max(min(atk_mults['RANGE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
+                               RANGE_MAX), RANGE_MIN),
+            }
+
+   return atk_mults
+
+
+def mate_atk_mults(atk_mults_0, atk_mults_1, single_offspring=False):
+   new_atk_mults_0, new_atk_mults_1 = {}, {}
+   for k, v in atk_mults_0.items():
+      if np.random.random() < 0.5:
+         new_atk_mults_0[k] = atk_mults_1[k]
+      else:
+         new_atk_mults_0[k] = atk_mults_0[k]
+
+      if single_offspring:
+         continue
+
+      if np.random.random() < 0.5:
+         new_atk_mults_1[k] = atk_mults_0[k]
+      else:
+         new_atk_mults_1[k] = atk_mults_1[k]
+
+   return new_atk_mults_0, new_atk_mults_1
+
+
+
 def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
 
@@ -184,8 +249,31 @@ def createPolicies(config):
     return policies
 
 
+class DefaultGenome(neat.genome.DefaultGenome):
+   evolver = None
+   ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
+   beyond the map.'''
+   def __init__(self, key):
+      super().__init__(key)
+      self.atk_mults = gen_atk_mults()
+
+   def configure_crossover(self, parent1, parent2, config):
+      super().configure_crossover(parent1, parent2, config)
+      mults_1, mults_2 = parent1.atk_mults, parent2.atk_mults
+      self.atk_mults, _ = mate_atk_mults(mults_1, mults_2, single_offspring=True)
+
+   def mutate(self, config):
+      super().mutate(config)
+      self.atk_mults = mutate_atk_mults(self.atk_mults)
+
+
+
+
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
+      self.gen_mults = gen_atk_mults
+      self.mutate_mults = mutate_atk_mults
+      self.mate_mults = mate_atk_mults
       config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', config.EVO_DIR, 'maps', 'map')
       super().__init__(save_path, n_proc=n_proc, n_pop=n_pop)
       self.lam = 1/4
@@ -247,24 +335,6 @@ class EvolverNMMO(LambdaMuEvolver):
       elif self.CPPN:
          self.n_epoch = -1
          evolver = self
-
-         class DefaultGenome(neat.genome.DefaultGenome):
-            ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
-            beyond the map.'''
-            def __init__(self, key):
-               super().__init__(key)
-               self.atk_mults = evolver.gen_mults()
-
-            def configure_crossover(self, parent1, parent2, config):
-               super().configure_crossover(parent1, parent2, config)
-               mults_1, mults_2 = parent1.atk_mults, parent2.atk_mults
-               self.atk_mults, _ = evolver.mate_atk_mults(mults_1, mults_2, single_offspring=True)
-
-            def mutate(self, config):
-               super().mutate(config)
-               self.atk_mults = evolver.mutate_mults(self.atk_mults)
-
-         self.genome_class = DefaultGenome
          self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                             'config_cppn_nmmo')
@@ -287,13 +357,12 @@ class EvolverNMMO(LambdaMuEvolver):
 
          if not self.epoch_reloaded:
             self.epoch_reloaded = self.n_epoch
-         elif self.epoch_reloaded < self.n_epoch:
+         elif self.epoch_reloaded < self.n_epoch + 11:
             self.reloading = False
 
       maps = {}
       global_counter = ray.get_actor("global_counter")
       g_idxs = set([idx-1 for idx, _ in genomes])
-      print('current map IDs: {}'.format(sorted(list(g_idxs))))
       skip_idxs = set()
 
       for idx, g in genomes:
@@ -370,10 +439,9 @@ class EvolverNMMO(LambdaMuEvolver):
 
          if idx in skip_idxs:
             continue
-         print(self.config.SKILLS)
          score = self.calc_diversity(stats[idx])
         #self.population[g_hash] = (None, score, None)
-         print('Map {}, diversity score: {}\n'.format(idx, score))
+#        print('Map {}, diversity score: {}\n'.format(idx, score))
          g.fitness = score
       global_stats.reset.remote()
 
@@ -617,29 +685,6 @@ class EvolverNMMO(LambdaMuEvolver):
          multi_hot[:, -b:, :]= -1
          multi_hot[:, :, -b:]= -1
 
-
-   def gen_mults(self):
-      # generate melee, range, and mage attack multipliers for automatic game-balancing
-     #atks = ['MELEE_MULT', 'RANGE_MULT', 'MAGE_MULT']
-     #mults = [(atks[i], 0.2 + np.random.random() * 0.8) for i in range(3)]
-     #atk_mults = dict(mults)
-      # range is way too dominant, always
-      self.MELEE_MIN = 0.4
-      self.MELEE_MAX = 1.4
-      self.MAGE_MIN = 0.6
-      self.MAGE_MAX = 1.6
-      self.RANGE_MIN = 0.2
-      self.RANGE_MAX = 1
-      atk_mults = {
-            # b/w 0.2 and 1.0
-            'MELEE_MULT': np.random.random() * (self.MELEE_MAX - self.MELEE_MIN) + self.MELEE_MIN,
-            'MAGE_MULT': np.random.random() * (self.MAGE_MAX - self.MAGE_MIN) + self.MAGE_MIN,
-            # b/w 0.0 and 0.8
-            'RANGE_MULT': np.random.random() * (self.RANGE_MAX - self.RANGE_MIN) + self.RANGE_MIN,
-            }
-
-      return atk_mults
-
    def mutate(self, g_hash):
       if self.CPPN:
          raise Exception('CPPN-generated maps should be mutated inside NEAT code.')
@@ -663,42 +708,6 @@ class EvolverNMMO(LambdaMuEvolver):
       atk_mults = self.mutate_mults(atk_mults)
 
       return map_arr, atk_mults
-
-   def mutate_mults(self, atk_mults):
-      rand = np.random.random()
-
-      if rand < 0.2:
-         atk_mults = self.gen_mults()
-      else:
-         atk_mults = {
-            'MELEE_MULT': max(min(atk_mults['MELEE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
-                                  self.MELEE_MAX), self.MELEE_MIN),
-            'MAGE_MULT': max(min(atk_mults['MAGE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
-                                 self.MAGE_MAX), self.MAGE_MIN),
-            'RANGE_MULT': max(min(atk_mults['RANGE_MULT'] + (np.random.random() * 2 - 1) * 0.3,
-                                  self.RANGE_MAX), self.RANGE_MIN),
-               }
-
-      return atk_mults
-
-
-   def mate_atk_mults(self, atk_mults_0, atk_mults_1, single_offspring=False):
-      new_atk_mults_0, new_atk_mults_1 = {}, {}
-      for k, v in atk_mults_0.items():
-         if np.random.random() < 0.5:
-            new_atk_mults_0[k] = atk_mults_1[k]
-         else:
-            new_atk_mults_0[k] = atk_mults_0[k]
-
-         if single_offspring:
-            continue
-
-         if np.random.random() < 0.5:
-            new_atk_mults_1[k] = atk_mults_0[k]
-         else:
-            new_atk_mults_1[k] = atk_mults_1[k]
-
-      return new_atk_mults_0, new_atk_mults_1
 
 
    def add_spawn(self, g_hash, map_arr):
