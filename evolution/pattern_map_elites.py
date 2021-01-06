@@ -15,6 +15,7 @@ import scipy
 from deap import algorithms, base, creator, gp, tools
 from forge.blade.lib import enums
 from pcg import TILE_PROBS
+import deap
 from qdpy.algorithms.deap import DEAPQDAlgorithm
 from qdpy.base import ParallelismManager
 # from qdpy.benchmarks import *
@@ -67,6 +68,110 @@ class Individual():
 #             'atk_muts':  atk_mults
               }
 
+
+
+def qdSimple(init_batch, toolbox, container, batch_size, niter, cxpb = 0.0, mutpb = 1.0, stats = None, halloffame = None, verbose = False, show_warnings = False, start_time = None, iteration_callback = None):
+    """The simplest QD algorithm using DEAP.
+    :param init_batch: Sequence of individuals used as initial batch.
+    :param toolbox: A :class:`~deap.base.Toolbox` that contains the evolution operators.
+    :param batch_size: The number of individuals in a batch.
+    :param niter: The number of iterations.
+    :param stats: A :class:`~deap.tools.Statistics` object that is updated inplace, optional.
+    :param halloffame: A :class:`~deap.tools.HallOfFame` object that will
+                       contain the best individuals, optional.
+    :param verbose: Whether or not to log the statistics.
+    :param show_warnings: Whether or not to show warnings and errors. Useful to check if some individuals were out-of-bounds.
+    :param start_time: Starting time of the illumination process, or None to take the current time.
+    :param iteration_callback: Optional callback funtion called when a new batch is generated. The callback function parameters are (iteration, batch, container, logbook).
+    :returns: The final batch
+    :returns: A class:`~deap.tools.Logbook` with the statistics of the
+              evolution
+
+    TODO
+    """
+    if start_time == None:
+        start_time = timer()
+    logbook = deap.tools.Logbook()
+    logbook.header = ["iteration", "containerSize", "evals", "nbUpdated"] + (stats.fields if stats else []) + ["elapsed"]
+
+    if len(init_batch) == 0:
+        raise ValueError("``init_batch`` must not be empty.")
+
+    # Evaluate the individuals with an invalid fitness
+    invalid_ind = [ind for ind in init_batch if not ind.fitness.valid]
+    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+    for ind, fit in zip(invalid_ind, fitnesses):
+        ind.fitness.values = fit[0]
+        ind.features = fit[1]
+
+    if len(invalid_ind) == 0:
+        raise ValueError("No valid individual found !")
+
+    # Update halloffame
+    if halloffame is not None:
+        halloffame.update(init_batch)
+
+    # Store batch in container
+    nb_updated = container.update(init_batch, issue_warning=show_warnings)
+    if nb_updated == 0:
+       pass
+#       raise ValueError("No individual could be added to the container !")
+
+    # Compile stats and update logs
+    record = stats.compile(container) if stats else {}
+    logbook.record(iteration=0, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+    if verbose:
+        print(logbook.stream)
+    # Call callback function
+    if iteration_callback != None:
+        iteration_callback(0, init_batch, container, logbook)
+
+    # Begin the generational process
+    for i in range(1, niter + 1):
+        start_time = timer()
+        # Select the next batch individuals
+        batch = toolbox.select(container, batch_size)
+
+        ## Vary the pool of individuals
+        offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
+        #offspring = []
+        #for o in batch:
+        #    newO = toolbox.clone(o)
+        #    ind, = toolbox.mutate(newO)
+        #    del ind.fitness.values
+        #    offspring.append(ind)
+
+        # Evaluate the individuals with an invalid fitness
+        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+        TT()
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit[0]
+            ind.features = fit[1]
+
+        # Replace the current population by the offspring
+        nb_updated = container.update(offspring, issue_warning=show_warnings)
+
+        # Update the hall of fame with the generated individuals
+        if halloffame is not None:
+            halloffame.update(container)
+
+        # Append the current generation statistics to the logbook
+        record = stats.compile(container) if stats else {}
+        logbook.record(iteration=i, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+        if verbose:
+            print(logbook.stream)
+        # Call callback function
+        if iteration_callback != None:
+            iteration_callback(i, batch, container, logbook)
+
+    return batch, logbook
+
+class EvoDEAPQD(DEAPQDAlgorithm):
+   def __init__(self, *args, **kwargs):
+      super().__init__(*args, **kwargs)
+      self.ea_fn = qdSimple
+
 class MapElites():
    def compile(self):
        TT()
@@ -78,7 +183,7 @@ class MapElites():
       evo = self.evolver
       idx = individual.data['ind_idx']
       chrom, atk_mults = evo.chromosomes[idx]
-      atk_mults = evo.mutate_mults(atk_mults)
+      atk_mults = self.evolver.mutate_mults(atk_mults)
       chrom.mutate()
 
       if not hasattr(individual.fitness, 'values'):
@@ -257,7 +362,10 @@ class MapElites():
          algo.current_iteration = archive['current_iteration']
 #        algo.start_time = timer()
 #        algo.run(archive['container'])
-         return algo.run()
+         if not self.evolver.config.RENDER:
+            algo.run()
+
+         return
 
 
    def expr(self):
@@ -350,7 +458,7 @@ class MapElites():
        with ParallelismManager(parallelism_type,
                                toolbox=self.toolbox) as pMgr:
            # Create a QD algorithm
-           algo = DEAPQDAlgorithm(pMgr.toolbox,
+           algo = EvoDEAPQD(pMgr.toolbox,
                                   grid,
                                   init_batch_size=init_batch_size,
                                   batch_size=batch_size,

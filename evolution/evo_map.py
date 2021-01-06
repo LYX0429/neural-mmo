@@ -111,9 +111,9 @@ def mate_atk_mults(atk_mults_0, atk_mults_1, single_offspring=False):
 
 def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
-
-    return np.column_stack(np.unravel_index(idx, a.shape))
-
+    k_lrg = np.column_stack(np.unravel_index(idx, a.shape))
+    T()
+    return k_lrg
 
 def calc_diversity_l2(agent_stats):
    agent_skills = agent_stats['skills']
@@ -306,18 +306,21 @@ class EvolverNMMO(LambdaMuEvolver):
       self.CPPN = config.GENOME == 'CPPN'
       self.PATTERN_GEN = config.GENOME == 'Pattern'
       self.RAND_GEN = config.GENOME == 'Random'
+      self.LAMBDA_MU = config.EVO_ALGO == 'Simple'
+      self.MAP_ELITES = config.EVO_ALGO == 'MAP-Elites'
 
       if self.PATTERN_GEN:
          self.max_primitives = 25
-         self.me = MapElites(
-               evolver=self,
-               save_path=self.save_path
-               )
-#        # Do MAP-Elites using qdpy
+         if self.MAP_ELITES:
+            self.me = MapElites(
+                  evolver=self,
+                  save_path=self.save_path
+                  )
+            self.init_pop()
+   #        # Do MAP-Elites using qdpy
          from evolution.paint_terrain import Chromosome
          self.Chromosome = Chromosome
          self.chromosomes = {}
-         self.init_pop()
          self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
 #        from qdpy import algorithms, containers, benchmarks, plots
 #        from deap import base
@@ -457,7 +460,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
 
    def evolve(self):
-      if self.PATTERN_GEN:
+      if self.MAP_ELITES:
          self.me.evolve()
 
       elif self.CPPN:
@@ -515,10 +518,10 @@ class EvolverNMMO(LambdaMuEvolver):
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
             Save.render(map_arr, self.map_generator.textures, png_path)
 
-         if self.RAND_GEN or self.PATTERN_GEN:
-            json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
-            with open(json_path, 'w') as json_file:
-               json.dump(atk_mults, json_file)
+        #if self.RAND_GEN or self.PATTERN_GEN:
+         json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
+         with open(json_path, 'w') as json_file:
+            json.dump(atk_mults, json_file)
 
    def make_game(self, child_map):
       config = self.config
@@ -638,8 +641,12 @@ class EvolverNMMO(LambdaMuEvolver):
          self.validate_spawns(map_arr, multi_hot)
          atk_mults = self.gen_mults()
          self.chromosomes[g_hash] = chromosome, atk_mults
-
-         return g_hash, map_arr, atk_mults
+         
+         #FIXME: hack for map elites
+         if self.MAP_ELITES:
+            return g_hash, map_arr, atk_mults
+         else:
+            return map_arr, atk_mults
       else:
          # FIXME: hack: ignore lava
          map_arr = np.random.choice(np.arange(0, self.n_tiles), (self.map_width, self.map_height),
@@ -660,15 +667,15 @@ class EvolverNMMO(LambdaMuEvolver):
          return
       n_new_spawns = self.config.NENT - n_spawns
 
-      if multi_hot is not None:
-         spawn_idxs = k_largest_index_argsort(
-               multi_hot[enums.Material.SPAWN.value.index, :, :],
-               n_new_spawns)
-         map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
-      else:
-         border = self.config.TERRAIN_BORDER
-         spawn_idxs = np.random.randint(border, self.map_width - border, (2, n_new_spawns))
-        #map_arr[spawn_idxs[0], spawn_idxs[1]] = enums.Material.SPAWN.value.index
+#     if multi_hot is not None:
+#        spawn_idxs = k_largest_index_argsort(
+#              multi_hot[enums.Material.SPAWN.value.index, :, :],
+#              n_new_spawns)
+#    #   map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
+#     else:
+      border = self.config.TERRAIN_BORDER
+      spawn_idxs = np.random.randint(border, self.map_width - border, (2, n_new_spawns))
+      map_arr[spawn_idxs[0], spawn_idxs[1]] = enums.Material.SPAWN.value.index
 
 
    def add_border(self, map_arr, multi_hot=None):
@@ -690,7 +697,8 @@ class EvolverNMMO(LambdaMuEvolver):
          raise Exception('CPPN-generated maps should be mutated inside NEAT code.')
       elif self.PATTERN_GEN:
          _, atk_mults = self.genes[g_hash]
-         chromosome = self.chromosomes[g_hash]
+         chromosome, atk_mults = self.chromosomes[g_hash]
+         atk_mults = self.mutate_mults(atk_mults)
          map_arr, multi_hot = chromosome.mutate()
          self.validate_spawns(map_arr, multi_hot)
       else:

@@ -148,6 +148,7 @@ class EvoNMMO(TreeOrerock):
 #  SKILLS = ['woodcutting', 'mining']
 #  SKILLS = ['range', 'mage', 'melee']
    SKILLS = ALL_SKILLS
+   EVO_ALGO = 'Simple'  # Simple, MAP-Elites
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS
