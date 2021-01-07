@@ -581,6 +581,7 @@ class EvolverNMMO(LambdaMuEvolver):
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
          g.fitness = score
+         self.population[g_idx] = (None, score, None)
       global_stats.reset.remote()
 
       if self.reloading:
@@ -588,9 +589,10 @@ class EvolverNMMO(LambdaMuEvolver):
 
       if self.n_epoch % 10 == 0:
          self.save()
-      self.neat_pop.reporters.reporters[0].save_genome_fitness(
-            delimiter=',',
-            filename=os.path.join(self.save_path, 'genome_fitness.csv'))
+      self.log()
+#     self.neat_pop.reporters.reporters[0].save_genome_fitness(
+#           delimiter=',',
+#           filename=os.path.join(self.save_path, 'genome_fitness.csv'))
       self.n_epoch += 1
 
 
