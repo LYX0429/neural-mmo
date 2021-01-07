@@ -93,6 +93,7 @@ def mutate_atk_mults(atk_mults):
 
 def mate_atk_mults(atk_mults_0, atk_mults_1, single_offspring=False):
    new_atk_mults_0, new_atk_mults_1 = {}, {}
+
    for k, v in atk_mults_0.items():
       if np.random.random() < 0.5:
          new_atk_mults_0[k] = atk_mults_1[k]
@@ -115,6 +116,7 @@ def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
     k_lrg = np.column_stack(np.unravel_index(idx, a.shape))
     T()
+
     return k_lrg
 
 def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
@@ -133,7 +135,8 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
    distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
    w_dists = weight_mat * distances
    score = np.sum(w_dists)/2
-   if verbose: 
+
+   if verbose:
 #  print(skill_headers)
        print('agent skills:\n{}'.format(a))
        print('score:\n{}\n'.format(
@@ -202,8 +205,9 @@ def calc_convex_hull(agent_stats, skill_headers=None):
        score = hull.volume
    except Exception:
        score = 0
-   
+
    print('Score: {}'.format(score))
+
    return score
 
 def calc_discrete_entropy_2(agent_stats, skill_headers=None):
@@ -244,6 +248,7 @@ def calc_discrete_entropy(agent_stats, skill_headers=None):
    i = 0
 
    # ensure that we will not be dividing by zero when computing probabilities
+
    for a in agent_sums:
        if a == 0:
            agent_sums[i] = BASE_VAL * n_skills
@@ -434,6 +439,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.CPPN = config.GENOME == 'CPPN'
       self.PATTERN_GEN = config.GENOME == 'Pattern'
       self.RAND_GEN = config.GENOME == 'Random'
+
       if not (self.CPPN or self.PATTERN_GEN or self.RAND_GEN):
          raise Exception('Invalid genome')
       self.LAMBDA_MU = config.EVO_ALGO == 'Simple'
@@ -441,6 +447,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
       if self.PATTERN_GEN:
          self.max_primitives = 25
+
          if self.MAP_ELITES:
             self.me = MapElites(
                   evolver=self,
@@ -497,14 +504,15 @@ class EvolverNMMO(LambdaMuEvolver):
       global_counter = ray.get_actor("global_counter")
       neat_idxs = set([idx for idx, _ in genomes])
       g_idxs = set([i for i in range(self.n_pop)])
+      g_idx = 0
       neat_to_g = {}
       skip_idxs = set()
 
       for idx, g in genomes:
          # neat-python indexes starting from 1
-         g_idx = g_idxs.pop()
          neat_to_g[idx] = g_idx
          self.genes[g_idx] = (None, g.atk_mults)
+
          if idx <= self.last_map_idx and not self.reloading:
             continue
          cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
@@ -545,6 +553,7 @@ class EvolverNMMO(LambdaMuEvolver):
             skip_idxs.add(idx)
          else:
             maps[g_idx] = map_arr, g.atk_mults
+         g_idx += 1
       g_idxs = set([i for i in range(self.n_pop)])
       self.maps = maps
       g_idxs = list(g_idxs)
@@ -628,6 +637,8 @@ class EvolverNMMO(LambdaMuEvolver):
          mutated = list(self.population.keys())
          self.reloading = False
 
+      checkpoint_dir_created = False
+
       for i in mutated:
          if self.CPPN:
             # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
@@ -651,9 +662,18 @@ class EvolverNMMO(LambdaMuEvolver):
             T()
          Save.np(map_arr, path)
 
-         if self.config.TERRAIN_RENDER:
-            png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
+         if self.config.TERRAIN_RENDER and self.n_epoch % 100 == 0:
+            checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
+
+            if not checkpoint_dir_created and not os.path.isdir(checkpoint_dir_path):
+               os.mkdir(checkpoint_dir_path)
+               checkpoint_dir_created = True
+            png_path = os.path.join(checkpoint_dir_path, 'map' + str(i) + '.png')
             Save.render(map_arr, self.map_generator.textures, png_path)
+            Save.np(map_arr, os.path.join(checkpoint_dir_path, 'map' + str(i) + '.np'))
+            json_path = os.path.join(checkpoint_dir_path, 'atk_mults' + str(i) + 'json')
+            with open(json_path, 'w') as json_file:
+               json.dump(atk_mults, json_file)
 
         #if self.RAND_GEN or self.PATTERN_GEN:
          json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
@@ -671,6 +691,7 @@ class EvolverNMMO(LambdaMuEvolver):
       '''
       trash_data: to avoid undetermined weirdness when reloading
       '''
+      self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.EVO_DIR, 'maps', 'map')
       self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
 
       if inference:
@@ -778,8 +799,9 @@ class EvolverNMMO(LambdaMuEvolver):
          self.validate_spawns(map_arr, multi_hot)
          atk_mults = self.gen_mults()
          self.chromosomes[g_hash] = chromosome, atk_mults
-         
+
          #FIXME: hack for map elites
+
          if self.MAP_ELITES:
             return g_hash, map_arr, atk_mults
          else:
@@ -1076,4 +1098,3 @@ def update_entropy_skills(skill_dict):
         i += 1
 
     return calc_diversity_l2(agent_skills)
-
