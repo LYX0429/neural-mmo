@@ -12,8 +12,8 @@ from pdb import set_trace as T
 import numpy as np
 
 # NOTE: to prevent "relative import" error, run `python -m evolution.skill_evolver
-from .evo_map import (calc_differential_entropy, calc_discrete_entropy,
-                      calc_diversity_l2)
+from .evo_map import (calc_differential_entropy, calc_discrete_entropy, calc_discrete_entropy_2,
+                      calc_diversity_l2, calc_convex_hull)
 from .lambda_mu import LambdaMuEvolver
 
 
@@ -22,6 +22,11 @@ class SkillEvolver(LambdaMuEvolver):
       alpha = kwargs.pop('alpha')
       self.alpha = alpha
       super().__init__(*args, **kwargs)
+      self.n_skills = 10
+      self.n_agents = 64
+      self.max_xp = 20000
+      self.max_lifespan = 100
+      self.MATURE_AGE = 1
 
    def infer(self):
       for g_hash, (_, score, age) in self.population.items():
@@ -39,8 +44,10 @@ class SkillEvolver(LambdaMuEvolver):
      #     [1200.,   0.,   0.,   0.,   0.,1500.,1500.,   0.,   0.],
      #     [1200.,   0.,   0.,   0.,   0.,1500.,1500.,   0.,   0.],
      #     [1200.,   0.,   0.,   0.,   0.,1500.,1500.,   0.,   0.], ]
-       agent_skills = [[0 for i in range(3)] for j in range(8)]
-       agent_lifespans = [0 for j in range(8)]
+       agent_skills = np.zeros((self.n_agents, self.n_skills))
+       agent_lifespans = np.random.randint(0, self.max_lifespan, (self.n_agents))
+#      agent_skills = [[0 for i in range(n_skills)] for j in range(n_agents)]
+#      agent_lifespans = [0 for j in range(n_agents)]
        agent_stats = {
              'skills': agent_skills,
              'lifespans': agent_lifespans,
@@ -53,8 +60,11 @@ class SkillEvolver(LambdaMuEvolver):
                        agent_stats,
                        n_sim_ticks,
                        child_conn,):
-#     score = calc_diversity_l2(agent_skills, self.alpha)
-      score = calc_differential_entropy(agent_stats)
+#     score = calc_diversity_l2(agent_stats, self.alpha)
+#     score = calc_differential_entropy(agent_stats)
+#     score = calc_discrete_entropy_2(agent_stats)
+#     score = calc_discrete_entropy(agent_stats)
+      score = calc_convex_hull(agent_stats)
 
       if child_conn:
           child_conn.send(score)
@@ -65,19 +75,20 @@ class SkillEvolver(LambdaMuEvolver):
       gene = self.genes[g_hash]
       agent_skills = gene['skills']
       agent_lifespans = gene['lifespans']
-      agent_skills = copy.deepcopy(agent_skills)
-      agent_lifespans = copy.deepcopy(agent_lifespans)
-      n_agents = len(agent_skills)
+      agent_skills = agent_skills.copy()
+      agent_lifespans = agent_lifespans.copy()
+      n_agents = agent_skills.shape[0]
+      n_skills = agent_skills.shape[1]
 
       for i in range(random.randint(1, 5)):
          for j in range(i):
             a_i = random.randint(0, n_agents - 1)
-            s_i = random.randint(0, len(agent_skills[0]) - 1)
+            s_i = random.randint(0, n_skills - 1)
            #if s_i in [0, 5, 6]:
            #    min_xp = 1000
            #else:
             min_xp = 0
-            max_xp = 20000
+            max_xp = self.max_xp
             agent_skills[a_i][s_i] = \
                   min(max(min_xp, agent_skills[a_i][s_i] + random.randint(-100, 100)), max_xp)
             l_i = random.randint(0, n_agents - 1)
@@ -85,18 +96,27 @@ class SkillEvolver(LambdaMuEvolver):
             agent_lifespans[l_i] = \
                   min(max(0, agent_lifespans[l_i] + random.randint(-10, 10)), max_lifespan)
 
-      if n_agents > 1 and random.random() < 0.05:
+      if n_agents > self.n_skills + 1 and random.random() < 0.05:
          # remove agent
          i = random.randint(0, n_agents - 1)
-         agent_skills.pop(i)
-         agent_lifespans.pop(i)
+         agent_skills = np.concatenate((agent_skills[0:i, :], agent_skills[i+1:, :]), axis=0)
+         agent_lifespans = np.concatenate((agent_lifespans[0:i], agent_lifespans[i+1:]), axis=0)
+        #agent_skills = np.delete(agent_skills, i, 0)
+        #agent_lifespans = np.delete(agent_skills, i, 0)
          n_agents -= 1
 
-      if 8 > n_agents > 0 and random.random() < 0.05:
+      if self.n_agents > n_agents > 0 and random.random() < 0.05:
          # add agent
          i = random.randint(0, n_agents - 1)
-         agent_skills.append(copy.deepcopy(agent_skills[i]))
-         agent_lifespans.append(copy.deepcopy(agent_lifespans[i]))
+         new_agent = np.zeros((1, self.n_skills))
+         print('new_agent', new_agent)
+         new_lifespan = np.random.randint(0, self.max_xp, (1))
+         agent_skills = np.concatenate((agent_skills, new_agent))
+         agent_lifespans = np.concatenate((agent_lifespans, new_lifespan))
+#        agent_skills = np.append(agent_skills, np.randint(0, self.max_xp, (self.n_skills)))
+#        agent_lifespans = np.append(agent_lifespans, np.randint(0, self.max_xp, 1))
+      if not agent_skills.shape[0] == agent_lifespans.shape[0]:
+         T()
 
       stats = {
             'skills': agent_skills,

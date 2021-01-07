@@ -33,6 +33,8 @@ from projekt import rlutils
 from projekt.evaluator import Evaluator
 from projekt.overlay import OverlayRegistry
 from pureples.shared.visualize import draw_net
+from scipy.spatial import ConvexHull
+import skbio
 
 np.set_printoptions(threshold=sys.maxsize,
                     linewidth=120,
@@ -115,7 +117,7 @@ def k_largest_index_argsort(a, k):
     T()
     return k_lrg
 
-def calc_diversity_l2(agent_stats):
+def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    assert len(agent_skills) == len(lifespans)
@@ -131,9 +133,11 @@ def calc_diversity_l2(agent_stats):
    distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
    w_dists = weight_mat * distances
    score = np.sum(w_dists)/2
-#  print('agent skills:\n{}'.format(a))
-#  print('score:\n{}\n'.format(
-#      score))
+   if verbose: 
+#  print(skill_headers)
+       print('agent skills:\n{}'.format(a))
+       print('score:\n{}\n'.format(
+       score))
 
    return score
 
@@ -143,7 +147,7 @@ def sigmoid_lifespan(x):
 
    return res
 
-def calc_differential_entropy(agent_stats, max_pop=8):
+def calc_differential_entropy(agent_stats, skill_headers=None):
    # Penalize if under max pop agents living
   #for i, a_skill in enumerate(agent_skills):
   #   if a_skill.shape[0] < max_pop:
@@ -166,6 +170,7 @@ def calc_differential_entropy(agent_stats, max_pop=8):
    # FIXME: Only applies to exploration-only experiment
   #print('exploration')
   #print(a_skills.transpose()[0])
+   print(skill_headers)
    print(a_skills.transpose())
    print(len(agent_skills), 'populations')
    print('lifespans')
@@ -181,6 +186,127 @@ def calc_differential_entropy(agent_stats, max_pop=8):
 #  print(np.array(a_skills))
    print('score:', score)
 
+   return score
+
+
+def calc_convex_hull(agent_stats, skill_headers=None):
+   agent_skills = agent_stats['skills']
+   lifespans = agent_stats['lifespans']
+   agent_skills_0 = np.vstack(agent_skills)
+   agent_lifespans = np.hstack(lifespans)
+   weights = sigmoid_lifespan(agent_lifespans)
+#  print(agent_skills_0.transpose())
+#  print(agent_lifespans)
+   try:
+       hull = ConvexHull(agent_skills_0)
+       score = hull.volume
+   except Exception:
+       score = 0
+   
+   print('Score: {}'.format(score))
+   return score
+
+def calc_discrete_entropy_2(agent_stats, skill_headers=None):
+   agent_skills = agent_stats['skills']
+   lifespans = agent_stats['lifespans']
+   agent_skills_0 = np.vstack(agent_skills)
+   agent_lifespans = np.hstack(lifespans)
+   print(agent_skills_0.transpose())
+   print(agent_lifespans)
+#  weights = sigmoid_lifespan(agent_lifespans)
+   agent_skills = agent_skills_0.transpose()
+ # agent_skills = weights * agent_skills_0.transpose()
+   # discretize
+   agent_skills = agent_skills/(np.where(agent_skills==0, agent_skills.max()+1, agent_skills)).min()
+   agent_skills = np.where(agent_skills==0, 0.0000001, agent_skills)
+   div_agents = skbio.diversity.alpha_diversity('shannon', agent_skills).mean()
+   div_skills = skbio.diversity.alpha_diversity('shannon', agent_skills.transpose()).mean()
+   div_lifespans = skbio.diversity.alpha_diversity('shannon', agent_lifespans)
+   score = -(div_agents * div_skills) / div_lifespans#/ len(agent_skills)**2
+   print(score)
+
+   return score
+
+
+def calc_discrete_entropy(agent_stats, skill_headers=None):
+   agent_skills = agent_stats['skills']
+   lifespans = agent_stats['lifespans']
+   agent_skills_0 = np.vstack(agent_skills)
+   agent_lifespans = np.hstack(lifespans)
+   weights = sigmoid_lifespan(agent_lifespans)
+   agent_skills = agent_skills_0.transpose() * weights
+   agent_skills = agent_skills.transpose()
+   BASE_VAL = 0.0001
+   # split between skill and agent entropy
+   n_skills = len(agent_skills[0])
+   n_pop = len(agent_skills)
+   agent_sums = [sum(skills) for skills in agent_skills]
+   i = 0
+
+   # ensure that we will not be dividing by zero when computing probabilities
+   for a in agent_sums:
+       if a == 0:
+           agent_sums[i] = BASE_VAL * n_skills
+       i += 1
+   skill_sums = [0 for i in range(n_skills)]
+
+   for i in range(n_skills):
+
+       for a_skills in agent_skills:
+           skill_sums[i] += a_skills[i]
+
+       if skill_sums[i] == 0:
+           skill_sums[i] = BASE_VAL * n_pop
+
+   skill_ents = []
+
+   for i in range(n_skills):
+       skill_ent = 0
+
+       for j in range(n_pop):
+
+           a_skill = agent_skills[j][i]
+
+           if a_skill == 0:
+               a_skill = BASE_VAL
+           p = a_skill / skill_sums[i]
+
+           if p == 0:
+               skill_ent += 0
+           else:
+               skill_ent += p * np.log(p)
+       skill_ent = skill_ent / (n_pop)
+       skill_ents.append(skill_ent)
+
+   agent_ents = []
+
+   for j in range(n_pop):
+       agent_ent = 0
+
+       for i in range(n_skills):
+
+           a_skill = agent_skills[j][i]
+
+           if a_skill == 0:
+               a_skill = BASE_VAL
+           p = a_skill / agent_sums[j]
+
+           if p == 0:
+               agent_ent += 0
+           else:
+               agent_ent += p * np.log(p)
+       agent_ent = agent_ent / (n_skills)
+       agent_ents.append(agent_ent)
+   agent_score =  np.mean(agent_ents)
+   skill_score =  np.mean(skill_ents)
+#  score = (alpha * skill_score + (1 - alpha) * agent_score)
+   score = -(skill_score * agent_score)
+   score = score * 100#/ n_pop**2
+   print('agent skills:\n{}\n{}'.format(skill_headers, np.array(agent_skills_0.transpose())))
+   print('lifespans:\n{}'.format(lifespans))
+#  print('skill_ents:\n{}\nskill_mean:\n{}\nagent_ents:\n{}\nagent_mean:{}\nscore:\n{}\n'.format(
+#      np.array(skill_ents), skill_score, np.array(agent_ents), agent_score, score))
+   print('score:\n{}'.format(score))
 
    return score
 
@@ -300,12 +426,16 @@ class EvolverNMMO(LambdaMuEvolver):
       elif self.config.FITNESS_METRIC == 'Differential':
          self.calc_diversity = calc_differential_entropy
       elif self.config.FITNESS_METRIC == 'Discrete':
-         self.calc_diversity = calc_discrete_entropy
+         self.calc_diversity = calc_discrete_entropy_2
+      elif self.config.FITNESS_METRIC == 'Hull':
+         self.calc_diversity = calc_convex_hull
       else:
          raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
       self.CPPN = config.GENOME == 'CPPN'
       self.PATTERN_GEN = config.GENOME == 'Pattern'
       self.RAND_GEN = config.GENOME == 'Random'
+      if not (self.CPPN or self.PATTERN_GEN or self.RAND_GEN):
+         raise Exception('Invalid genome')
       self.LAMBDA_MU = config.EVO_ALGO == 'Simple'
       self.MAP_ELITES = config.EVO_ALGO == 'MAP-Elites'
 
@@ -365,13 +495,16 @@ class EvolverNMMO(LambdaMuEvolver):
 
       maps = {}
       global_counter = ray.get_actor("global_counter")
-      g_idxs = set([idx-1 for idx, _ in genomes])
+      neat_idxs = set([idx for idx, _ in genomes])
+      g_idxs = set([i for i in range(self.n_pop)])
+      neat_to_g = {}
       skip_idxs = set()
 
       for idx, g in genomes:
          # neat-python indexes starting from 1
-         idx -= 1
-         self.genes[idx] = (None, g.atk_mults)
+         g_idx = g_idxs.pop()
+         neat_to_g[idx] = g_idx
+         self.genes[g_idx] = (None, g.atk_mults)
          if idx <= self.last_map_idx and not self.reloading:
             continue
          cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
@@ -406,15 +539,17 @@ class EvolverNMMO(LambdaMuEvolver):
          if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
                tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
                tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
-            print('map {} rejected'.format(idx))
+            print('map {} rejected'.format(g_idx))
             g.fitness = 0
-            g_idxs.remove(idx)
+            neat_idxs.remove(idx)
             skip_idxs.add(idx)
          else:
-            maps[idx] = map_arr, g.atk_mults
+            maps[g_idx] = map_arr, g.atk_mults
+      g_idxs = set([i for i in range(self.n_pop)])
       self.maps = maps
       g_idxs = list(g_idxs)
-      self.last_map_idx = g_idxs[-1]
+      neat_idxs = list(neat_idxs)
+      self.last_map_idx = neat_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
       self.saveMaps(maps)
       global_stats = self.global_stats
@@ -424,25 +559,25 @@ class EvolverNMMO(LambdaMuEvolver):
 #     headers = ray.get(global_stats.get_headers.remote())
       n_epis = train_stats['episodes_this_iter']
      #assert n_epis == self.n_pop
-      for idx, _ in genomes:
-         idx -= 1
+      for idx in neat_idxs:
+         g_idx = neat_to_g[idx]
          #FIXME: hack
 
          if idx in skip_idxs:
             continue
 
-         if idx not in stats:
-            print('Missing stats for map {}, training again.'.format(idx))
+         if g_idx not in stats:
+            print('Missing stats for map {}, training again.'.format(g_idx))
             self.trainer.train()
             stats = ray.get(global_stats.get.remote())
 
       for idx, g in genomes:
-         idx -= 1
+         g_idx = neat_to_g[idx]
          #FIXME: hack
 
-         if idx in skip_idxs:
+         if g_idx in skip_idxs:
             continue
-         score = self.calc_diversity(stats[idx])
+         score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
          g.fitness = score
@@ -940,73 +1075,3 @@ def update_entropy_skills(skill_dict):
 
     return calc_diversity_l2(agent_skills)
 
-def calc_discrete_entropy(agent_skills, alpha, skill_idxs=None):
-    BASE_VAL = 0.0001
-    # split between skill and agent entropy
-    n_skills = len(agent_skills[0])
-    n_pop = len(agent_skills)
-    agent_sums = [sum(skills) for skills in agent_skills]
-    i = 0
-
-    for a in agent_sums:
-        if a == 0:
-            agent_sums[i] = BASE_VAL * n_skills
-        i += 1
-    skill_sums = [0 for i in range(n_skills)]
-
-    for i in range(n_skills):
-
-        for a_skills in agent_skills:
-            skill_sums[i] += a_skills[i]
-
-        if skill_sums[i] == 0:
-            skill_sums[i] = BASE_VAL * n_pop
-
-    skill_ents = []
-
-    for i in range(n_skills):
-        skill_ent = 0
-
-        for j in range(n_pop):
-
-            a_skill = agent_skills[j][i]
-
-            if a_skill == 0:
-                a_skill = BASE_VAL
-            p = a_skill / skill_sums[i]
-
-            if p == 0:
-                skill_ent += 0
-            else:
-                skill_ent += p * np.log(p)
-        skill_ent = skill_ent / (n_pop)
-        skill_ents.append(skill_ent)
-
-    agent_ents = []
-
-    for j in range(n_pop):
-        agent_ent = 0
-
-        for i in range(n_skills):
-
-            a_skill = agent_skills[j][i]
-
-            if a_skill == 0:
-                a_skill = BASE_VAL
-            p = a_skill / agent_sums[j]
-
-            if p == 0:
-                agent_ent += 0
-            else:
-                agent_ent += p * np.log(p)
-        agent_ent = agent_ent / (n_skills)
-        agent_ents.append(agent_ent)
-    agent_score = np.mean(agent_ents)
-    skill_score = np.mean(skill_ents)
-    score = (alpha * skill_score + (1 - alpha) * agent_score)
-    score = score * 100
-    print('agent skills:\n{}\n{}'.format(skill_idxs, np.array(agent_skills)))
-    print('skill_ents:\n{}\nskill_mean:\n{}\nagent_ents:\n{}\nagent_mean:{}\nscore:\n{}\n'.format(
-        np.array(skill_ents), skill_score, np.array(agent_ents), agent_score, score))
-
-    return score

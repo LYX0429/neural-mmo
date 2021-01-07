@@ -178,7 +178,7 @@ if __name__ == '__main__':
 
          print('loading evolver from save file')
       # change params on reload here
-#     evolver.config.ROOT = config.ROOT
+      evolver.config.ROOT = config.ROOT
       evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
       evolver.config.INFER_IDX = config.INFER_IDX
 #     evolver.config.SKILLS = config.SKILLS

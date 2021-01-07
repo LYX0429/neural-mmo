@@ -129,7 +129,7 @@ class EvoNMMO(TreeOrerock):
    MODEL = 'current'
    NENT = 8  # Maximum population size
    TERRAIN_SIZE = 70
-   EVO_DIR = 'all_random_l2'
+   EVO_DIR = 'all_random_l2_1'
 #  ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
