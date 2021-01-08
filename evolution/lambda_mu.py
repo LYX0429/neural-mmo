@@ -112,7 +112,7 @@ class LambdaMuEvolver():
       if ranked_pop is None:
          pop_list = [(g_hash, game, score, age) for g_hash, (game, score, age) in self.population.items() if score is not None]
          ranked_pop = sorted(pop_list, key=lambda tpl: tpl[2])
-      VERBOSE = False
+      VERBOSE = True
 
       if VERBOSE:
          print('Ranked population: (id, running_mean_score, last_score, age)')
@@ -249,6 +249,7 @@ class LambdaMuEvolver():
        try:
            os.mkdir(os.path.join(self.save_path, 'maps'))
        except FileExistsError:
+           pass
            print('Overwriting evolved maps at {}.'.format(self.save_path))
        self.restore()
 
