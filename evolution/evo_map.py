@@ -456,7 +456,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.MAP_ELITES = config.EVO_ALGO == 'MAP-Elites'
 
       if self.PATTERN_GEN:
-         self.max_primitives = 25
+         self.max_primitives = self.map_width**2 / 4
 
          if self.MAP_ELITES:
             self.me = MapElites(
