@@ -216,16 +216,25 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None):
    lifespans = agent_stats['lifespans']
    agent_skills_0 = np.vstack(agent_skills)
    agent_lifespans = np.hstack(lifespans)
+   n_agents = lifespans.shape[0]
+   n_skills = agent_skills.shape[1]
    print(agent_skills_0.transpose())
    print(agent_lifespans)
-#  weights = sigmoid_lifespan(agent_lifespans)
+   weights = sigmoid_lifespan(agent_lifespans)
    agent_skills = agent_skills_0.transpose()
- # agent_skills = weights * agent_skills_0.transpose()
    # discretize
    agent_skills = agent_skills/(np.where(agent_skills==0, agent_skills.max()+1, agent_skills)).min()
    agent_skills = np.where(agent_skills==0, 0.0000001, agent_skills)
+   # contract population toward mean according to lifespan
+   mean_skill = agent_skills.mean(axis=1)
+   mean_agent = agent_skills.mean(axis=0)
+   mean_skills = np.repeat(mean_skill, n_skills, axis=1)
+#  mean_agents = np.repeat(mean_agent, n_agents, axis=0)
+   agent_deltas = agent_skills - mean_agents
+   a_skills_skills = mean_agents + weights * agent_deltas
+#  a_skills_agents =
    div_agents = skbio.diversity.alpha_diversity('shannon', agent_skills).mean()
-   div_skills = skbio.diversity.alpha_diversity('shannon', agent_skills.transpose()).mean()
+   div_skills = skbio.diversity.alpha_diversity('shannon', agent_skills_skills.transpose()).mean()
    div_lifespans = skbio.diversity.alpha_diversity('shannon', agent_lifespans)
    score = -(div_agents * div_skills) / div_lifespans#/ len(agent_skills)**2
    print(score)
@@ -480,6 +489,8 @@ class EvolverNMMO(LambdaMuEvolver):
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                             'config_cppn_nmmo')
          self.neat_config.pop_size = self.config.N_EVO_MAPS
+         self.neat_config.elitism = int(self.lam * self.config.N_EVO_MAPS)
+         self.neat_config.survival_threshold = self.mu
          self.neat_pop = neat.population.Population(self.neat_config)
          stats = neat.statistics.StatisticsReporter()
          self.neat_pop.add_reporter(stats)
@@ -561,7 +572,7 @@ class EvolverNMMO(LambdaMuEvolver):
             maps[g_idx] = map_arr, g.atk_mults
          g_idx += 1
       self.maps = maps
-      g_idxs = [i for i in range(g_idx)] 
+      g_idxs = [i for i in range(g_idx)]
       neat_idxs = list(neat_idxs)
       self.last_map_idx = neat_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
@@ -587,12 +598,14 @@ class EvolverNMMO(LambdaMuEvolver):
 
       last_fitnesses = self.last_fitnesses
       new_fitness_hist = {}
+
       for idx, g in genomes:
          g_idx = neat_to_g[idx]
          #FIXME: hack
 
          if g_idx in skip_idxs:
             new_fitness_hist[idx] = last_fitnesses[idx]
+
             continue
          score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS)
         #self.population[g_hash] = (None, score, None)
@@ -600,6 +613,7 @@ class EvolverNMMO(LambdaMuEvolver):
          last_fitness = last_fitnesses[idx]
          last_fitness.append(score)
          g.fitness = np.mean(last_fitness)
+
          if len(last_fitness) == self.config.ROLLING_FITNESS:
              last_fitness = last_fitness[:self.config.ROLLING_FITNESS]
          new_fitness_hist[idx] = last_fitness
@@ -679,7 +693,11 @@ class EvolverNMMO(LambdaMuEvolver):
             T()
          Save.np(map_arr, path)
 
-         if self.config.TERRAIN_RENDER and self.n_epoch % 100 == 0:
+         if self.config.TERRAIN_RENDER:
+            png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
+            Save.render(map_arr, self.map_generator.textures, png_path)
+
+         if self.n_epoch % 100 == 0:
             checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
 
             if not checkpoint_dir_created and not os.path.isdir(checkpoint_dir_path):
@@ -743,7 +761,7 @@ class EvolverNMMO(LambdaMuEvolver):
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
             'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
-           #'train_batch_size': 4000,
+           #'train_batch_size': 5000,
             'rollout_fragment_length': 100,
             'sgd_minibatch_size': 128,  # normally: 128
             'num_sgd_iter': 1,

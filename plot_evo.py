@@ -78,7 +78,7 @@ if __name__ == '__main__':
                     ind_y.append(e_scores[-i])
                 else:
                     ind_y.append(0)
-            ax.scatter(x, ind_y, s=0.1, c=colors[i])
+            ax.scatter(x, ind_y, s=0.1, c=colors[i%48])
     avg_scores = [np.mean(np.array(scores)) for scores in ep_scores]
     std = [np.std(np.array(scores)) for scores in ep_scores]
     ax.plot(avg_scores, c='indigo')
