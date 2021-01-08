@@ -138,7 +138,8 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
 
    if verbose:
 #  print(skill_headers)
-       print('agent skills:\n{}'.format(a))
+       print('agent skills:\n{}'.format(a.transpose()))
+       print('lifespans:\n{}'.format(a_lifespans))
        print('score:\n{}\n'.format(
        score))
 
@@ -491,6 +492,7 @@ class EvolverNMMO(LambdaMuEvolver):
    def neat_eval_fitness(self, genomes, neat_config):
       if self.n_epoch == 0:
          self.last_map_idx = -1
+         self.last_fitnesses = {}
 
       if self.reloading:
          # Turn off reloading after 1 epoch.
@@ -510,6 +512,8 @@ class EvolverNMMO(LambdaMuEvolver):
       skip_idxs = set()
 
       for idx, g in genomes:
+         if self.n_epoch == 0 or idx not in self.last_fitnesses:
+             self.last_fitnesses[idx] = []
          # neat-python indexes starting from 1
          g_idxs.add(g_idx)
          neat_to_g[idx] = g_idx
@@ -581,17 +585,26 @@ class EvolverNMMO(LambdaMuEvolver):
             self.trainer.train()
             stats = ray.get(global_stats.get.remote())
 
+      last_fitnesses = self.last_fitnesses
+      new_fitness_hist = {}
       for idx, g in genomes:
          g_idx = neat_to_g[idx]
          #FIXME: hack
 
          if g_idx in skip_idxs:
+            new_fitness_hist[idx] = last_fitnesses[idx]
             continue
          score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
-         g.fitness = score
+         last_fitness = last_fitnesses[idx]
+         last_fitness.append(score)
+         g.fitness = np.mean(last_fitness)
+         if len(last_fitness) == self.config.ROLLING_FITNESS:
+             last_fitness = last_fitness[:self.config.ROLLING_FITNESS]
+         new_fitness_hist[idx] = last_fitness
          self.population[g_idx] = (None, score, None)
+      self.last_fitnesses = new_fitness_hist
       global_stats.reset.remote()
 
       if self.reloading:
