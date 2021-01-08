@@ -635,7 +635,10 @@ class EvolverNMMO(LambdaMuEvolver):
             return
      #for i, map_arr in maps.items():
       if mutated is None or self.reloading:
-         mutated = list(maps.keys())
+         if isinstance(maps, dict):
+             mutated = maps.keys()
+         else:
+             mutated = [i for i, _ in enumerate(maps)]
          self.reloading = False
 
       checkpoint_dir_created = False
