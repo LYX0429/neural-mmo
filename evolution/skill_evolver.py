@@ -60,9 +60,9 @@ class SkillEvolver(LambdaMuEvolver):
                        agent_stats,
                        n_sim_ticks,
                        child_conn,):
-      score = calc_diversity_l2(agent_stats, self.alpha)
+#     score = calc_diversity_l2(agent_stats, self.alpha)
 #     score = calc_differential_entropy(agent_stats)
-#     score = calc_discrete_entropy_2(agent_stats)
+      score = calc_discrete_entropy_2(agent_stats)
 #     score = calc_discrete_entropy(agent_stats)
 #     score = calc_convex_hull(agent_stats)
 
@@ -96,7 +96,7 @@ class SkillEvolver(LambdaMuEvolver):
             agent_lifespans[l_i] = \
                   min(max(0, agent_lifespans[l_i] + random.randint(-10, 10)), max_lifespan)
 
-      if n_agents > self.n_skills + 1 and random.random() < 0.05:
+      if n_agents > 1 and random.random() < 0.05:
          # remove agent
          i = random.randint(0, n_agents - 1)
          agent_skills = np.concatenate((agent_skills[0:i, :], agent_skills[i+1:, :]), axis=0)

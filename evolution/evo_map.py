@@ -248,7 +248,7 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
    div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
  # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
    score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
-   score = score
+   score = score * 100 / n_agents**2
    if verbose:
        print('Score:', score)
 
