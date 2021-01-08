@@ -557,7 +557,8 @@ class EvolverNMMO(LambdaMuEvolver):
             maps[g_idx] = map_arr, g.atk_mults
          g_idx += 1
       self.maps = maps
-      g_idxs = list(g_idxs) neat_idxs = list(neat_idxs)
+      g_idxs = [i for i in range(g_idx)] 
+      neat_idxs = list(neat_idxs)
       self.last_map_idx = neat_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
       self.saveMaps(maps)
@@ -586,7 +587,6 @@ class EvolverNMMO(LambdaMuEvolver):
 
          if g_idx in skip_idxs:
             continue
-         if g_idx not in stats:
          score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
@@ -635,7 +635,7 @@ class EvolverNMMO(LambdaMuEvolver):
             return
      #for i, map_arr in maps.items():
       if mutated is None or self.reloading:
-         mutated = list(self.population.keys())
+         mutated = list(maps.keys())
          self.reloading = False
 
       checkpoint_dir_created = False
