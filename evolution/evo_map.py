@@ -218,6 +218,8 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
    agent_skills_0 = agent_skills= np.vstack(agent_skills)
    lifespans = np.hstack(lifespans)
    n_agents = lifespans.shape[0]
+   if n_agents == 1:
+       return -np.float('inf')
    n_skills = agent_skills.shape[1]
    if verbose:
        print('skills')
