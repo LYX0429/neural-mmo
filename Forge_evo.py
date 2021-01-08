@@ -189,7 +189,7 @@ if __name__ == '__main__':
       evolver.epoch_reloaded = evolver.n_epoch
       evolver.restore(trash_data=True)
       evolver.trainer.reset()
-      if evolver.PATTERN_GEN:
+      if evolver.MAP_ELITES:
          evolver.me.load()
 
    except FileNotFoundError as e:

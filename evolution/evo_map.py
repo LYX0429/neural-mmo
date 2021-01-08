@@ -503,13 +503,15 @@ class EvolverNMMO(LambdaMuEvolver):
       maps = {}
       global_counter = ray.get_actor("global_counter")
       neat_idxs = set([idx for idx, _ in genomes])
-      g_idxs = set([i for i in range(self.n_pop)])
+#     g_idxs = set([i for i in range(self.n_pop)])
+      g_idxs = set()
       g_idx = 0
       neat_to_g = {}
       skip_idxs = set()
 
       for idx, g in genomes:
          # neat-python indexes starting from 1
+         g_idxs.add(g_idx)
          neat_to_g[idx] = g_idx
          self.genes[g_idx] = (None, g.atk_mults)
 
@@ -554,10 +556,8 @@ class EvolverNMMO(LambdaMuEvolver):
          else:
             maps[g_idx] = map_arr, g.atk_mults
          g_idx += 1
-      g_idxs = set([i for i in range(self.n_pop)])
       self.maps = maps
-      g_idxs = list(g_idxs)
-      neat_idxs = list(neat_idxs)
+      g_idxs = list(g_idxs) neat_idxs = list(neat_idxs)
       self.last_map_idx = neat_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
       self.saveMaps(maps)
@@ -586,6 +586,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
          if g_idx in skip_idxs:
             continue
+         if g_idx not in stats:
          score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
