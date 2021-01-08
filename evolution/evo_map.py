@@ -215,16 +215,16 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
    verbose=True
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
-   agent_skills_0 = np.vstack(agent_skills)
-   agent_lifespans = np.hstack(lifespans)
+   agent_skills_0 = agent_skills= np.vstack(agent_skills)
+   lifespans = np.hstack(lifespans)
    n_agents = lifespans.shape[0]
    n_skills = agent_skills.shape[1]
    if verbose:
        print('skills')
        print(agent_skills_0.transpose())
        print('lifespans')
-       print(agent_lifespans)
-   weights = sigmoid_lifespan(agent_lifespans)
+       print(lifespans)
+   weights = sigmoid_lifespan(lifespans)
    agent_skills_1 = agent_skills_0.transpose()
    # discretize
    agent_skills = agent_skills/(np.where(agent_skills==0, agent_skills.max()+1, agent_skills)).min()
@@ -244,7 +244,7 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
    a_skills_agents = mean_skills + (weights * skill_deltas.transpose()).transpose()
    div_agents = skbio.diversity.alpha_diversity('shannon', a_skills_agents).mean()
    div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
- # div_lifespans = skbio.diversity.alpha_diversity('shannon', agent_lifespans)
+ # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
    score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
    score = score
    if verbose:
