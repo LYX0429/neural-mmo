@@ -146,8 +146,8 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
    return score
 
 def sigmoid_lifespan(x):
-   res = 3 / (1 + np.exp(0.1*(-x+50)))
-   res = scipy.special.softmax(res)
+   res = 1 / (1 + np.exp(0.1*(-x+50)))
+#  res = scipy.special.softmax(res)
 
    return res
 
@@ -199,45 +199,56 @@ def calc_convex_hull(agent_stats, skill_headers=None):
    agent_skills_0 = np.vstack(agent_skills)
    agent_lifespans = np.hstack(lifespans)
    weights = sigmoid_lifespan(agent_lifespans)
-#  print(agent_skills_0.transpose())
-#  print(agent_lifespans)
+   print(agent_skills_0.transpose())
+   print(agent_lifespans)
    try:
        hull = ConvexHull(agent_skills_0)
        score = hull.volume
    except Exception:
        score = 0
 
-   print('Score: {}'.format(score))
+#  print('Score: {}'.format(score))
 
    return score
 
-def calc_discrete_entropy_2(agent_stats, skill_headers=None):
+def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
+   verbose=True
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    agent_skills_0 = np.vstack(agent_skills)
    agent_lifespans = np.hstack(lifespans)
    n_agents = lifespans.shape[0]
    n_skills = agent_skills.shape[1]
-   print(agent_skills_0.transpose())
-   print(agent_lifespans)
+   if verbose:
+       print('skills')
+       print(agent_skills_0.transpose())
+       print('lifespans')
+       print(agent_lifespans)
    weights = sigmoid_lifespan(agent_lifespans)
-   agent_skills = agent_skills_0.transpose()
+   agent_skills_1 = agent_skills_0.transpose()
    # discretize
    agent_skills = agent_skills/(np.where(agent_skills==0, agent_skills.max()+1, agent_skills)).min()
    agent_skills = np.where(agent_skills==0, 0.0000001, agent_skills)
    # contract population toward mean according to lifespan
+   # mean experience level for each agent
    mean_skill = agent_skills.mean(axis=1)
+   # mean skill vector of an agent
    mean_agent = agent_skills.mean(axis=0)
-   mean_skills = np.repeat(mean_skill, n_skills, axis=1)
-#  mean_agents = np.repeat(mean_agent, n_agents, axis=0)
+   assert mean_skill.shape[0] == n_agents
+   assert mean_agent.shape[0] == n_skills
+   mean_skills = np.repeat(mean_skill.reshape(mean_skill.shape[0], 1), n_skills, axis=1)
+   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
    agent_deltas = agent_skills - mean_agents
-   a_skills_skills = mean_agents + weights * agent_deltas
-#  a_skills_agents =
-   div_agents = skbio.diversity.alpha_diversity('shannon', agent_skills).mean()
-   div_skills = skbio.diversity.alpha_diversity('shannon', agent_skills_skills.transpose()).mean()
-   div_lifespans = skbio.diversity.alpha_diversity('shannon', agent_lifespans)
-   score = -(div_agents * div_skills) / div_lifespans#/ len(agent_skills)**2
-   print(score)
+   skill_deltas = agent_skills - mean_skills
+   a_skills_skills = mean_agents + (weights * agent_deltas.transpose()).transpose()
+   a_skills_agents = mean_skills + (weights * skill_deltas.transpose()).transpose()
+   div_agents = skbio.diversity.alpha_diversity('shannon', a_skills_agents).mean()
+   div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
+ # div_lifespans = skbio.diversity.alpha_diversity('shannon', agent_lifespans)
+   score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
+   score = score
+   if verbose:
+       print('Score:', score)
 
    return score
 

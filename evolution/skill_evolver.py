@@ -23,7 +23,7 @@ class SkillEvolver(LambdaMuEvolver):
       self.alpha = alpha
       super().__init__(*args, **kwargs)
       self.n_skills = 10
-      self.n_agents = 64
+      self.n_agents = 16
       self.max_xp = 20000
       self.max_lifespan = 100
       self.MATURE_AGE = 1
@@ -60,11 +60,11 @@ class SkillEvolver(LambdaMuEvolver):
                        agent_stats,
                        n_sim_ticks,
                        child_conn,):
-#     score = calc_diversity_l2(agent_stats, self.alpha)
+      score = calc_diversity_l2(agent_stats, self.alpha)
 #     score = calc_differential_entropy(agent_stats)
 #     score = calc_discrete_entropy_2(agent_stats)
 #     score = calc_discrete_entropy(agent_stats)
-      score = calc_convex_hull(agent_stats)
+#     score = calc_convex_hull(agent_stats)
 
       if child_conn:
           child_conn.send(score)
