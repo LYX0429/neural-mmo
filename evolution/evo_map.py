@@ -747,7 +747,7 @@ class EvolverNMMO(LambdaMuEvolver):
          except FileExistsError:
             print('Model directory already exists.')
          # Instantiate monolithic RLlib Trainer object.
-         num_workers = 12
+         num_workers = self.config.N_PROC
          trainer = rlutils.EvoPPOTrainer(
             env="custom",
             path=model_path,

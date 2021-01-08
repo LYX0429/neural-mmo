@@ -200,7 +200,7 @@ if __name__ == '__main__':
                             createEnv,
                             None,  # init the trainer in evolution script
                             config,
-                            n_proc=   6,
+                            n_proc=   config.N_PROC,
                             n_pop=    config.N_EVO_MAPS,
                             )
 #  print(torch.__version__)
