@@ -513,8 +513,8 @@ class EvolverNMMO(LambdaMuEvolver):
          neat_to_g[idx] = g_idx
          self.genes[g_idx] = (None, g.atk_mults)
 
-         if idx <= self.last_map_idx and not self.reloading:
-            continue
+        #if idx <= self.last_map_idx and not self.reloading:
+        #   continue
          cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
 #        if self.config.NET_RENDER:
 #           with open('nmmo_cppn.pkl', 'wb') a
