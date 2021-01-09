@@ -712,7 +712,8 @@ class EvolverNMMO(LambdaMuEvolver):
             Save.render(map_arr, self.map_generator.textures, png_path)
 
          if self.n_epoch % 100 == 0:
-            plot_exp(self.config.EVO_DIR)
+            if self.n_epoch != 0:
+                plot_exp(self.config.EVO_DIR)
             checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
 
             if not checkpoint_dir_created and not os.path.isdir(checkpoint_dir_path):

@@ -135,7 +135,7 @@ class EvoNMMO(TreeOrerock):
    MAX_STEPS = 100
    MATURE_AGE = 3
    ROLLING_FITNESS = 25  # Size of window to use while calculating mean rolling fitness
-   TERRAIN_RENDER = True
+   TERRAIN_RENDER = False
    TERRAIN_WATER        = 0.15
    TERRAIN_GRASS        = 0.35
    TERRAIN_LAVA         = 0.45
