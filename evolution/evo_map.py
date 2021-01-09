@@ -199,19 +199,20 @@ def calc_convex_hull(agent_stats, skill_headers=None):
    agent_skills = np.vstack(agent_skills)
    lifespans = np.hstack(lifespans)
    weights = sigmoid_lifespan(lifespans)
-   print(agent_skills.transpose())
    print(lifespans)
    n_agents = lifespans.shape[0]
    mean_agent = agent_skills.mean(axis=0)
    mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
    agent_deltas = agent_skills - mean_agents
    agent_skills = mean_agents + (weights * agent_deltas.T).T
+   print(agent_skills.transpose())
    try:
        hull = ConvexHull(agent_skills, qhull_options='QJ')
        score = hull.volume
    except Exception as e:
        print(e)
        score = 0
+   print('score:', score)
 
 #  print('Score: {}'.format(score))
 
@@ -253,7 +254,7 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
    div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
  # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
    score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
-   score = score * 100#/ (n_agents * n_skills)
+   score = score * 100  #/ (n_agents * n_skills)
    if verbose:
        print('Score:', score)
 
@@ -482,23 +483,11 @@ class EvolverNMMO(LambdaMuEvolver):
                   save_path=self.save_path
                   )
             self.init_pop()
-   #        # Do MAP-Elites using qdpy
+            # Do MAP-Elites using qdpy
          from evolution.paint_terrain import Chromosome
          self.Chromosome = Chromosome
          self.chromosomes = {}
          self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
-#        from qdpy import algorithms, containers, benchmarks, plots
-#        from deap import base
-#        toolbox = base.Toolbox()
-#        toolbox.register("mutate", self.me_pattern_mutate)
-
-#        # Create container and algorithm. Here we use MAP-Elites, by illuminating a Grid container by evolution.
-#        self.me_grid = containers.Grid(shape=(64,64), max_items_per_bin=1, fitness_domain=((0., 1.),), features_domain=((0., 1.), (0., 1.)))
-#        self.me_algo = algorithms.RandomSearchMutPolyBounded(self.me_grid, budget=60000, batch_size=config.N_EVO_MAPS,
-#                dimension=3, optimisation_task="maximisation")
-
-#        # Create a logger to pretty-print everything and generate output data files
-#        self.me_logger = algorithms.AlgorithmLogger(self.me_algo)
 
       elif self.CPPN:
          self.n_epoch = -1
@@ -506,6 +495,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                             'config_cppn_nmmo')
+         self.neat_config.fitness_threshold = np.int('inf')
          self.neat_config.pop_size = self.config.N_EVO_MAPS
          self.neat_config.elitism = int(self.lam * self.config.N_EVO_MAPS)
          self.neat_config.survival_threshold = self.mu
