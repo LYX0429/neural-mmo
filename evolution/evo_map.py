@@ -197,24 +197,30 @@ def calc_convex_hull(agent_stats, skill_headers=None):
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    agent_skills = np.vstack(agent_skills)
+   n_skills = agent_skills.shape[1]
+
    lifespans = np.hstack(lifespans)
    weights = sigmoid_lifespan(lifespans)
+   print('skills:')
+   print(agent_skills.transpose())
+   print('lifespans:')
    print(lifespans)
    n_agents = lifespans.shape[0]
    mean_agent = agent_skills.mean(axis=0)
    mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
    agent_deltas = agent_skills - mean_agents
    agent_skills = mean_agents + (weights * agent_deltas.T).T
-   print(agent_skills.transpose())
-   try:
-       hull = ConvexHull(agent_skills, qhull_options='QJ')
-       score = hull.volume
-   except Exception as e:
-       print(e)
-       score = 0
+   if n_skills == 1:
+      # Max distance, i.e. a 1D hull
+      score = agent_skills.max() - agent_skills.mean()
+   else:
+      try:
+          hull = ConvexHull(agent_skills, qhull_options='QJ')
+          score = hull.volume
+      except Exception as e:
+          print(e)
+          score = 0
    print('score:', score)
-
-#  print('Score: {}'.format(score))
 
    return score
 
@@ -495,7 +501,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                             'config_cppn_nmmo')
-         self.neat_config.fitness_threshold = np.int('inf')
+         self.neat_config.fitness_threshold = np.float('inf')
          self.neat_config.pop_size = self.config.N_EVO_MAPS
          self.neat_config.elitism = int(self.lam * self.config.N_EVO_MAPS)
          self.neat_config.survival_threshold = self.mu
