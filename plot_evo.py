@@ -75,7 +75,8 @@ def plot_exp(exp_name, render=False):
     plt.xlabel('generation')
     plt.savefig(im_path, dpi=my_dpi)
     if render:
-       plt.close()
+       plt.show()
+    plt.close()
 
 
 if __name__ == '__main__':
@@ -96,4 +97,3 @@ if __name__ == '__main__':
 
     exp_name = args.experiment_name
     plot_exp(exp_name, render=True)
-    plt.show()
