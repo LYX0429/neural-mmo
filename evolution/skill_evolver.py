@@ -62,9 +62,9 @@ class SkillEvolver(LambdaMuEvolver):
                        child_conn,):
 #     score = calc_diversity_l2(agent_stats, self.alpha)
 #     score = calc_differential_entropy(agent_stats)
-      score = calc_discrete_entropy_2(agent_stats)
+#     score = calc_discrete_entropy_2(agent_stats)
 #     score = calc_discrete_entropy(agent_stats)
-#     score = calc_convex_hull(agent_stats)
+      score = calc_convex_hull(agent_stats)
 
       if child_conn:
           child_conn.send(score)

@@ -120,14 +120,14 @@ class EvoNMMO(TreeOrerock):
  # INFER_IDX = 79766
  # INFER_IDX = 80117
    # How to measure diversity of agents on generated map.
-   FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete'
+   FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete', 'Hull'
    GENOME = 'Random'  # CPPN, Pattern, Random
    THRESHOLD = False
    TERRAIN_MODE = 'contract'
    EVO_MAP = True
    RENDER = False
    MODEL = 'current'
-   NENT = 8  # Maximum population size
+   NENT = 16  # Maximum population size
    TERRAIN_SIZE = 70
    EVO_DIR = 'all_random_l2_1'
 #  ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')

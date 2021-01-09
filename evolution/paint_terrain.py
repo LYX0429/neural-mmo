@@ -197,11 +197,8 @@ class Chromosome():
             self.features[1] += 1
 
    def mutate(self):
-      for p in self.patterns:
-         rand = np.random.random()
-
-         if rand < 0.3:
-            p.mutate()
+      for p in np.random.choice(self.patterns, np.random.randint(1, 10)):
+         p.mutate()
 
       n_patterns = len(self.patterns)
       if np.random.random() < 0.3 and n_patterns > 0:

@@ -196,15 +196,21 @@ def calc_differential_entropy(agent_stats, skill_headers=None):
 def calc_convex_hull(agent_stats, skill_headers=None):
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
-   agent_skills_0 = np.vstack(agent_skills)
-   agent_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(agent_lifespans)
-   print(agent_skills_0.transpose())
-   print(agent_lifespans)
+   agent_skills = np.vstack(agent_skills)
+   lifespans = np.hstack(lifespans)
+   weights = sigmoid_lifespan(lifespans)
+   print(agent_skills.transpose())
+   print(lifespans)
+   n_agents = lifespans.shape[0]
+   mean_agent = agent_skills.mean(axis=0)
+   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
+   agent_deltas = agent_skills - mean_agents
+   agent_skills = mean_agents + (weights * agent_deltas.T).T
    try:
-       hull = ConvexHull(agent_skills_0)
+       hull = ConvexHull(agent_skills, qhull_options='QJ')
        score = hull.volume
-   except Exception:
+   except Exception as e:
+       print(e)
        score = 0
 
 #  print('Score: {}'.format(score))
@@ -229,7 +235,6 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
    weights = sigmoid_lifespan(lifespans)
    agent_skills_1 = agent_skills_0.transpose()
    # discretize
-   agent_skills = agent_skills/(np.where(agent_skills==0, agent_skills.max()+1, agent_skills)).min()
    agent_skills = np.where(agent_skills==0, 0.0000001, agent_skills)
    # contract population toward mean according to lifespan
    # mean experience level for each agent
@@ -248,7 +253,7 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
    div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
  # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
    score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
-   score = score * 100 / n_agents**2
+   score = score * 100#/ (n_agents * n_skills)
    if verbose:
        print('Score:', score)
 
@@ -530,7 +535,6 @@ class EvolverNMMO(LambdaMuEvolver):
       global_counter = ray.get_actor("global_counter")
       neat_idxs = set([idx for idx, _ in genomes])
 #     g_idxs = set([i for i in range(self.n_pop)])
-      g_idxs = set()
       g_idx = 0
       neat_to_g = {}
       skip_idxs = set()
@@ -539,7 +543,6 @@ class EvolverNMMO(LambdaMuEvolver):
          if self.n_epoch == 0 or idx not in self.last_fitnesses:
              self.last_fitnesses[idx] = []
          # neat-python indexes starting from 1
-         g_idxs.add(g_idx)
          neat_to_g[idx] = g_idx
          self.genes[g_idx] = (None, g.atk_mults)
 
@@ -574,18 +577,19 @@ class EvolverNMMO(LambdaMuEvolver):
          # Impossible maps are no good
          tile_counts = np.bincount(map_arr.reshape(-1))
 
-         if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
+         if (len(tile_counts) <= enums.Material.FOREST.value.index or \
                tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
                tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
-            print('map {} rejected'.format(g_idx))
+            print('map {} rejected for lack of food and water'.format(g_idx))
             g.fitness = 0
             neat_idxs.remove(idx)
-            skip_idxs.add(idx)
+            skip_idxs.add(g_idx)
+            self.genes.pop(g_idx)
          else:
             maps[g_idx] = map_arr, g.atk_mults
          g_idx += 1
       self.maps = maps
-      g_idxs = [i for i in range(g_idx)]
+      g_idxs = [i for i in range(g_idx) if not i in skip_idxs]
       neat_idxs = list(neat_idxs)
       self.last_map_idx = neat_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
