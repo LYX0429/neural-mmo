@@ -197,13 +197,17 @@ class Chromosome():
             self.features[1] += 1
 
    def mutate(self):
-      for p in np.random.choice(self.patterns, np.random.randint(1, 10)):
-         p.mutate()
-
       n_patterns = len(self.patterns)
+      if n_patterns == 0:
+         add_ptrn = True
+      else: 
+          add_ptrn = np.random.random() < 0.3
+          for p in np.random.choice(self.patterns, np.random.randint(1, 10)):
+             p.mutate()
+
       if np.random.random() < 0.3 and n_patterns > 0:
          self.patterns.pop(np.random.randint(n_patterns))
-      if np.random.random() < 0.3 and n_patterns < self.max_patterns:
+      if add_ptrn and n_patterns < self.max_patterns:
          p = np.random.choice(self.pattern_templates)
          p = p.generate(p, self.n_tiles, self.map_width)
          self.patterns.append(p)
