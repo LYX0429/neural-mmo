@@ -4,24 +4,9 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 
-if __name__ == '__main__':
+def plot_exp(exp_name, render=False):
 
     my_dpi = 96
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--experiment-name',
-                        default='scratch',
-                        help='name of the experiment')
-    args = parser.parse_args()
-
-    #exp_name = 'entropy'
-    #exp_name = 'special_and_alive'
-    #exp_name = 'skill_entropy'
-    #exp_name = 'skill_entropy_life'
-    #exp_name = 'entropy_2'
-    #exp_name = 'skill_evolver'
-    #exp_name = 'scratch'
-
-    exp_name = args.experiment_name
     log_path = 'evo_experiment/{}/log.csv'.format(exp_name)
     im_path = 'evo_experiment/{}/fitness.png'.format(exp_name)
 
@@ -89,4 +74,26 @@ if __name__ == '__main__':
     plt.ylabel('fitness')
     plt.xlabel('generation')
     plt.savefig(im_path, dpi=my_dpi)
+    if render:
+       plt.close()
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--experiment-name',
+                        default='scratch',
+                        help='name of the experiment')
+    args = parser.parse_args()
+
+    #exp_name = 'entropy'
+    #exp_name = 'special_and_alive'
+    #exp_name = 'skill_entropy'
+    #exp_name = 'skill_entropy_life'
+    #exp_name = 'entropy_2'
+    #exp_name = 'skill_evolver'
+    #exp_name = 'scratch'
+
+    exp_name = args.experiment_name
+    plot_exp(exp_name, render=True)
     plt.show()
