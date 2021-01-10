@@ -32,7 +32,7 @@ class EvoPPOTrainer(ppo.PPOTrainer):
          with open(os.path.join(self.pathDir, 'path.txt')) as f:
             path = f.read().splitlines()[0]
       else:
-         raise Exception("Shouldn't the config.MODEL = 'current', for evolution?")
+         raise Exception("Invalid model.")
          path = 'experiment/{}/checkpoint'.format(model)
 
       print('Loading from: {}'.format(path))
@@ -107,6 +107,17 @@ class SanePPOTrainer(ppo.PPOTrainer):
       if model == 'current':
          with open('experiment/path.txt') as f:
             path = f.read().splitlines()[0]
+      elif model.startswith('evo_experiment'):
+#        path = '/'.join(model.split('/')[1:])
+         path = os.path.join(model, 'path.txt')
+         with open(path) as f:
+            path = f.read().splitlines()[0]
+         #FIXME dumb hack
+         path = '{}/{}/{}'.format(path.split('/')[0],
+               'greene',
+               '/'.join(path.split('/')[1:]),
+               )
+         path = os.path.abspath(path)
       else:
          path = 'experiment/{}/checkpoint'.format(model)
 

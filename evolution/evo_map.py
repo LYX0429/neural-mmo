@@ -33,9 +33,8 @@ from projekt import rlutils
 from projekt.evaluator import Evaluator
 from projekt.overlay import OverlayRegistry
 from pureples.shared.visualize import draw_net
-from scipy.spatial import ConvexHull
 from plot_evo import plot_exp
-import skbio
+from evolution.diversity import diversity_calc
 
 np.set_printoptions(threshold=sys.maxsize,
                     linewidth=120,
@@ -53,6 +52,18 @@ MAGE_MIN = 0.6
 MAGE_MAX = 1.6
 RANGE_MIN = 0.2
 RANGE_MAX = 1
+
+class SpawnPoints():
+   def __init__(self, map_width, n_players):
+      self.max_spawns = n_players * 3
+      n_spawns = np.random.randint(n_players, self.max_spawns)
+      self.spawn_points = np.random.randint(0, map_width (2, n_spawns))
+
+   def mutate(self):
+      n_spawns = len(self.spawn_points)
+      n_delete = np.random.randint(0, 5)
+      n_add = np.random.randint(0, 5)
+
 
 #NOTE: had to move this multiplier stuff outside of the evolver so the CPPN genome could incorporate them
 # without pickling error.
@@ -120,276 +131,6 @@ def k_largest_index_argsort(a, k):
 
     return k_lrg
 
-def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   assert len(agent_skills) == len(lifespans)
-   a_skills = np.vstack(agent_skills)
-   a_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(a_lifespans)
-   weight_mat = np.outer(weights, weights)
-  #assert len(agent_skills) == 1
-   a = a_skills
-   n_agents = a.shape[0]
-   b = a.reshape(n_agents, 1, a.shape[1])
-   # https://stackoverflow.com/questions/43367001/how-to-calculate-euclidean-distance-between-pair-of-rows-of-a-numpy-array
-   distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
-   w_dists = weight_mat * distances
-   score = np.sum(w_dists)/2
-
-   if verbose:
-#  print(skill_headers)
-       print('agent skills:\n{}'.format(a.transpose()))
-       print('lifespans:\n{}'.format(a_lifespans))
-       print('score:\n{}\n'.format(
-       score))
-
-   return score
-
-def sigmoid_lifespan(x):
-   res = 1 / (1 + np.exp(0.1*(-x+50)))
-#  res = scipy.special.softmax(res)
-
-   return res
-
-def calc_differential_entropy(agent_stats, skill_headers=None):
-   # Penalize if under max pop agents living
-  #for i, a_skill in enumerate(agent_skills):
-  #   if a_skill.shape[0] < max_pop:
-  #      a = np.mean(a_skill, axis=0)
-  #      a_skill = np.vstack(np.array([a_skill] + [a for _ in range(max_pop - a_skill.shape[0])]))
-  #      agent_skills[i] = a_skill
-   # if there are stats from multiple simulations, we consider agents from all simulations together
-   #FIXME: why
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-
-   if not len(agent_skills) == 1:
-      pass
-   assert len(agent_skills) == len(lifespans)
-   a_skills = np.vstack(agent_skills)
-   a_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(a_lifespans)
-#  assert len(agent_skills) == 1
-  #a_skills = agent_skills[0]
-   # FIXME: Only applies to exploration-only experiment
-  #print('exploration')
-  #print(a_skills.transpose()[0])
-   print(skill_headers)
-   print(a_skills.transpose())
-   print(len(agent_skills), 'populations')
-   print('lifespans')
-   print(a_lifespans)
-
-   if len(lifespans) == 1:
-      score = 0
-   else:
-      mean = np.average(a_skills, axis=0, weights=weights)
-      cov = np.cov(a_skills,rowvar=0, aweights=weights)
-      gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
-      score = gaussian.entropy()
-#  print(np.array(a_skills))
-   print('score:', score)
-
-   return score
-
-
-def calc_convex_hull(agent_stats, skill_headers=None):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   agent_skills = np.vstack(agent_skills)
-   n_skills = agent_skills.shape[1]
-
-   lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(lifespans)
-   print('skills:')
-   print(agent_skills.transpose())
-   print('lifespans:')
-   print(lifespans)
-   n_agents = lifespans.shape[0]
-   mean_agent = agent_skills.mean(axis=0)
-   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
-   agent_deltas = agent_skills - mean_agents
-   agent_skills = mean_agents + (weights * agent_deltas.T).T
-   if n_skills == 1:
-      # Max distance, i.e. a 1D hull
-      score = agent_skills.max() - agent_skills.mean()
-   else:
-      try:
-          hull = ConvexHull(agent_skills, qhull_options='QJ')
-          score = hull.volume
-      except Exception as e:
-          print(e)
-          score = 0
-   print('score:', score)
-
-   return score
-
-def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
-   verbose=True
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   agent_skills_0 = agent_skills= np.vstack(agent_skills)
-   lifespans = np.hstack(lifespans)
-   n_agents = lifespans.shape[0]
-   if n_agents == 1:
-       return -np.float('inf')
-   n_skills = agent_skills.shape[1]
-   if verbose:
-       print('skills')
-       print(agent_skills_0.transpose())
-       print('lifespans')
-       print(lifespans)
-   weights = sigmoid_lifespan(lifespans)
-   agent_skills_1 = agent_skills_0.transpose()
-   # discretize
-   agent_skills = np.where(agent_skills==0, 0.0000001, agent_skills)
-   # contract population toward mean according to lifespan
-   # mean experience level for each agent
-   mean_skill = agent_skills.mean(axis=1)
-   # mean skill vector of an agent
-   mean_agent = agent_skills.mean(axis=0)
-   assert mean_skill.shape[0] == n_agents
-   assert mean_agent.shape[0] == n_skills
-   mean_skills = np.repeat(mean_skill.reshape(mean_skill.shape[0], 1), n_skills, axis=1)
-   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
-   agent_deltas = agent_skills - mean_agents
-   skill_deltas = agent_skills - mean_skills
-   a_skills_skills = mean_agents + (weights * agent_deltas.transpose()).transpose()
-   a_skills_agents = mean_skills + (weights * skill_deltas.transpose()).transpose()
-   div_agents = skbio.diversity.alpha_diversity('shannon', a_skills_agents).mean()
-   div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
- # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
-   score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
-   score = score * 100  #/ (n_agents * n_skills)
-   if verbose:
-       print('Score:', score)
-
-   return score
-
-
-def calc_discrete_entropy(agent_stats, skill_headers=None):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   agent_skills_0 = np.vstack(agent_skills)
-   agent_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(agent_lifespans)
-   agent_skills = agent_skills_0.transpose() * weights
-   agent_skills = agent_skills.transpose()
-   BASE_VAL = 0.0001
-   # split between skill and agent entropy
-   n_skills = len(agent_skills[0])
-   n_pop = len(agent_skills)
-   agent_sums = [sum(skills) for skills in agent_skills]
-   i = 0
-
-   # ensure that we will not be dividing by zero when computing probabilities
-
-   for a in agent_sums:
-       if a == 0:
-           agent_sums[i] = BASE_VAL * n_skills
-       i += 1
-   skill_sums = [0 for i in range(n_skills)]
-
-   for i in range(n_skills):
-
-       for a_skills in agent_skills:
-           skill_sums[i] += a_skills[i]
-
-       if skill_sums[i] == 0:
-           skill_sums[i] = BASE_VAL * n_pop
-
-   skill_ents = []
-
-   for i in range(n_skills):
-       skill_ent = 0
-
-       for j in range(n_pop):
-
-           a_skill = agent_skills[j][i]
-
-           if a_skill == 0:
-               a_skill = BASE_VAL
-           p = a_skill / skill_sums[i]
-
-           if p == 0:
-               skill_ent += 0
-           else:
-               skill_ent += p * np.log(p)
-       skill_ent = skill_ent / (n_pop)
-       skill_ents.append(skill_ent)
-
-   agent_ents = []
-
-   for j in range(n_pop):
-       agent_ent = 0
-
-       for i in range(n_skills):
-
-           a_skill = agent_skills[j][i]
-
-           if a_skill == 0:
-               a_skill = BASE_VAL
-           p = a_skill / agent_sums[j]
-
-           if p == 0:
-               agent_ent += 0
-           else:
-               agent_ent += p * np.log(p)
-       agent_ent = agent_ent / (n_skills)
-       agent_ents.append(agent_ent)
-   agent_score =  np.mean(agent_ents)
-   skill_score =  np.mean(skill_ents)
-#  score = (alpha * skill_score + (1 - alpha) * agent_score)
-   score = -(skill_score * agent_score)
-   score = score * 100#/ n_pop**2
-   print('agent skills:\n{}\n{}'.format(skill_headers, np.array(agent_skills_0.transpose())))
-   print('lifespans:\n{}'.format(lifespans))
-#  print('skill_ents:\n{}\nskill_mean:\n{}\nagent_ents:\n{}\nagent_mean:{}\nscore:\n{}\n'.format(
-#      np.array(skill_ents), skill_score, np.array(agent_ents), agent_score, score))
-   print('score:\n{}'.format(score))
-
-   return score
-
-class LogCallbacks(DefaultCallbacks):
-   STEP_KEYS = 'env_step realm_step env_stim stim_process'.split()
-   EPISODE_KEYS = ['env_reset']
-
-   def init(self, episode):
-      for key in LogCallbacks.STEP_KEYS + LogCallbacks.EPISODE_KEYS:
-         episode.hist_data[key] = []
-
-   def on_episode_start(self, *, worker: RolloutWorker, base_env: BaseEnv,
-         policies: Dict[str, Policy],
-         episode: MultiAgentEpisode, **kwargs):
-      self.init(episode)
-
-   def on_episode_step(self, *, worker: RolloutWorker, base_env: BaseEnv,
-         episode: MultiAgentEpisode, **kwargs):
-
-      env = base_env.envs[0]
-
-      for key in LogCallbacks.STEP_KEYS:
-         if not hasattr(env, key):
-            continue
-         episode.hist_data[key].append(getattr(env, key))
-
-   def on_episode_end(self, *, worker: RolloutWorker, base_env: BaseEnv,
-         policies: Dict[str, Policy], episode: MultiAgentEpisode, **kwargs):
-      env = base_env.envs[0]
-
-      for key in LogCallbacks.EPISODE_KEYS:
-         if not hasattr(env, key):
-            continue
-         episode.hist_data[key].append(getattr(env, key))
-
-   def on_train_result(self, *, trainer, result: dict, **kwargs) -> None:
-      n_epis = result["episodes_this_iter"]
-#     print("trainer.train() result: {} -> {} episodes".format(
-#        trainer, n_epis))
-
-      # you can mutate the result dict to add new fields to return
-      # result['something'] = True
 
 
 # Map agentID to policyID -- requires config global
@@ -435,7 +176,6 @@ class DefaultGenome(neat.genome.DefaultGenome):
 
 
 
-
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
       self.gen_mults = gen_atk_mults
@@ -461,20 +201,10 @@ class EvolverNMMO(LambdaMuEvolver):
       self.epoch_reloaded = None
       self.global_stats = ray.get_actor("global_stats")
       self.global_counter = ray.get_actor("global_counter")
-
-      if self.config.FITNESS_METRIC == 'L2':
-         self.calc_diversity = calc_diversity_l2
-      elif self.config.FITNESS_METRIC == 'Differential':
-         self.calc_diversity = calc_differential_entropy
-      elif self.config.FITNESS_METRIC == 'Discrete':
-         self.calc_diversity = calc_discrete_entropy_2
-      elif self.config.FITNESS_METRIC == 'Hull':
-         self.calc_diversity = calc_convex_hull
-      else:
-         raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
       self.CPPN = config.GENOME == 'CPPN'
       self.PATTERN_GEN = config.GENOME == 'Pattern'
       self.RAND_GEN = config.GENOME == 'Random'
+      self.calc_diversity = diversity_calc(config)
 
       if not (self.CPPN or self.PATTERN_GEN or self.RAND_GEN):
          raise Exception('Invalid genome')
@@ -1132,20 +862,20 @@ class EvolverNMMO(LambdaMuEvolver):
        self.saveMaps(self.genes, list(self.genes.keys()))
        self.config.MODEL = 'current'
 
-def update_entropy_skills(skill_dict):
-    agent_skills = [[] for _ in range(len(skill_dict))]
-    i = 0
-
-    for a_skills in skill_dict:
-        j = 0
-
-        for a_skill in a_skills:
-            try:
-                val = float(a_skill)
-                agent_skills[i].append(val)
-                j += 1
-            except:
-                pass
-        i += 1
-
-    return calc_diversity_l2(agent_skills)
+#def update_entropy_skills(skill_dict):
+#    agent_skills = [[] for _ in range(len(skill_dict))]
+#    i = 0
+#
+#    for a_skills in skill_dict:
+#        j = 0
+#
+#        for a_skill in a_skills:
+#            try:
+#                val = float(a_skill)
+#                agent_skills[i].append(val)
+#                j += 1
+#            except:
+#                pass
+#        i += 1
+#
+#    return calc_diversity_l2(agent_skills)

@@ -65,7 +65,7 @@ class SmallMap(Config):
    MODEL                   = 'small-map'
 
    NENT                    = 128
-   NMOB                    = 32
+   NMOB                    = 0
 
    TERRAIN_MODE            = 'contract'
    TERRAIN_LERP            = False
@@ -90,8 +90,17 @@ class SmallMap(Config):
    NPC_SPAWN_NEUTRAL       = 0.60
    NPC_SPAWN_AGGRESSIVE    = 0.80
 
+
+ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
+COMBAT_SKILLS = ['range', 'mage', 'melee']
+EXPLORE_SKILLS = ['exploration']
+HARVEST_SKILLS = ['woodcutting', 'mining']
+
 class TreeOrerock(SmallMap):
-   NENT                 = 8
+   EVO_MAP = True
+   FIXED_MAPS = True
+   EVALUATE = True
+   NENT                 = 16
    NMOB                 = 0
    MODEL                = 'current'
    TERRAIN_SIZE         = 70
@@ -100,22 +109,23 @@ class TreeOrerock(SmallMap):
 #  TERRAIN_RENDER       = True
 #  TERRAIN_ALPHA = 0
 #  TERRAIN_BETA = 0
-#  TERRAIN_LAVA         = 0.0
 #  TERRAIN_WATER        = 0.25
 #  TERRAIN_FOREST_LOW   = 0.35
+   TERRAIN_GRASS_0   = 0.4
+   TERRAIN_LAVA  = 0.45
+   TERRAIN_SPAWN = 0.5
 #  TERRAIN_GRASS        = 0.7
 #  TERRAIN_FOREST_HIGH  = 0.725
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.85
-
-
-ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
-COMBAT_SKILLS = ['range', 'mage', 'melee']
-EXPLORE_SKILLS = ['exploration']
-HARVEST_SKILLS = ['woodcutting', 'mining']
+   SKILLS               = ALL_SKILLS
+   FITNESS_METRIC       = 'L2'
+   MAP = 'PCG'
 
 class EvoNMMO(TreeOrerock):
 
+   FIXED_MAPS = False
+   EVALUATE = False
    INFER_IDX = 3
  # INFER_IDX = 79766
  # INFER_IDX = 80117

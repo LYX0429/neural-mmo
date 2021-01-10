@@ -1,1 +1,1 @@
-evo_experiment/no_disparity_0/models/checkpoint_1/checkpoint-1
+experiment/checkpoint_1915/checkpoint-1915

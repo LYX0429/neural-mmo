@@ -165,6 +165,9 @@ class Env(Timed):
       blob.log(ent.skills.defense.level,      'Defense')
       blob.log(ent.skills.fishing.level,      'Fishing')
       blob.log(ent.skills.hunting.level,      'Hunting')
+      blob.log(ent.skills.woodcutting.level,  'Woodcutting')
+      blob.log(ent.skills.mining.level,       'Mining')
+      blob.log(ent.exploration_grid.sum(),    'Exploration')
 
       #TODO: swap these entries when equipment is reenabled
       blob = quill.register('Wilderness', quill.HISTOGRAM, quill.SCATTER)
@@ -178,6 +181,7 @@ class Env(Timed):
       quill.stat('Skilling',  (ent.skills.fishing.level + ent.skills.hunting.level)/2.0)
       quill.stat('Combat',    combat.level(ent.skills))
       quill.stat('Equipment', ent.loadout.defense)
+#     quill.stat('Exploration', ent.exploration_grid.sum())
 
    def terminal(self):
       infos = log.Quill(self.worldIdx, self.realm.tick)
@@ -205,12 +209,12 @@ class Env(Timed):
       '''
       err = 'Neural MMO is persistent and may only be reset once upon initialization'
       if idx is None:
-         if self.config.EVO_MAP:
+         if self.config.EVO_MAP and not self.config.FIXED_MAPS:
             counter = ray.get_actor("global_counter")
             idx = ray.get(counter.get.remote())
          else:
             idx = np.random.randint(self.config.NMAPS)
-      if self.config.EVO_MAP:
+      if self.config.EVO_MAP and not self.config.FIXED_MAPS:
          global_stats = ray.get_actor("global_stats")
          atk_mults = ray.get(global_stats.get_mults.remote(idx))
          if atk_mults:

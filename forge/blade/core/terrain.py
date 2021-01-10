@@ -74,14 +74,18 @@ class MapGenerator:
          return Terrain.IRON_ORE
       return Terrain.STONE
 
-   def material_evo(self, config, val):
+   def material_evo(self, config, val, gamma=0):
 
       if val <= config.TERRAIN_WATER:
          return Terrain.WATER
-      if val <= config.TERRAIN_GRASS:
+      if val <= config.TERRAIN_GRASS_0:
          return Terrain.GRASS
       if val <= config.TERRAIN_LAVA:
          return Terrain.LAVA
+      if val <= config.TERRAIN_SPAWN:
+         return Terrain.SPAWN
+      if val <= config.TERRAIN_GRASS:
+         return Terrain.GRASS
       if val <= config.TERRAIN_FOREST_LOW:
          return Terrain.FOREST
       if val <= config.TERRAIN_FOREST_HIGH:
@@ -173,7 +177,8 @@ class MapGenerator:
       matl = np.zeros((sz, sz), dtype=object)
       for y in range(sz):
          for x in range(sz):
-            matl[y, x] = self.material(config, val[y, x], l1[y, x])
+            matl[y, x] = self.material_evo(config, val[y, x], l1[y, x])
+#           matl[y, x] = self.material(config, val[y, x], l1[y, x])
 
       #Lava border and center crop
       matl[thresh > sz//2 - border] = Terrain.LAVA
