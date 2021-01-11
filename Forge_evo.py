@@ -12,11 +12,12 @@ from ray import rllib
 
 import projekt
 import evolution
-from evolution import EvolverNMMO, calc_differential_entropy
+from evolution.evo_map import EvolverNMMO
+from evolution.diversity import calc_differential_entropy
 from forge.ethyr.torch import utils
 from pcg import TILE_TYPES
-from projekt import env, rlutils
-from projekt.visualize import visualize
+#from projekt import env, rlutils
+from projekt import rllib_wrapper
 
 '''Main file for the neural-mmo/projekt demo
 
@@ -31,7 +32,7 @@ own models immediately or hack on the environment'''
 def createEnv(config):
 #   map_arr = config['map_arr']
 
-    return projekt.RLLibEnv(#map_arr,
+    return rllib_wrapper.RLLibEnv(#map_arr,
             config)
 
 # Map agentID to policyID -- requires config global
@@ -43,8 +44,8 @@ def mapPolicy(agentID):
 # Generate RLlib policies
 
 def createPolicies(config):
-    obs = env.observationSpace(config)
-    atns = env.actionSpace(config)
+    obs = rllib_wrapper.observationSpace(config)
+    atns = rllib_wrapper.actionSpace(config)
     policies = {}
 
     for i in range(config.NPOLICIES):
@@ -159,7 +160,7 @@ if __name__ == '__main__':
 
    # RLlib registry
    rllib.models.ModelCatalog.register_custom_model('test_model',
-                                                   projekt.Policy)
+                                                   rllib_wrapper.Policy)
    ray.tune.registry.register_env("custom", createEnv)
 
  # save_path = 'evo_experiment/skill_entropy_life'
@@ -188,7 +189,7 @@ if __name__ == '__main__':
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
       evolver.restore(trash_data=True)
-      evolver.trainer.reset()
+#     evolver.trainer.reset()
       if evolver.MAP_ELITES:
          evolver.me.load()
 

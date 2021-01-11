@@ -29,12 +29,15 @@ from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
 from forge.ethyr.torch import utils
 from pcg import TILE_PROBS, TILE_TYPES
-from projekt import rlutils
-from projekt.evaluator import Evaluator
-from projekt.overlay import OverlayRegistry
+#from projekt import rlutils
+#from projekt.evaluator import Evaluator
+from projekt.rllib_wrapper import RLLibEvaluator, EvoPPOTrainer, LogCallbacks, observationSpace, actionSpace, frozen_execution_plan
 from pureples.shared.visualize import draw_net
 from plot_evo import plot_exp
 from evolution.diversity import diversity_calc
+from forge.trinity.overlay import OverlayRegistry
+from ray.rllib.agents.trainer_template import build_trainer
+from pathlib import Path
 
 np.set_printoptions(threshold=sys.maxsize,
                     linewidth=120,
@@ -52,6 +55,22 @@ MAGE_MIN = 0.6
 MAGE_MAX = 1.6
 RANGE_MIN = 0.2
 RANGE_MAX = 1
+
+# FIXME: backward compatability, we point to correct function on restore()
+def calc_convex_hull():
+   pass
+
+def calc_differential_entropy():
+   pass
+
+def calc_discrete_entropy_2():
+   pass
+
+def calc_convex_hull():
+   pass
+
+def calc_diversity_l2():
+   pass
 
 class SpawnPoints():
    def __init__(self, map_width, n_players):
@@ -143,8 +162,8 @@ def mapPolicy(agentID,
 
 # Generate RLlib policies
 def createPolicies(config):
-    obs = projekt.env.observationSpace(config)
-    atns = projekt.env.actionSpace(config)
+    obs = observationSpace(config)
+    atns = actionSpace(config)
     policies = {}
 
     for i in range(config.NPOLICIES):
@@ -326,7 +345,7 @@ class EvolverNMMO(LambdaMuEvolver):
       train_stats = self.trainer.train()
       stats = ray.get(global_stats.get.remote())
 #     headers = ray.get(global_stats.get_headers.remote())
-      n_epis = train_stats['episodes_this_iter']
+     #n_epis = train_stats['episodes_this_iter']
      #assert n_epis == self.n_pop
       for idx in neat_idxs:
          g_idx = neat_to_g[idx]
@@ -472,7 +491,9 @@ class EvolverNMMO(LambdaMuEvolver):
       '''
       trash_data: to avoid undetermined weirdness when reloading
       '''
+      self.calc_diversity = diversity_calc(self.config)
       self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.EVO_DIR, 'maps', 'map')
+
       self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
 
       if inference:
@@ -494,7 +515,17 @@ class EvolverNMMO(LambdaMuEvolver):
             print('Model directory already exists.')
          # Instantiate monolithic RLlib Trainer object.
          num_workers = self.config.N_PROC
-         trainer = rlutils.EvoPPOTrainer(
+       # EvoPPOTrainer = build_trainer(
+       #     name="EvoPPO",
+       #    #name="PPO",
+       #    #default_config=DEFAULT_CONFIG,
+       #    #validate_config=validate_config,
+       #    #default_policy=PPOTFPolicy,
+       #    #get_policy_class=get_policy_class,
+       #     execution_plan=frozen_execution_plan,
+       # )
+         trainer = EvoPPOTrainer(
+            execution_plan=frozen_execution_plan,
             env="custom",
             path=model_path,
             config={
@@ -531,8 +562,14 @@ class EvolverNMMO(LambdaMuEvolver):
                 'custom_model_config': {
                     'config':
                     self.config
-                }
+                },
             },
+#           'optimizer': {
+#              'frozen': True,
+#              },
+#           'multiagent': {
+#              'policies_to_train': [],
+#              },
           })
 
          # Print model size
@@ -557,7 +594,9 @@ class EvolverNMMO(LambdaMuEvolver):
       best_g = self.config.INFER_IDX
       global_counter.set.remote(best_g)
       self.config.EVALUATE = True
-      evaluator = Evaluator(self.config, self.trainer)
+      if not self.trainer:
+         self.restore()
+      evaluator = RLLibEvaluator(self.config, self.trainer)
       evaluator.render()
 
    def genRandMap(self, g_hash=None):
@@ -855,7 +894,10 @@ class EvolverNMMO(LambdaMuEvolver):
        self.restore()
 
    def init_pop(self):
-       self.config.MODEL = None
+       if not self.config.PRETRAINED:
+          self.config.MODEL = None
+       else:
+          self.config.MODEL = 'current'
        super().init_pop()
 
       #if not self.PATTERN_GEN:
