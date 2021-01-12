@@ -436,6 +436,7 @@ class DefaultGenome(neat.genome.DefaultGenome):
    def __init__(self, key):
       super().__init__(key)
       self.atk_mults = gen_atk_mults()
+      self.age = 0
 
    def configure_crossover(self, parent1, parent2, config):
       super().configure_crossover(parent1, parent2, config)
@@ -445,6 +446,7 @@ class DefaultGenome(neat.genome.DefaultGenome):
    def mutate(self, config):
       super().mutate(config)
       self.atk_mults = mutate_atk_mults(self.atk_mults)
+      self.age += 1
 
 
 
@@ -499,6 +501,9 @@ class EvolverNMMO(LambdaMuEvolver):
          self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
 
       elif self.CPPN:
+         # g_idxs we might use
+         self.g_idxs_reserve = set([i for i in range(self.n_pop*10)])
+         self.neat_to_g = {}
          self.n_epoch = -1
          evolver = self
          self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
@@ -533,8 +538,9 @@ class EvolverNMMO(LambdaMuEvolver):
       maps = {}
       global_counter = ray.get_actor("global_counter")
       neat_idxs = set([idx for idx, _ in genomes])
-#     g_idxs = set([i for i in range(self.n_pop)])
-      g_idx = 0
+      # the g_idxs that end up being relevant
+      g_idxs = self.g_idxs_reserve
+      g_idxs_out = set()
       neat_to_g = {}
       skip_idxs = set()
 
@@ -542,57 +548,71 @@ class EvolverNMMO(LambdaMuEvolver):
          if self.n_epoch == 0 or idx not in self.last_fitnesses:
              self.last_fitnesses[idx] = []
          # neat-python indexes starting from 1
-         neat_to_g[idx] = g_idx
-         self.genes[g_idx] = (None, g.atk_mults)
-
-        #if idx <= self.last_map_idx and not self.reloading:
-        #   continue
-         cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
-#        if self.config.NET_RENDER:
-#           with open('nmmo_cppn.pkl', 'wb') a
-         multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
-         map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
-
-         for x in range(self.map_width):
-            for y in range(self.map_height):
-               x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
-               x_i, y_i = x_i * 2, y_i * 2
-               v = cppn.activate((x_i, y_i))
-
-               if self.config.THRESHOLD:
-                  # use NMMO's threshold logic
-                  assert len(v) == 1
-                  v = v[0]
-                  v = self.map_generator.material_evo(self.config, v)
-               else:
-                  # CPPN has output channel for each tile type; take argmax over channels
-                  # also a spawn-point tile
-                  assert len(v) == self.n_tiles
-                  multi_hot[:, x, y] = v
-                  v = np.argmax(v)
-                  map_arr[x, y] = v
-         self.validate_spawns(map_arr, multi_hot)
-        #map_arr = self.add_border(map_arr)
-         # Impossible maps are no good
-         tile_counts = np.bincount(map_arr.reshape(-1))
-
-         if (len(tile_counts) <= enums.Material.FOREST.value.index or \
-               tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
-               tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
-            print('map {} rejected for lack of food and water'.format(g_idx))
-            g.fitness = 0
-            neat_idxs.remove(idx)
-            skip_idxs.add(g_idx)
-            self.genes.pop(g_idx)
+         if idx in self.neat_to_g:
+             g_idx = self.neat_to_g[idx]
+             neat_to_g[idx] = g_idx
+            #g_idxs.remove(g_idx)
+             (map_arr, multi_hot), atk_mults = self.genes[g_idx]
          else:
-            maps[g_idx] = map_arr, g.atk_mults
-         g_idx += 1
+             g_idx = g_idxs.pop()
+             neat_to_g[idx] = g_idx
+             self.genes[g_idx] = (None, g.atk_mults)
+
+            #if idx <= self.last_map_idx and not self.reloading:
+            #   continue
+             cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
+    #        if self.config.NET_RENDER:
+    #           with open('nmmo_cppn.pkl', 'wb') a
+             multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
+             map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
+
+             for x in range(self.map_width):
+                for y in range(self.map_height):
+                   # a decent scale for NMMO
+                   x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
+                   x_i, y_i = x_i * 2, y_i * 2
+                   v = cppn.activate((x_i, y_i))
+
+                   if self.config.THRESHOLD:
+                      # use NMMO's threshold logic
+                      assert len(v) == 1
+                      v = v[0]
+                      v = self.map_generator.material_evo(self.config, v)
+                   else:
+                      # CPPN has output channel for each tile type; take argmax over channels
+                      # also a spawn-point tile
+                      assert len(v) == self.n_tiles
+                      multi_hot[:, x, y] = v
+                      v = np.argmax(v)
+                      map_arr[x, y] = v
+             self.validate_spawns(map_arr, multi_hot)
+            #map_arr = self.add_border(map_arr)
+             # Impossible maps are no good
+             tile_counts = np.bincount(map_arr.reshape(-1))
+
+             if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
+                   tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
+                   tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
+                print('map {} rejected for lack of food and water'.format(g_idx))
+                g.fitness = 0
+                neat_idxs.remove(idx)
+                skip_idxs.add(g_idx)
+             #  self.genes.pop(g_idx)
+             self.genes[g_idx] = (map_arr, multi_hot), g.atk_mults
+         g_idxs_out.add(g_idx)
+         maps[g_idx] = map_arr, g.atk_mults
+      # remove dead guys
+      for ni, gi in self.neat_to_g.items():
+          if ni not in neat_to_g:
+              self.g_idxs_reserve.add(gi)
+      self.neat_to_g = neat_to_g
       self.maps = maps
-      g_idxs = [i for i in range(g_idx) if not i in skip_idxs]
       neat_idxs = list(neat_idxs)
       self.last_map_idx = neat_idxs[-1]
-      global_counter.set_idxs.remote(g_idxs)
-      self.saveMaps(maps, mutated=g_idxs)
+      g_idxs_envs = list(g_idxs_out)
+      np.random.shuffle(g_idxs_envs)
+      global_counter.set_idxs.remote(g_idxs_envs)
+      self.saveMaps(maps)
       global_stats = self.global_stats
       self.send_genes(global_stats)
       train_stats = self.trainer.train()
@@ -600,17 +620,19 @@ class EvolverNMMO(LambdaMuEvolver):
 #     headers = ray.get(global_stats.get_headers.remote())
      #n_epis = train_stats['episodes_this_iter']
      #assert n_epis == self.n_pop
-      for idx in neat_idxs:
-         g_idx = neat_to_g[idx]
+      for g_idx in g_idxs_out:
+#        g_idx = neat_to_g[idx]
          #FIXME: hack
 
-         if idx in skip_idxs:
+         if g_idx in skip_idxs:
             continue
 
          if g_idx not in stats:
             print('Missing stats for map {}, training again.'.format(g_idx))
+#           print('Missing stats for map {}, using old stats.'.format(g_idx))
             self.trainer.train()
             stats = ray.get(global_stats.get.remote())
+            continue
 
       last_fitnesses = self.last_fitnesses
       new_fitness_hist = {}
@@ -619,21 +641,26 @@ class EvolverNMMO(LambdaMuEvolver):
          g_idx = neat_to_g[idx]
          #FIXME: hack
 
-         if g_idx in skip_idxs:
-            new_fitness_hist[idx] = last_fitnesses[idx]
+        #if g_idx not in stats:
+        #   # do something clever?
 
-            continue
-         score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=False)
+        #   continue
+
+         if g_idx not in g_idxs_out:
+             score = 0
+         else:
+             score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=False)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
          last_fitness = last_fitnesses[idx]
          last_fitness.append(score)
          g.fitness = np.mean(last_fitness)
+         g.age += 1
 
          if len(last_fitness) == self.config.ROLLING_FITNESS:
              last_fitness = last_fitness[:self.config.ROLLING_FITNESS]
          new_fitness_hist[idx] = last_fitness
-         self.population[g_idx] = (None, score, None)
+         self.population[g_idx] = (None, score, g.age)
       self.last_fitnesses = new_fitness_hist
       global_stats.reset.remote()
 
@@ -682,11 +709,11 @@ class EvolverNMMO(LambdaMuEvolver):
             self.n_epoch += 1
 
             return
-      if self.n_epoch % 100 == 0:
-         if self.PATTERN_GEN:
-             mutated = [i for i in self.chromosomes.keys()]
-         else:
-             mutated = list(range(self.n_pop))
+#     if self.n_epoch % 100 == 0:
+#        if self.PATTERN_GEN:
+#            mutated = [i for i in self.chromosomes.keys()]
+#        else:
+#            mutated = list(range(self.n_pop))
      #for i, map_arr in maps.items():
       if mutated is None or self.reloading:
          if isinstance(maps, dict):
@@ -700,6 +727,8 @@ class EvolverNMMO(LambdaMuEvolver):
       for i in mutated:
          if self.CPPN:
             # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
+            if not i in maps:
+                T()
             map_arr, atk_mults = maps[i]
          elif self.RAND_GEN:
             map_arr, atk_mults = maps[i]

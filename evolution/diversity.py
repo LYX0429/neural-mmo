@@ -29,9 +29,13 @@ def sum_experience(agent_stats, skill_headers=None, verbose=False):
    n_agents, n_skills = a_skills.shape
 #  avg_skill = (weights * a_skills).sum() / (n_agents * n_skills)
    mean_xp = a_skills.sum() / (n_agents * n_skills)
-   print(a_skills)
-   print(mean_xp)
-   print()
+   if verbose:
+      print('skills')
+      print(a_skills)
+      print('lifespans')
+      print(a_lifespans)
+      print('mean xp:', mean_xp)
+      print()
 
    return mean_xp
 

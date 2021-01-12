@@ -78,6 +78,7 @@ class Counter:
    def __init__(self, config):
       self.count = 0
       self.idxs = None
+
    def get(self):
 
       if not self.idxs:
