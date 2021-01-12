@@ -605,6 +605,8 @@ class EvolverNMMO(LambdaMuEvolver):
       for ni, gi in self.neat_to_g.items():
           if ni not in neat_to_g:
               self.g_idxs_reserve.add(gi)
+              self.population.pop(gi)
+              self.genes.pop(gi)
       self.neat_to_g = neat_to_g
       self.maps = maps
       neat_idxs = list(neat_idxs)
@@ -660,6 +662,7 @@ class EvolverNMMO(LambdaMuEvolver):
          if len(last_fitness) == self.config.ROLLING_FITNESS:
              last_fitness = last_fitness[:self.config.ROLLING_FITNESS]
          new_fitness_hist[idx] = last_fitness
+         self.score_hists[g_idx] = new_fitness_hist[idx]
          self.population[g_idx] = (None, score, g.age)
       self.last_fitnesses = new_fitness_hist
       global_stats.reset.remote()
