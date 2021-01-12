@@ -355,9 +355,17 @@ class EvoPPOTrainer(ppo.PPOTrainer):
           with open(os.path.join(Path(self.pathDir).parent.parent, 'experiment', 'path.txt')) as f:
              path = f.read().splitlines()[0]
 #         with open(os.path.join(self.pathDir, 'path.txt')) as f:
+      elif model == 'reload':
+#        path = '/'.join(model.split('/')[1:])
+         path = os.path.join(self.pathDir, 'path.txt')
+         with open(path) as f:
+            path = f.read().splitlines()[0]
+         path = os.path.abspath(path)
       else:
-         raise Exception("Invalid model.")
-         path = 'experiment/{}/checkpoint'.format(model)
+         T()
+     #else:
+     #   raise Exception("Invalid model. {}".format(path))
+     #   path = 'experiment/{}/checkpoint'.format(model)
 
       print('Loading from: {}'.format(path))
       super().restore(path)
@@ -467,6 +475,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
                )
          path = os.path.abspath(path)
       else:
+         T()
          path = 'experiment/{}/checkpoint'.format(model)
 
       print('Loading from: {}'.format(path))

@@ -72,6 +72,9 @@ def calc_convex_hull():
 def calc_diversity_l2():
    pass
 
+def calc_map_diversity():
+   T()
+
 class SpawnPoints():
    def __init__(self, map_width, n_players):
       self.max_spawns = n_players * 3
@@ -387,7 +390,7 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.reloading:
          self.reloading = False
 
-      if self.n_epoch % 10 == 0:
+      if (self.n_epoch % 10 == 0 or self.n_epoch == 0) and not self.reloading:
          self.save()
       self.log()
 #     self.neat_pop.reporters.reporters[0].save_genome_fitness(
@@ -411,10 +414,16 @@ class EvolverNMMO(LambdaMuEvolver):
 
 
    def saveMaps(self, maps, mutated=None):
+      if self.n_epoch % 100 == 0:
+         checkpoint_maps = True
+         mutated = self.genes.keys()
+      else:
+         checkpoint_maps = False
       if self.PATTERN_GEN:
          # map index, (map_arr, multi_hot), atk_mults
-         maps = [(i, c[0].generate(), c[1]) for i, c in self.chromosomes.items()]
-         [self.validate_spawns(m[1][0], m[1][1]) for m in maps]
+         maps = [(i, (self.chromosomes[i][0].paint_map(), self.chromosomes[i][1])) for i in mutated]
+         [self.validate_spawns(m[1][0][0], m[1][0][1]) for m in maps]
+         maps = dict(maps)
       elif self.CPPN:
          mutated = list(maps.keys())
          #FIXME: hack
@@ -440,12 +449,11 @@ class EvolverNMMO(LambdaMuEvolver):
          elif self.RAND_GEN:
             map_arr, atk_mults = maps[i]
          else:
-            _, map_arr, atk_mults = maps[i]
+            map_arr, atk_mults = maps[i]
 
          if self.PATTERN_GEN:
             # ignore one-hot map
             map_arr = map_arr[0]
-#        print('Saving map ' + str(i))
          path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
          try:
             os.mkdir(path)
@@ -512,7 +520,7 @@ class EvolverNMMO(LambdaMuEvolver):
          try:
             os.mkdir(model_path)
          except FileExistsError:
-            print('Model directory already exists.')
+            print('Model directory already exists.',model_path)
          # Instantiate monolithic RLlib Trainer object.
          num_workers = self.config.N_PROC
        # EvoPPOTrainer = build_trainer(
@@ -575,6 +583,7 @@ class EvolverNMMO(LambdaMuEvolver):
          # Print model size
          utils.modelSize(trainer.defaultModel())
          trainer.restore(self.config.MODEL)
+         TRAINER = trainer
          self.trainer = trainer
 
    def infer(self):
@@ -600,7 +609,8 @@ class EvolverNMMO(LambdaMuEvolver):
       evaluator.render()
 
    def genRandMap(self, g_hash=None):
-      if self.n_epoch > 0:
+      print('genRandMap {}'.format(g_hash))
+      if self.n_epoch > 0 or self.reloading:
          print('generating new random map when I probably should not be... \n\n')
 #     map_arr= np.random.randint(1, self.n_tiles,
 #                                 (self.map_width, self.map_height))
@@ -617,6 +627,7 @@ class EvolverNMMO(LambdaMuEvolver):
                enums.Material.GRASS.value.index)
          map_arr, multi_hot = chromosome.generate()
          self.validate_spawns(map_arr, multi_hot)
+         chromosome.flat_map = map_arr
          atk_mults = self.gen_mults()
          self.chromosomes[g_hash] = chromosome, atk_mults
 
@@ -671,17 +682,17 @@ class EvolverNMMO(LambdaMuEvolver):
          multi_hot[:, -b:, :]= -1
          multi_hot[:, :, -b:]= -1
 
-   def mutate(self, g_hash):
+   def mutate(self, g_hash, par_hash):
       if self.CPPN:
          raise Exception('CPPN-generated maps should be mutated inside NEAT code.')
       elif self.PATTERN_GEN:
-         _, atk_mults = self.genes[g_hash]
-         chromosome, atk_mults = self.chromosomes[g_hash]
-         atk_mults = self.mutate_mults(atk_mults)
+         chromosome, atk_mults = copy.deepcopy(self.chromosomes[par_hash])
          map_arr, multi_hot = chromosome.mutate()
          self.validate_spawns(map_arr, multi_hot)
+         chromosome.flat_map = map_arr
+         self.chromosomes[g_hash] = chromosome, atk_mults
       else:
-         map_arr, atk_mults = self.genes[g_hash]
+         map_arr, atk_mults = self.genes[par_hash]
          map_arr = map_arr.copy()
 
          for i in range(random.randint(0, self.n_mutate_actions)):
@@ -894,30 +905,17 @@ class EvolverNMMO(LambdaMuEvolver):
        self.restore()
 
    def init_pop(self):
-       if not self.config.PRETRAINED:
+       if not self.config.PRETRAINED and not self.reloading:
+           # train from scratch
           self.config.MODEL = None
+       elif self.reloading:
+           # use pre-trained model
+          self.config.MODEL = 'reload'
        else:
           self.config.MODEL = 'current'
+       # load the model and initialize and save the population
        super().init_pop()
-
-      #if not self.PATTERN_GEN:
        self.saveMaps(self.genes, list(self.genes.keys()))
-       self.config.MODEL = 'current'
+       # reload latest model from evolution moving forward
+       self.config.MODEL = 'reload'
 
-#def update_entropy_skills(skill_dict):
-#    agent_skills = [[] for _ in range(len(skill_dict))]
-#    i = 0
-#
-#    for a_skills in skill_dict:
-#        j = 0
-#
-#        for a_skill in a_skills:
-#            try:
-#                val = float(a_skill)
-#                agent_skills[i].append(val)
-#                j += 1
-#            except:
-#                pass
-#        i += 1
-#
-#    return calc_diversity_l2(agent_skills)

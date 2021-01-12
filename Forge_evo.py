@@ -179,17 +179,12 @@ if __name__ == '__main__':
 
          print('loading evolver from save file')
       # change params on reload here
-#     evolver.config.ROOT = config.ROOT
-      evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
-      evolver.config.INFER_IDX = config.INFER_IDX
-#     evolver.config.SKILLS = config.SKILLS
-#     evolver.config.MODEL = config.MODEL
-#     evolver.config['config'].MAX_STEPS = 200
-#     evolver.n_epochs = 15000
+      evolver.config.MODEL = 'reload'
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
       evolver.restore(trash_data=True)
-#     evolver.trainer.reset()
+      if config.RENDER:
+         evolver.config.INFER_IDX = config.INFER_IDX
       if evolver.MAP_ELITES:
          evolver.me.load()
 

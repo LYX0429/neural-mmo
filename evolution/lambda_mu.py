@@ -210,7 +210,8 @@ class LambdaMuEvolver():
               mutated.append(g_hash)
               population.pop(g_hash)
              #self.score_var.pop(g_hash)
-              child_map = self.mutate(par_hash)
+              print('mutating parent {} into child {}'.format(par_hash, g_hash))
+              child_map = self.mutate(g_hash, par_hash)
              #child_game = self.make_game(child_map)
               child_game = None
               population[g_hash] = (child_game, None, 0)
@@ -220,7 +221,9 @@ class LambdaMuEvolver():
 
       self.saveMaps(self.genes, mutated)
 
-      if self.n_epoch % self.mature_age == 0 or self.n_epoch == 2:
+#     if (self.n_epoch % 10 == 0 or self.n_epoch == 2) and not self.reloading:
+      if not self.reloading:
+         # save every generation since we do the same with the maps
           self.save()
       self.n_epoch += 1
 
@@ -234,24 +237,25 @@ class LambdaMuEvolver():
 
    def init_pop(self):
 
-       for i in range(self.n_pop):
-           rank= self.g_hashes.pop()
+      if not self.reloading:
+         for i in range(self.n_pop):
+             rank= self.g_hashes.pop()
 
-          #if rank in self.genes:
-          #    map_arr = self.genes[rank]
-          #else:
-           map_arr = self.genRandMap(rank)
-           game = None
-           self.population[rank]= (game, None, 0)
-           self.genes[rank]= map_arr
-           self.score_hists[rank] = []
+            #if rank in self.genes:
+            #    map_arr = self.genes[rank]
+            #else:
+             map_arr = self.genRandMap(rank)
+             game = None
+             self.population[rank]= (game, None, 0)
+             self.genes[rank]= map_arr
+             self.score_hists[rank] = []
 
-       try:
-           os.mkdir(os.path.join(self.save_path, 'maps'))
-       except FileExistsError:
-           pass
-           print('Overwriting evolved maps at {}.'.format(self.save_path))
-       self.restore()
+         try:
+             os.mkdir(os.path.join(self.save_path, 'maps'))
+         except FileExistsError:
+             pass
+             print('Overwriting evolved maps at {}.'.format(self.save_path))
+         self.restore()
 
    def evolve(self, n_epochs=None):
    #   self.save()
