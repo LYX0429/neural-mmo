@@ -153,15 +153,6 @@ def k_largest_index_argsort(a, k):
 
     return k_lrg
 
-   if verbose:
-#  print(skill_headers)
-       print('agent skills:\n{}'.format(a.transpose()))
-       print('lifespans:\n{}'.format(a_lifespans))
-       print('score:\n{}\n'.format(
-       score))
-
-   return score
-
 def sigmoid_lifespan(x):
    res = 1 / (1 + np.exp(0.1*(-x+50)))
 #  res = scipy.special.softmax(res)
@@ -412,7 +403,6 @@ class LogCallbacks(DefaultCallbacks):
 
       # you can mutate the result dict to add new fields to return
       # result['something'] = True
->>>>>>> 64371b5c8bc23718c5cd67c6d7b7152c7cc43d3e
 
 
 # Map agentID to policyID -- requires config global
@@ -602,7 +592,7 @@ class EvolverNMMO(LambdaMuEvolver):
       neat_idxs = list(neat_idxs)
       self.last_map_idx = neat_idxs[-1]
       global_counter.set_idxs.remote(g_idxs)
-      self.saveMaps(maps)
+      self.saveMaps(maps, mutated=g_idxs)
       global_stats = self.global_stats
       self.send_genes(global_stats)
       train_stats = self.trainer.train()
