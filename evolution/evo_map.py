@@ -649,9 +649,13 @@ class EvolverNMMO(LambdaMuEvolver):
         #   continue
 
          if g_idx not in g_idxs_out:
-             score = 0
+            score = 0
          else:
-             score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=False)
+            if 'skills' not in stats:
+               score = 0
+#              T()
+            else:
+               score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=True)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
          last_fitness = last_fitnesses[idx]

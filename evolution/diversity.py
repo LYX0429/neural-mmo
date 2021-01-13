@@ -1,8 +1,10 @@
+from pdb import set_trace as T
 import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
 
 import skbio
+
 
 def diversity_calc(config):
    if config.FITNESS_METRIC == 'L2':
@@ -22,9 +24,9 @@ def diversity_calc(config):
 def sum_experience(agent_stats, skill_headers=None, verbose=False):
    # No need to weight by lifespan.
    agent_skills = agent_stats['skills']
-#  lifespans = agent_stats['lifespans']
+   lifespans = agent_stats['lifespans']
    a_skills = np.vstack(agent_skills)
-#  a_lifespans = np.hstack(lifespans)
+   a_lifespans = np.hstack(lifespans)
 #  weights = sigmoid_lifespan(a_lifespans)
    n_agents, n_skills = a_skills.shape
 #  avg_skill = (weights * a_skills).sum() / (n_agents * n_skills)
@@ -45,7 +47,7 @@ def sigmoid_lifespan(x):
 
    return res
 
-def calc_differential_entropy(agent_stats, skill_headers=None):
+def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}):
    # Penalize if under max pop agents living
   #for i, a_skill in enumerate(agent_skills):
   #   if a_skill.shape[0] < max_pop:
@@ -77,15 +79,19 @@ def calc_differential_entropy(agent_stats, skill_headers=None):
    else:
       mean = np.average(a_skills, axis=0, weights=weights)
       cov = np.cov(a_skills,rowvar=0, aweights=weights)
+#     cov = np.array([[2,1],[1,2]])
+ #    T()
       gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
+      infos['gaussian'] = gaussian
       score = gaussian.entropy()
+
 #  print(np.array(a_skills))
    print('score:', score)
 
    return score
 
 
-def calc_convex_hull(agent_stats, skill_headers=None):
+def calc_convex_hull(agent_stats, skill_headers=None, verbose=False):
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    agent_skills = np.vstack(agent_skills)
@@ -271,3 +277,5 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
        score))
 
    return score
+
+DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'), (calc_discrete_entropy_2, 'discrete entropy'), (calc_convex_hull, 'convex hull volume')]

@@ -18,7 +18,7 @@ from evolution.diversity import diversity_calc
 from matplotlib import pyplot as plt
 
 
-def plot_diversity(x, y, model_name, map_name, render=True):
+def plot_diversity(x, y, model_name, map_name, map_idx, render=True):
     my_dpi = 96
     colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
             'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
@@ -27,15 +27,16 @@ def plot_diversity(x, y, model_name, map_name, render=True):
             'cyan', 'lightsalmon', 'springgreen', 'mediumblue', 'dodgerblue', 'mediumpurple', 'darkslategray', 'goldenrod',
             'indigo', 'steelblue', 'coral', 'mistyrose', 'indianred']
     fig, ax = plt.subplots(figsize=(800/my_dpi, 400/my_dpi), dpi=my_dpi)
-    ax.plot(y, c='indigo')
-    plt.tight_layout()
+    ax.errorbar(x, y.mean(axis=0), yerr=y.std(axis=0),  c='indigo')
     #markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
     #                                   ecolor='purple')
     #[bar.set_alpha(0.03) for bar in bars]
     plt.ylabel('diversity')
     plt.xlabel('tick')
-    plt.savefig('experiment/diversity_MODEL_{}_MAP_{}.png'.format(model_name, map_name),
-          dpi=my_dpi)
+    plt.subplots_adjust(top=0.9)
+    exp_name = 'diversity_MODEL_{}_MAP_{}_ID_{}.png'.format(model_name, map_name, map_idx)
+    plt.title(exp_name)
+    plt.savefig(os.path.join('experiment', exp_name), dpi=my_dpi)
 
     if render:
        plt.show()
@@ -62,15 +63,24 @@ class Base:
          self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
 
       ts = np.arange(self.config.EVALUATION_HORIZON)
-      divs = np.zeros((self.config.EVALUATION_HORIZON))
+      n_evals = 20
+      div_mat = np.zeros((n_evals, self.config.EVALUATION_HORIZON))
 
-      for t in tqdm(range(self.config.EVALUATION_HORIZON)):
-         self.tick(None, None)
-         div_stats = self.env.get_agent_stats()
-         calc_diversity = diversity_calc(self.config)
-         diversity = calc_diversity(div_stats, verbose=False)
-         divs[t] = diversity
-      plot_diversity(ts, divs, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1])
+      for i in range(n_evals):
+         self.env.reset(idx=self.config.INFER_IDX)
+         self.obs = self.env.step({})[0]
+         self.state = {}
+         self.registry = OverlayRegistry(self.env, self.model, self.trainer, self.config)
+         divs = np.zeros((self.config.EVALUATION_HORIZON))
+         for t in tqdm(range(self.config.EVALUATION_HORIZON)):
+            self.tick(None, None)
+#           print(len(self.env.realm.players.entities))
+            div_stats = self.env.get_agent_stats()
+            calc_diversity = diversity_calc(self.config)
+            diversity = calc_diversity(div_stats, verbose=False)
+            divs[t] = diversity
+         div_mat[i] = divs
+      plot_diversity(ts, div_mat, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
       print('Diversity: {}'.format(diversity))
 
       log = InkWell()

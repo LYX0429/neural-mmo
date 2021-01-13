@@ -1,4 +1,6 @@
 from pdb import set_trace as T
+import json
+import os
 import numpy as np
 import time
 
@@ -218,6 +220,7 @@ class Env:
       self.lifetimes = []
 
       self.env_reset = time.time()
+
       
      #if idx is None:
       if self.config.EVO_MAP and not self.config.FIXED_MAPS:
@@ -228,15 +231,21 @@ class Env:
          if atk_mults:
             for k, v in atk_mults.items():
                setattr(self.config, k, v)
-      else:
+      elif self.config.EVALUATE and idx is not None and not self.config.MAP == 'PCG':
+         json_path = os.path.join(os.curdir, 'evo_experiment', self.config.MAP, 'maps', 'atk_mults{}json'.format(idx))
+         with open(json_path, 'r') as f:
+            atk_mults = json.load(f)
+         pass
+      elif idx is None:
          idx = np.random.randint(self.config.NMAPS)
 
       self.worldIdx = idx
+#     print('trinity env idx: {}'.format(idx))
       self.dead     = {}
 
       self.realm.reset(idx)
 
-      if self.config.EVO_MAP:
+      if self.config.EVO_MAP: #and not self.config.MAP == 'PCG':
      #   self.realm.spawn_points = ray.get(global_stats.get_spawn_points.remote(idx))
          self.realm.spawn_points = np.vstack(np.where(self.realm.map.np() == Material.SPAWN.value.index)).transpose()
 
