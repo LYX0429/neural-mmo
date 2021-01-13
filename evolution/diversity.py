@@ -14,32 +14,32 @@ def diversity_calc(config):
    elif config.FITNESS_METRIC == 'Discrete':
       calc_diversity = calc_discrete_entropy_2
    elif config.FITNESS_METRIC == 'Hull':
-      calc_diversity = calc_convex_hull
+       calc_diversity = calc_convex_hull
    elif config.FITNESS_METRIC == 'Sum':
-      calc_diversity = sum_experience
+       calc_diversity = sum_experience
    else:
-      raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
+       raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
    return calc_diversity
 
-def sum_experience(agent_stats, skill_headers=None, verbose=False):
-   # No need to weight by lifespan.
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   a_skills = np.vstack(agent_skills)
-   a_lifespans = np.hstack(lifespans)
-#  weights = sigmoid_lifespan(a_lifespans)
-   n_agents, n_skills = a_skills.shape
-#  avg_skill = (weights * a_skills).sum() / (n_agents * n_skills)
-   mean_xp = a_skills.sum() / (n_agents * n_skills)
-   if verbose:
-      print('skills')
-      print(a_skills)
-      print('lifespans')
-      print(a_lifespans)
-      print('mean xp:', mean_xp)
-      print()
+   def sum_experience(agent_stats, skill_headers=None, verbose=False):
+      # No need to weight by lifespan.
+      agent_skills = agent_stats['skills']
+      lifespans = agent_stats['lifespans']
+      a_skills = np.vstack(agent_skills)
+      a_lifespans = np.hstack(lifespans)
+   #  weights = sigmoid_lifespan(a_lifespans)
+      n_agents, n_skills = a_skills.shape
+   #  avg_skill = (weights * a_skills).sum() / (n_agents * n_skills)
+      mean_xp = a_skills.sum() / (n_agents * n_skills)
+      if verbose:
+         print('skills')
+         print(a_skills.T)
+         print('lifespans')
+         print(a_lifespans)
+         print('mean xp:', mean_xp)
+         print()
 
-   return mean_xp
+      return mean_xp
 
 def sigmoid_lifespan(x):
    res = 1 / (1 + np.exp(0.1*(-x+50)))
@@ -68,11 +68,12 @@ def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, in
    # FIXME: Only applies to exploration-only experiment
   #print('exploration')
   #print(a_skills.transpose()[0])
-   print(skill_headers)
-   print(a_skills.transpose())
-   print(len(agent_skills), 'populations')
-   print('lifespans')
-   print(a_lifespans)
+   if verbose:
+      print(skill_headers)
+      print(a_skills.transpose())
+      print(len(agent_skills), 'populations')
+      print('lifespans')
+      print(a_lifespans)
 
    if len(lifespans) == 1:
       score = 0
@@ -86,12 +87,13 @@ def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, in
       score = gaussian.entropy()
 
 #  print(np.array(a_skills))
-   print('score:', score)
+   if verbose:
+      print('score:', score)
 
    return score
 
 
-def calc_convex_hull(agent_stats, skill_headers=None, verbose=False):
+def calc_convex_hull(agent_stats, skill_headers=None, verbose=False, infos={}):
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    agent_skills = np.vstack(agent_skills)
@@ -99,11 +101,12 @@ def calc_convex_hull(agent_stats, skill_headers=None, verbose=False):
 
    lifespans = np.hstack(lifespans)
    weights = sigmoid_lifespan(lifespans)
-   print('skills:')
-   print(agent_skills.transpose())
-   print('lifespans:')
-   print(lifespans)
-   print(len(agent_stats['lifespans']), 'populations')
+   if verbose:
+      print('skills:')
+      print(agent_skills.transpose())
+      print('lifespans:')
+      print(lifespans)
+      print(len(agent_stats['lifespans']), 'populations')
    n_agents = lifespans.shape[0]
    mean_agent = agent_skills.mean(axis=0)
    mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
@@ -115,17 +118,18 @@ def calc_convex_hull(agent_stats, skill_headers=None, verbose=False):
    else:
       try:
           hull = ConvexHull(agent_skills, qhull_options='QJ')
+          infos['hull'] = hull
           score = hull.volume
           score = score ** (1 / n_skills)
       except Exception as e:
           print(e)
           score = 0
-   print('score:', score)
+      if verbose:
+         print('score:', score)
 
    return score
 
-def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
-   verbose=True
+def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False):
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    agent_skills_0 = agent_skills= np.vstack(agent_skills)
@@ -251,7 +255,7 @@ def calc_discrete_entropy(agent_stats, skill_headers=None):
    return score
 
 
-def calc_diversity_l2(agent_stats, skill_headers=None, verbose=True):
+def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False):
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    assert len(agent_skills) == len(lifespans)

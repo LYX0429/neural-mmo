@@ -5,6 +5,7 @@ from pdb import set_trace as T
 from typing import Dict
 
 import gym
+from matplotlib import pyplot as plt
 import numpy as np
 import ray
 import ray.rllib.agents.ppo.ppo as ppo
@@ -31,6 +32,8 @@ from forge.trinity import Env, evaluator
 from forge.trinity.dataframe import DataType
 from forge.trinity.overlay import OverlayRegistry
 
+from evolution.diversity import DIV_CALCS
+
 from ray.rllib.execution.metric_ops import StandardMetricsReporting
 
 from ray.rllib.evaluation.worker_set import WorkerSet
@@ -45,6 +48,7 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
       self.config = config['config']
       self.headers = self.config.SKILLS
       super().__init__(self.config)
+      self.evo_dones = None
 
 
    def init_skill_log(self):
@@ -66,16 +70,24 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
       # are we doing evolution?
 
-      if self.config.EVO_MAP and not self.config.FIXED_MAPS:# and not self.config.RENDER:
-         if self.realm.tick >= self.config.MAX_STEPS or self.config.RENDER:
-            global_stats = ray.get_actor('global_stats')
-            # reset the env manually, to load from the new updated population of maps
-#           print('resetting env {} after {} steps'.format(self.worldIdx, self.n_step))
-            dones['__all__'] = True
-            stats = self.get_agent_stats()
-            global_stats.add.remote(stats, self.worldIdx)
+ #    if self.config.EVO_MAP and not self.config.FIXED_MAPS:# and not self.config.RENDER:
+ #       if self.realm.tick >= self.config.MAX_STEPS or self.config.RENDER:
+ #          # reset the env manually, to load from the new updated population of maps
+##          print('resetting env {} after {} steps'.format(self.worldIdx, self.n_step))
+ #          dones['__all__'] = True
+
+      if self.config.EVO_MAP and hasattr(self, 'evo_dones') and self.evo_dones is not None:
+         dones = self.evo_dones
+         self.evo_dones = None
 
       return obs, rewards, dones, infos
+
+   def send_agent_stats(self):
+      global_stats = ray.get_actor('global_stats')
+      stats = self.get_agent_stats()
+      global_stats.add.remote(stats, self.worldIdx)
+      self.evo_dones = {}
+      self.evo_dones['__all__'] = True
 
    def get_agent_stats(self):
       skills = {}
@@ -170,6 +182,37 @@ def actionSpace(config):
 
    return atns
 
+def plot_diversity(x, y, div_names, model_name, map_name, map_idx, render=True):
+   my_dpi = 96
+   colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
+            'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
+            'fuchsia', 'deeppink', 'olive', 'orange', 'maroon', 'lightcoral', 'firebrick', 'black', 'dimgrey', 'tomato',
+            'saddlebrown', 'greenyellow', 'limegreen', 'turquoise', 'midnightblue', 'darkkhaki', 'darkseagreen', 'teal',
+            'cyan', 'lightsalmon', 'springgreen', 'mediumblue', 'dodgerblue', 'mediumpurple', 'darkslategray', 'goldenrod',
+            'indigo', 'steelblue', 'coral', 'mistyrose', 'indianred']
+#   fig, ax = plt.subplots(figsize=(800/my_dpi, 400/my_dpi), dpi=my_dpi)
+   fig, axs = plt.subplots(len(div_names)) 
+   exp_name = 'diversity_MODEL_{}_MAP_{}_ID_{}.png'.format(model_name, map_name, map_idx)
+   fig.suptitle(exp_name)
+   for i, div_name in enumerate(div_names):
+      ax = axs[i]
+      ax.errorbar(x, y[:,i,:].mean(axis=0), yerr=y[:,i,:].std(axis=0), label=div_name)
+      ax.legend()
+   #markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
+   #                                   ecolor='purple')
+   #[bar.set_alpha(0.03) for bar in bars]
+   plt.ylabel('diversity')
+   plt.xlabel('tick')
+  #plt.subplots_adjust(top=0.9)
+  #plt.legend()
+   plt.savefig(os.path.join('experiment', exp_name), dpi=my_dpi)
+
+   if render:
+      plt.show()
+   plt.close()
+
+
+
 class RLLibEvaluator(evaluator.Base):
    '''Test-time evaluation with communication to
    the Unity3D client. Makes use of batched GPU inference'''
@@ -187,6 +230,37 @@ class RLLibEvaluator(evaluator.Base):
 
       self.state    = {}
 
+   def test(self):
+      if self.config.MAP != 'PCG':
+         self.config.ROOT = self.config.MAP
+         self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
+
+      ts = np.arange(self.config.EVALUATION_HORIZON)
+      n_evals = 20
+      div_mat = np.zeros((n_evals, len(DIV_CALCS), self.config.EVALUATION_HORIZON))
+
+      for i in range(n_evals):
+         self.env.reset(idx=self.config.INFER_IDX)
+         self.obs = self.env.step({})[0]
+         self.state = {}
+         self.registry = OverlayRegistry(self.env, self.model, self.trainer, self.config)
+         divs = np.zeros((len(DIV_CALCS), self.config.EVALUATION_HORIZON))
+         for t in tqdm(range(self.config.EVALUATION_HORIZON)):
+            self.tick(None, None)
+#           print(len(self.env.realm.players.entities))
+            div_stats = self.env.get_agent_stats()
+            for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
+               diversity = calc_diversity(div_stats, verbose=False)
+               divs[j, t] = diversity
+            div_mat[i] = divs
+      plot_diversity(ts, div_mat, [d[1] for d in DIV_CALCS], self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
+      print('Diversity: {}'.format(diversity))
+
+      log = InkWell()
+      log.update(self.env.terminal())
+
+      fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
+      np.save(fpath, log.packet)
 
 
    def tick(self, pos, cmd):
@@ -383,7 +457,10 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       return self.model(self.policyID(0))
 
    def train(self):
-      return self.simulate_unfrozen()
+#     self.reset()
+#     self.reset_envs()
+      stats = self.simulate_unfrozen()
+      self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.send_agent_stats()))
 #     return self.simulate_frozen()
 #     if self.training_iteration % 2 == 0:
 #        return self.simulate_unfrozen()
@@ -401,6 +478,11 @@ class EvoPPOTrainer(ppo.PPOTrainer):
          T()
 
          self.workers.foreach_env(lambda env: env.step(actions, env.id))
+
+   def reset_envs(self):
+      obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset({}, step=True)))
+#     obs = [ob for worker_obs in obs for ob in worker_obs]
+
 
    def simulate_unfrozen(self):
       stats = super().train()

@@ -159,211 +159,6 @@ def sigmoid_lifespan(x):
 
    return res
 
-def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False):
-   # Penalize if under max pop agents living
-  #for i, a_skill in enumerate(agent_skills):
-  #   if a_skill.shape[0] < max_pop:
-  #      a = np.mean(a_skill, axis=0)
-  #      a_skill = np.vstack(np.array([a_skill] + [a for _ in range(max_pop - a_skill.shape[0])]))
-  #      agent_skills[i] = a_skill
-   # if there are stats from multiple simulations, we consider agents from all simulations together
-   #FIXME: why
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-
-   if not len(agent_skills) == 1:
-      pass
-   assert len(agent_skills) == len(lifespans)
-   a_skills = np.vstack(agent_skills)
-   a_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(a_lifespans)
-#  assert len(agent_skills) == 1
-  #a_skills = agent_skills[0]
-   # FIXME: Only applies to exploration-only experiment
-  #print('exploration')
-  #print(a_skills.transpose()[0])
-   if verbose:
-       print(skill_headers)
-       print(a_skills.transpose())
-       print(len(agent_skills), 'populations')
-       print('lifespans')
-       print(a_lifespans)
-
-   if len(lifespans) == 1:
-      score = 0
-   else:
-      mean = np.average(a_skills, axis=0, weights=weights)
-      cov = np.cov(a_skills,rowvar=0, aweights=weights)
-      gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
-      score = gaussian.entropy()
-#  print(np.array(a_skills))
-   if verbose:
-       print('score:', score)
-
-   return score
-
-
-def calc_convex_hull(agent_stats, skill_headers=None, verbose=False):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   agent_skills = np.vstack(agent_skills)
-   n_skills = agent_skills.shape[1]
-
-   lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(lifespans)
-   if verbose:
-       print('skills:')
-       print(agent_skills.transpose())
-       print('lifespans:')
-       print(lifespans)
-   n_agents = lifespans.shape[0]
-   mean_agent = agent_skills.mean(axis=0)
-   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
-   agent_deltas = agent_skills - mean_agents
-   agent_skills = mean_agents + (weights * agent_deltas.T).T
-   if n_skills == 1:
-      # Max distance, i.e. a 1D hull
-      score = agent_skills.max() - agent_skills.mean()
-   else:
-      try:
-          hull = ConvexHull(agent_skills, qhull_options='QJ')
-          score = hull.volume
-      except Exception as e:
-          if verbose:
-              print(e)
-          score = 0
-   if verbose:
-       print('score:', score)
-
-   return score
-
-def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=True):
-   verbose=True
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   agent_skills_0 = agent_skills= np.vstack(agent_skills)
-   lifespans = np.hstack(lifespans)
-   n_agents = lifespans.shape[0]
-   if n_agents == 1:
-       return -np.float('inf')
-   n_skills = agent_skills.shape[1]
-   if verbose:
-       print('skills')
-       print(agent_skills_0.transpose())
-       print('lifespans')
-       print(lifespans)
-   weights = sigmoid_lifespan(lifespans)
-   agent_skills_1 = agent_skills_0.transpose()
-   # discretize
-   agent_skills = np.where(agent_skills==0, 0.0000001, agent_skills)
-   # contract population toward mean according to lifespan
-   # mean experience level for each agent
-   mean_skill = agent_skills.mean(axis=1)
-   # mean skill vector of an agent
-   mean_agent = agent_skills.mean(axis=0)
-   assert mean_skill.shape[0] == n_agents
-   assert mean_agent.shape[0] == n_skills
-   mean_skills = np.repeat(mean_skill.reshape(mean_skill.shape[0], 1), n_skills, axis=1)
-   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
-   agent_deltas = agent_skills - mean_agents
-   skill_deltas = agent_skills - mean_skills
-   a_skills_skills = mean_agents + (weights * agent_deltas.transpose()).transpose()
-   a_skills_agents = mean_skills + (weights * skill_deltas.transpose()).transpose()
-   div_agents = skbio.diversity.alpha_diversity('shannon', a_skills_agents).mean()
-   div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
- # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
-   score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
-   score = score * 100  #/ (n_agents * n_skills)
-   if verbose:
-       print('Score:', score)
-
-   return score
-
-
-def calc_discrete_entropy(agent_stats, skill_headers=None, verbose=False):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
-   agent_skills_0 = np.vstack(agent_skills)
-   agent_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(agent_lifespans)
-   agent_skills = agent_skills_0.transpose() * weights
-   agent_skills = agent_skills.transpose()
-   BASE_VAL = 0.0001
-   # split between skill and agent entropy
-   n_skills = len(agent_skills[0])
-   n_pop = len(agent_skills)
-   agent_sums = [sum(skills) for skills in agent_skills]
-   i = 0
-
-   # ensure that we will not be dividing by zero when computing probabilities
-
-   for a in agent_sums:
-       if a == 0:
-           agent_sums[i] = BASE_VAL * n_skills
-       i += 1
-   skill_sums = [0 for i in range(n_skills)]
-
-   for i in range(n_skills):
-
-       for a_skills in agent_skills:
-           skill_sums[i] += a_skills[i]
-
-       if skill_sums[i] == 0:
-           skill_sums[i] = BASE_VAL * n_pop
-
-   skill_ents = []
-
-   for i in range(n_skills):
-       skill_ent = 0
-
-       for j in range(n_pop):
-
-           a_skill = agent_skills[j][i]
-
-           if a_skill == 0:
-               a_skill = BASE_VAL
-           p = a_skill / skill_sums[i]
-
-           if p == 0:
-               skill_ent += 0
-           else:
-               skill_ent += p * np.log(p)
-       skill_ent = skill_ent / (n_pop)
-       skill_ents.append(skill_ent)
-
-   agent_ents = []
-
-   for j in range(n_pop):
-       agent_ent = 0
-
-       for i in range(n_skills):
-
-           a_skill = agent_skills[j][i]
-
-           if a_skill == 0:
-               a_skill = BASE_VAL
-           p = a_skill / agent_sums[j]
-
-           if p == 0:
-               agent_ent += 0
-           else:
-               agent_ent += p * np.log(p)
-       agent_ent = agent_ent / (n_skills)
-       agent_ents.append(agent_ent)
-   agent_score =  np.mean(agent_ents)
-   skill_score =  np.mean(skill_ents)
-#  score = (alpha * skill_score + (1 - alpha) * agent_score)
-   score = -(skill_score * agent_score)
-   score = score * 100#/ n_pop**2
-   if verbose:
-       print('agent skills:\n{}\n{}'.format(skill_headers, np.array(agent_skills_0.transpose())))
-       print('lifespans:\n{}'.format(lifespans))
-    #  print('skill_ents:\n{}\nskill_mean:\n{}\nagent_ents:\n{}\nagent_mean:{}\nscore:\n{}\n'.format(
-    #      np.array(skill_ents), skill_score, np.array(agent_ents), agent_score, score))
-       print('score:\n{}'.format(score))
-
-   return score
-
 class LogCallbacks(DefaultCallbacks):
    STEP_KEYS = 'env_step realm_step env_stim stim_process'.split()
    EPISODE_KEYS = ['env_reset']
@@ -541,6 +336,7 @@ class EvolverNMMO(LambdaMuEvolver):
       # the g_idxs that end up being relevant
       g_idxs = self.g_idxs_reserve
       g_idxs_out = set()
+      new_g_idxs = set()
       neat_to_g = {}
       skip_idxs = set()
 
@@ -554,51 +350,52 @@ class EvolverNMMO(LambdaMuEvolver):
             #g_idxs.remove(g_idx)
              (map_arr, multi_hot), atk_mults = self.genes[g_idx]
          else:
-             g_idx = g_idxs.pop()
-             neat_to_g[idx] = g_idx
-             self.genes[g_idx] = (None, g.atk_mults)
+            g_idx = g_idxs.pop()
+            new_g_idxs.add(g_idx)   
+            neat_to_g[idx] = g_idx
+            self.genes[g_idx] = (None, g.atk_mults)
 
-            #if idx <= self.last_map_idx and not self.reloading:
-            #   continue
-             cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
-    #        if self.config.NET_RENDER:
-    #           with open('nmmo_cppn.pkl', 'wb') a
-             multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
-             map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
+           #if idx <= self.last_map_idx and not self.reloading:
+           #   continue
+            cppn = neat.nn.FeedForwardNetwork.create(g, self.neat_config)
+    #       if self.config.NET_RENDER:
+    #          with open('nmmo_cppn.pkl', 'wb') a
+            multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
+            map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
 
-             for x in range(self.map_width):
-                for y in range(self.map_height):
-                   # a decent scale for NMMO
-                   x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
-                   x_i, y_i = x_i * 2, y_i * 2
-                   v = cppn.activate((x_i, y_i))
+            for x in range(self.map_width):
+               for y in range(self.map_height):
+                  # a decent scale for NMMO
+                  x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
+                  x_i, y_i = x_i * 2, y_i * 2
+                  v = cppn.activate((x_i, y_i))
 
-                   if self.config.THRESHOLD:
-                      # use NMMO's threshold logic
-                      assert len(v) == 1
-                      v = v[0]
-                      v = self.map_generator.material_evo(self.config, v)
-                   else:
-                      # CPPN has output channel for each tile type; take argmax over channels
-                      # also a spawn-point tile
-                      assert len(v) == self.n_tiles
-                      multi_hot[:, x, y] = v
-                      v = np.argmax(v)
-                      map_arr[x, y] = v
-             self.validate_spawns(map_arr, multi_hot)
-            #map_arr = self.add_border(map_arr)
-             # Impossible maps are no good
-             tile_counts = np.bincount(map_arr.reshape(-1))
+                  if self.config.THRESHOLD:
+                     # use NMMO's threshold logic
+                     assert len(v) == 1
+                     v = v[0]
+                     v = self.map_generator.material_evo(self.config, v)
+                  else:
+                     # CPPN has output channel for each tile type; take argmax over channels
+                     # also a spawn-point tile
+                     assert len(v) == self.n_tiles
+                     multi_hot[:, x, y] = v
+                     v = np.argmax(v)
+                     map_arr[x, y] = v
+            self.validate_spawns(map_arr, multi_hot)
+           #map_arr = self.add_border(map_arr)
+            # Impossible maps are no good
+            tile_counts = np.bincount(map_arr.reshape(-1))
 
-             if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
-                   tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
-                   tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
-                print('map {} rejected for lack of food and water'.format(g_idx))
-                g.fitness = 0
-                neat_idxs.remove(idx)
-                skip_idxs.add(g_idx)
-             #  self.genes.pop(g_idx)
-             self.genes[g_idx] = (map_arr, multi_hot), g.atk_mults
+            if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
+                  tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
+                  tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
+               print('map {} rejected for lack of food and water'.format(g_idx))
+               g.fitness = 0
+               neat_idxs.remove(idx)
+               skip_idxs.add(g_idx)
+            #  self.genes.pop(g_idx)
+            self.genes[g_idx] = (map_arr, multi_hot), g.atk_mults
          g_idxs_out.add(g_idx)
          maps[g_idx] = map_arr, g.atk_mults
       # remove dead guys
@@ -614,7 +411,7 @@ class EvolverNMMO(LambdaMuEvolver):
       g_idxs_envs = list(g_idxs_out)
       np.random.shuffle(g_idxs_envs)
       global_counter.set_idxs.remote(g_idxs_envs)
-      self.saveMaps(maps)
+      self.saveMaps(maps, new_g_idxs)
       global_stats = self.global_stats
       self.send_genes(global_stats)
       train_stats = self.trainer.train()
@@ -630,6 +427,7 @@ class EvolverNMMO(LambdaMuEvolver):
             continue
 
          if g_idx not in stats:
+#           T()
             print('Missing stats for map {}, training again.'.format(g_idx))
 #           print('Missing stats for map {}, using old stats.'.format(g_idx))
             self.trainer.train()
@@ -651,7 +449,7 @@ class EvolverNMMO(LambdaMuEvolver):
          if g_idx not in g_idxs_out:
             score = 0
          else:
-            if 'skills' not in stats:
+            if 'skills' not in stats[g_idx]:
                score = 0
 #              T()
             else:
@@ -663,8 +461,8 @@ class EvolverNMMO(LambdaMuEvolver):
          g.fitness = np.mean(last_fitness)
          g.age += 1
 
-         if len(last_fitness) == self.config.ROLLING_FITNESS:
-             last_fitness = last_fitness[:self.config.ROLLING_FITNESS]
+         if len(last_fitness) >= self.config.ROLLING_FITNESS:
+            last_fitness = last_fitness[-self.config.ROLLING_FITNESS:]
          new_fitness_hist[idx] = last_fitness
          self.score_hists[g_idx] = new_fitness_hist[idx]
          self.population[g_idx] = (None, score, g.age)
@@ -709,7 +507,8 @@ class EvolverNMMO(LambdaMuEvolver):
          [self.validate_spawns(m[1][0][0], m[1][0][1]) for m in maps]
          maps = dict(maps)
       elif self.CPPN:
-         mutated = list(maps.keys())
+         if mutated is None:
+            mutated = list(maps.keys())
          #FIXME: hack
 
          if self.n_epoch == -1:
@@ -1085,12 +884,12 @@ class EvolverNMMO(LambdaMuEvolver):
       train_stats = self.trainer.train()
       stats = ray.get(global_stats.get.remote())
      #headers = ray.get(global_stats.get_headers.remote())
-      n_epis = train_stats['episodes_this_iter']
+#     n_epis = train_stats['episodes_this_iter']
 
-      if n_epis == 0:
-         print('Missing simulation stats. I assume this is the 0th generation? Re-running the training step.')
+#     if n_epis == 0:
+#        print('Missing simulation stats. I assume this is the 0th generation? Re-running the training step.')
 
-         return self.evolve_generation()
+#        return self.evolve_generation()
 
       global_stats.reset.remote()
 
@@ -1111,18 +910,20 @@ class EvolverNMMO(LambdaMuEvolver):
          # get score from latest simulation
          # cull score history
 
-         if len(self.score_hists[g_hash]) >= self.config.ROLLING_FITNESS:
-            while len(self.score_hists[g_hash]) >= self.config.ROLLING_FITNESS:
-               self.score_hists[g_hash].pop(0)
+        #if len(self.score_hists[g_hash]) >= self.config.ROLLING_FITNESS:
+        #   self.score_hists[g_hash] = self.score_hists[g_hash][-self.config.ROLLING_FITNESS:]
+#           while len(self.score_hists[g_hash]) >= self.config.ROLLING_FITNESS:
+#              self.score_hists[g_hash].pop(0)
           # hack
 
          #if score_t is None:
          #    score_t = 0
-         else:
-            self.score_hists[g_hash].append(score_t)
-            score = np.mean(self.score_hists[g_hash])
-            game, _, age = self.population[g_hash]
-            self.population[g_hash] = (game, score, age + 1)
+        #else:
+         self.score_hists[g_hash].append(score_t)
+         self.score_hists[g_hash] = self.score_hists[g_hash][-self.config.ROLLING_FITNESS:]
+         score = np.mean(self.score_hists[g_hash])
+         game, _, age = self.population[g_hash]
+         self.population[g_hash] = (game, score, age + 1)
       super().mutate_gen()
 
    def tick_game(self, game, g_hash=None):

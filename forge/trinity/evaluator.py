@@ -14,33 +14,8 @@ from forge.trinity.overlay import OverlayRegistry
 from forge.blade.io.action import static as Action
 from forge.blade.lib.log import InkWell
 
-from evolution.diversity import diversity_calc
 from matplotlib import pyplot as plt
 
-
-def plot_diversity(x, y, model_name, map_name, map_idx, render=True):
-    my_dpi = 96
-    colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
-            'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
-            'fuchsia', 'deeppink', 'olive', 'orange', 'maroon', 'lightcoral', 'firebrick', 'black', 'dimgrey', 'tomato',
-            'saddlebrown', 'greenyellow', 'limegreen', 'turquoise', 'midnightblue', 'darkkhaki', 'darkseagreen', 'teal',
-            'cyan', 'lightsalmon', 'springgreen', 'mediumblue', 'dodgerblue', 'mediumpurple', 'darkslategray', 'goldenrod',
-            'indigo', 'steelblue', 'coral', 'mistyrose', 'indianred']
-    fig, ax = plt.subplots(figsize=(800/my_dpi, 400/my_dpi), dpi=my_dpi)
-    ax.errorbar(x, y.mean(axis=0), yerr=y.std(axis=0),  c='indigo')
-    #markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
-    #                                   ecolor='purple')
-    #[bar.set_alpha(0.03) for bar in bars]
-    plt.ylabel('diversity')
-    plt.xlabel('tick')
-    plt.subplots_adjust(top=0.9)
-    exp_name = 'diversity_MODEL_{}_MAP_{}_ID_{}.png'.format(model_name, map_name, map_idx)
-    plt.title(exp_name)
-    plt.savefig(os.path.join('experiment', exp_name), dpi=my_dpi)
-
-    if render:
-       plt.show()
-    plt.close()
 
 
 class Base:

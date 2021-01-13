@@ -54,7 +54,8 @@ def plot_exp(exp_name, render=False):
             'saddlebrown', 'greenyellow', 'limegreen', 'turquoise', 'midnightblue', 'darkkhaki', 'darkseagreen', 'teal',
             'cyan', 'lightsalmon', 'springgreen', 'mediumblue', 'dodgerblue', 'mediumpurple', 'darkslategray', 'goldenrod',
             'indigo', 'steelblue', 'coral', 'mistyrose', 'indianred']
-    fig, ax = plt.subplots(figsize=(1800/my_dpi, 900/my_dpi), dpi=my_dpi)
+#   fig, ax = plt.subplots(figsize=(1800/my_dpi, 900/my_dpi), dpi=my_dpi)
+    fig, ax = plt.subplots()
     if True:
         for i in range(len(scores)):
             ind_y = []
@@ -67,12 +68,12 @@ def plot_exp(exp_name, render=False):
     avg_scores = [np.mean(np.array(scores)) for scores in ep_scores]
     std = [np.std(np.array(scores)) for scores in ep_scores]
     ax.plot(avg_scores, c='indigo')
-    plt.tight_layout()
-    #markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
-    #                                   ecolor='purple')
-    #[bar.set_alpha(0.03) for bar in bars]
+    markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
+                                       ecolor='purple')
+    [bar.set_alpha(0.03) for bar in bars]
     plt.ylabel('fitness')
     plt.xlabel('generation')
+    plt.title('evolved diversity')
     plt.savefig(im_path, dpi=my_dpi)
     if render:
        plt.show()
