@@ -6,7 +6,6 @@ import random
 import warnings
 from pdb import set_trace as TT
 from timeit import default_timer as timer
-from forge.blade.core.terrain import MapGenerator, Save
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -16,6 +15,7 @@ import scipy
 
 import deap
 from deap import algorithms, base, creator, gp, tools
+from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
 from pcg import TILE_PROBS
 from qdpy.algorithms.deap import DEAPQDAlgorithm
@@ -71,114 +71,6 @@ class Individual():
 
 
 
-def qdSimple(init_batch, toolbox, container, batch_size, niter, cxpb = 0.0, mutpb = 1.0, stats = None, halloffame = None, verbose = False, show_warnings = False, start_time = None, iteration_callback = None):
-    """The simplest QD algorithm using DEAP.
-    :param init_batch: Sequence of individuals used as initial batch.
-    :param toolbox: A :class:`~deap.base.Toolbox` that contains the evolution operators.
-    :param batch_size: The number of individuals in a batch.
-    :param niter: The number of iterations.
-    :param stats: A :class:`~deap.tools.Statistics` object that is updated inplace, optional.
-    :param halloffame: A :class:`~deap.tools.HallOfFame` object that will
-                       contain the best individuals, optional.
-    :param verbose: Whether or not to log the statistics.
-    :param show_warnings: Whether or not to show warnings and errors. Useful to check if some individuals were out-of-bounds.
-    :param start_time: Starting time of the illumination process, or None to take the current time.
-    :param iteration_callback: Optional callback funtion called when a new batch is generated. The callback function parameters are (iteration, batch, container, logbook).
-    :returns: The final batch
-    :returns: A class:`~deap.tools.Logbook` with the statistics of the
-              evolution
-
-    TODO
-    """
-    
-    if start_time == None:
-        start_time = timer()
-    logbook = deap.tools.Logbook()
-    logbook.header = ["iteration", "containerSize", "evals", "nbUpdated"] + (stats.fields if stats else []) + ["elapsed"]
-
-    if len(init_batch) == 0:
-        raise ValueError("``init_batch`` must not be empty.")
-
-    # Evaluate the individuals with an invalid fitness
-    invalid_ind = [ind for ind in init_batch if not ind.fitness.valid]
-    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-
-    for ind, fit in zip(invalid_ind, fitnesses):
-        ind.fitness.values = fit[0]
-        ind.features = fit[1]
-
-    if len(invalid_ind) == 0:
-        raise ValueError("No valid individual found !")
-
-    # Update halloffame
-
-    if halloffame is not None:
-        halloffame.update(init_batch)
-
-    # Store batch in container
-    nb_updated = container.update(init_batch, issue_warning=show_warnings)
-
-    if nb_updated == 0:
-       pass
-#      TT()
-#      raise ValueError("No individual could be added to the container !")
-
-    else:
-       # Compile stats and update logs
-       record = stats.compile(container) if stats else {}
-       logbook.record(iteration=0, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
-
-       if verbose:
-           print(logbook.stream)
-    # Call callback function
-
-    if iteration_callback != None:
-        iteration_callback(0, init_batch, container, logbook)
-
-    # Begin the generational process
-
-    for i in range(1, niter + 1):
-        start_time = timer()
-        # Select the next batch individuals
-        batch = toolbox.select(container, batch_size)
-
-        ## Vary the pool of individuals
-        offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
-        #offspring = []
-        #for o in batch:
-        #    newO = toolbox.clone(o)
-        #    ind, = toolbox.mutate(newO)
-        #    del ind.fitness.values
-        #    offspring.append(ind)
-
-        # Evaluate the individuals with an invalid fitness
-        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit[0]
-            ind.features = fit[1]
-
-        # Replace the current population by the offspring
-        nb_updated = container.update(offspring, issue_warning=show_warnings)
-
-        # Update the hall of fame with the generated individuals
-
-        if halloffame is not None:
-            halloffame.update(container)
-
-        # Append the current generation statistics to the logbook
-        record = stats.compile(container) if stats else {}
-        logbook.record(iteration=i, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
-
-        if verbose:
-            print(logbook.stream)
-        # Call callback function
-
-        if iteration_callback != None:
-            iteration_callback(i, batch, container, logbook)
-
-    return batch, logbook
 
 class NMMOGrid(Grid):
     def __init__(self, save_path, render, map_generator, *args, **kwargs):
@@ -189,10 +81,11 @@ class NMMOGrid(Grid):
 
     def add(self, individual):
         index = super(NMMOGrid, self).add(individual)
+
         if index is not None:
-            
+
             map_path = os.path.join(self.save_path, 'maps', 'map' + '('+ ', '.join([str(f) for f in self.index_grid(individual.features)]) + ')')
-            try: 
+            try:
                 os.makedirs(map_path)
             except FileExistsError:
                 pass
@@ -202,15 +95,129 @@ class NMMOGrid(Grid):
 #           individual.data['ind_idx'] = tuple(individual.features)
 #           print('add ind with idx {}'.format(tuple(individual.features)))
             return index
+
         return None
 
 class EvoDEAPQD(DEAPQDAlgorithm):
-   def __init__(self, *args, **kwargs):
+   def __init__(self, qd_fun, *args, **kwargs):
       super().__init__(*args, **kwargs)
-      self.ea_fn = qdSimple
+      self.ea_fn = qd_fun
 
 class MapElites():
+   def qdSimple(self, init_batch, toolbox, container, batch_size, niter, cxpb = 0.0, mutpb = 1.0, stats = None, halloffame = None, verbose = False, show_warnings = False, start_time = None, iteration_callback = None):
+       """The simplest QD algorithm using DEAP.
+       :param init_batch: Sequence of individuals used as initial batch.
+       :param toolbox: A :class:`~deap.base.Toolbox` that contains the evolution operators.
+       :param batch_size: The number of individuals in a batch.
+       :param niter: The number of iterations.
+       :param stats: A :class:`~deap.tools.Statistics` object that is updated inplace, optional.
+       :param halloffame: A :class:`~deap.tools.HallOfFame` object that will
+                          contain the best individuals, optional.
+       :param verbose: Whether or not to log the statistics.
+       :param show_warnings: Whether or not to show warnings and errors. Useful to check if some individuals were out-of-bounds.
+       :param start_time: Starting time of the illumination process, or None to take the current time.
+       :param iteration_callback: Optional callback funtion called when a new batch is generated. The callback function parameters are (iteration, batch, container, logbook).
+       :returns: The final batch
+       :returns: A class:`~deap.tools.Logbook` with the statistics of the
+                 evolution
+
+       TODO
+       """
+
+       if start_time == None:
+           start_time = timer()
+       logbook = deap.tools.Logbook()
+       logbook.header = ["iteration", "containerSize", "evals", "nbUpdated"] + (stats.fields if stats else []) + ["elapsed"]
+
+       if len(init_batch) == 0:
+           raise ValueError("``init_batch`` must not be empty.")
+
+       # Evaluate the individuals with an invalid fitness
+       invalid_ind = [ind for ind in init_batch if not ind.fitness.valid]
+       fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+
+       for ind, fit in zip(invalid_ind, fitnesses):
+           ind.fitness.values = fit[0]
+           ind.features = fit[1]
+
+       if len(invalid_ind) == 0:
+           raise ValueError("No valid individual found !")
+
+       # Update halloffame
+
+       if halloffame is not None:
+           halloffame.update(init_batch)
+
+       # Store batch in container
+       nb_updated = container.update(init_batch, issue_warning=show_warnings)
+
+       if nb_updated == 0:
+          pass
+   #      TT()
+   #      raise ValueError("No individual could be added to the container !")
+
+       else:
+          # Compile stats and update logs
+          record = stats.compile(container) if stats else {}
+          logbook.record(iteration=0, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+
+          if verbose:
+              print(logbook.stream)
+       # Call callback function
+
+       if iteration_callback != None:
+           iteration_callback(0, init_batch, container, logbook)
+
+       # Begin the generational process
+
+       for i in range(1, niter + 1):
+           start_time = timer()
+           # Select the next batch individuals
+           batch = toolbox.select(container, batch_size)
+
+           print(container)
+           print(self.g_idxs)
+           ## Vary the pool of individuals
+           offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
+           #for o in batch:
+           #    newO = toolbox.clone(o)
+           #    ind, = toolbox.mutate(newO)
+           #    del ind.fitness.values
+           #    offspring.append(ind)
+
+           # Evaluate the individuals with an invalid fitness
+           invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+#          print('{} invalid individuals'.format(len(invalid_ind)))
+           fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+
+           for ind, fit in zip(invalid_ind, fitnesses):
+               ind.fitness.values = fit[0]
+               ind.features = fit[1]
+
+           # Replace the current population by the offspring
+           nb_updated = container.update(offspring, issue_warning=show_warnings)
+
+           # Update the hall of fame with the generated individuals
+
+           if halloffame is not None:
+               halloffame.update(container)
+
+           # Append the current generation statistics to the logbook
+           record = stats.compile(container) if stats else {}
+           logbook.record(iteration=i, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+
+           if verbose:
+               print(logbook.stream)
+           # Call callback function
+
+           if iteration_callback != None:
+               iteration_callback(i, batch, container, logbook)
+
+       return batch, logbook
+
+
    def compile(self):
+
        TT()
 
    def gen_individual(self):
@@ -219,6 +226,8 @@ class MapElites():
    def mutate(self, individual):
       evo = self.evolver
       idx = individual.data['ind_idx']
+
+#     print('mutate {}'.format(idx))
       if isinstance(idx, tuple):
           idx = self.g_idxs.pop()
       individual.data['ind_idx'] = idx
@@ -231,7 +240,7 @@ class MapElites():
       if not hasattr(individual.fitness, 'values'):
          individual.fitness.values = None
       individual.fitness.valid = False
-      evo.genes[idxs] = map_arr, atk_mults
+#     evo.genes[idxs] = map_arr, atk_mults
 
       return (individual, )
 
@@ -240,8 +249,8 @@ class MapElites():
       evo = self.evolver
  #    idx_0 = parent_0.data['ind_idx']
  #    idx_1 = parent_1.data['ind_idx']
-      idx_0 = self.g_idxs.pop()
-      idx_1 = self.g_idxs.pop()
+#     idx_0 = self.g_idxs.pop()
+#     idx_1 = self.g_idxs.pop()
       chrom_0, atk_mults_0 = parent_0.data['chromosome']
       chrom_1, atk_mults_1 = parent_1.data['chromosome']
       prims_0 = chrom_0.patterns
@@ -257,8 +266,8 @@ class MapElites():
       new_prims_1 = [prims_0[i] if random.random() < 0.5 else prims_1[i] for i in range(len_1)]
       chrom_0.patterns = new_prims_0
       chrom_1.patterns = new_prims_1
-      evo.chromosomes[idx_0] = chrom_0, new_atk_mults_0
-      evo.chromosomes[idx_1] = chrom_1, new_atk_mults_1
+#     evo.chromosomes[idx_0] = chrom_0, new_atk_mults_0
+#     evo.chromosomes[idx_1] = chrom_1, new_atk_mults_1
       chrom_0.update_features()
       chrom_1.update_features()
 
@@ -349,15 +358,18 @@ class MapElites():
       # update the elites to avoid stagnation (since simulation is stochastic)
       invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
       elite_idxs = [container.index_grid(ind.features) for ind in invalid_elites]
+
       if len(elite_idxs) > 0 and len(container) > 1:
           [ind.data.update({'ind_idx':idx}) for ind, idx in zip(invalid_elites, elite_idxs)]
           self.evolver.global_counter.set_idxs.remote(elite_idxs)
           self.evolver.trainer.train()
           self.stats = ray.get(evo.global_stats.get.remote())
           elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_elites)
+
           for el, el_fit in zip(invalid_elites, elite_fitnesses):
              el.fitness.values = el_fit[0]
              el.features = el_fit[1]
+
              if el in container:
                  try:
                      container.discard(el)
@@ -391,6 +403,7 @@ class MapElites():
 
       if ind_idx not in evo.genes:
           evo.genes[ind_idx] = individual.data['chromosome'][0].paint_map(), individual.data['chromosome'][1]
+          evo.chromosomes[ind_idx] = individual.data['chromosome']
 
       if ind_idx in self.idxs:
          pass
@@ -400,18 +413,21 @@ class MapElites():
          TT()
 
       if self.stats is None or ind_idx not in self.stats:
-         print("Training batch 1")
+#        print("Training batch 1")
          evo.trainer.train()
          self.stats = ray.get(evo.global_stats.get.remote())
+
       if ind_idx not in self.stats:
          print("Training batch 2")
          evo.trainer.train()
       assert ind_idx in self.stats
       ind_stats = self.stats[ind_idx]
+
       if 'skills' not in ind_stats:
          score = 0
       score = evo.calc_diversity(ind_stats)
       features = calc_mean_agent(ind_stats)
+
       if ind_idx in evo.population:
           (game, old_score, age) = evo.population[ind_idx]
           evo.population[ind_idx] = (game, score, age)
@@ -445,7 +461,8 @@ class MapElites():
          archive = pickle.load(f)
          # NOTE: (Elite) individuals saved in the grid will have overlapping indexes.
          # TODO: Save all elite maps; do inference on one of them.
-         algo = EvoDEAPQD(self, 
+         algo = EvoDEAPQD(self,
+                 self.qdSimple,
                  self.toolbox,
                                archive['container'],
                                init_batch_size=archive['init_batch_size'],
@@ -563,8 +580,9 @@ class MapElites():
       with ParallelismManager(parallelism_type,
                              toolbox=self.toolbox) as pMgr:
          # Create a QD algorithm
-         algo = EvoDEAPQD(pMgr.toolbox,
-                                grid,
+         algo = EvoDEAPQD(self.qdSimple,
+                            pMgr.toolbox,
+                            grid,
                                 init_batch_size=init_batch_size,
                                 batch_size=batch_size,
                                 niter=nb_iterations,
@@ -581,7 +599,7 @@ class MapElites():
       self.log_me()
 
    def log_me(self):
-      grid = self.grid 
+      grid = self.grid
       algo = self.algo
       log_base_path = self.log_base_path
       # Print results info
