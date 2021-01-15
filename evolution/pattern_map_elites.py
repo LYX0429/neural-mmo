@@ -357,7 +357,7 @@ class MapElites():
       self.stats = None
       # update the elites to avoid stagnation (since simulation is stochastic)
       invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
-      elite_idxs = [container.index_grid(ind.features) for ind in invalid_elites]
+      elite_idxs = [container.index_grid(np.clip(ind.features, 0, 2000)) for ind in invalid_elites]
 
       if len(elite_idxs) > 0 and len(container) > 1 and np.random.random() < 0.1:
           [ind.data.update({'ind_idx':idx}) for ind, idx in zip(invalid_elites, elite_idxs)]
@@ -367,8 +367,10 @@ class MapElites():
           elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_elites)
 
           for el, el_fit in zip(invalid_elites, elite_fitnesses):
+             #FIXME: iterate through diff. features
              el.fitness.values = el_fit[0]
-             el.features = el_fit[1]
+#            el.features = np.clip(el_fit[1], self.features_domain[0][0], self.features_domain[0][1])
+             el.features = np.clip(el_fit[1], 0, 2000)
 
              if el in container:
                  try:
@@ -389,7 +391,7 @@ class MapElites():
           evo.saveMaps(evo.genes)
       else:
           evo.saveMaps(evo.genes, self.mutated_idxs)
-#     evo.log()
+      evo.log()
       self.mutated_idxs = set()
       if self.n_gen % 10 == 0:
          self.log_me()
@@ -531,7 +533,7 @@ class MapElites():
       #    ind_domain = (0., 1.)                     # The domain (min/max values) of the individual genomes
       # The domain (min/max values) of the features
 #     features_domain = [(0, 2000), (0, 2000)]
-      features_domain = [(0, 2000), (0, 2000)]
+      self.features_domain = features_domain = [(0, 2000), (0, 2000)]
       # The domain (min/max values) of the fitness
       fitness_domain = [(-np.inf, np.inf)]
       # The number of evaluations of the initial batch ('batch' = population)
