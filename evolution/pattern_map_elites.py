@@ -175,8 +175,6 @@ class MapElites():
            # Select the next batch individuals
            batch = toolbox.select(container, batch_size)
 
-           print(container)
-           print(self.g_idxs)
            ## Vary the pool of individuals
            offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
            #for o in batch:
@@ -230,6 +228,7 @@ class MapElites():
 #     print('mutate {}'.format(idx))
       if isinstance(idx, tuple):
           idx = self.g_idxs.pop()
+      self.mutated_idxs.add(idx)
       individual.data['ind_idx'] = idx
       #FIXME: big hack
       chrom, atk_mults = individual.data['chromosome']
@@ -290,6 +289,7 @@ class MapElites():
       # Create fitness classes (must NOT be initialised in __main__ if you want to use scoop)
       self.init_toolbox()
       self.idxs = set()
+      self.mutated_idxs = set()
       self.stats = None
       self.g_idxs = list(range(self.evolver.config.N_EVO_MAPS))
 
@@ -359,7 +359,7 @@ class MapElites():
       invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
       elite_idxs = [container.index_grid(ind.features) for ind in invalid_elites]
 
-      if len(elite_idxs) > 0 and len(container) > 1:
+      if len(elite_idxs) > 0 and len(container) > 1 and np.random.random() < 0.1:
           [ind.data.update({'ind_idx':idx}) for ind, idx in zip(invalid_elites, elite_idxs)]
           self.evolver.global_counter.set_idxs.remote(elite_idxs)
           self.evolver.trainer.train()
@@ -385,8 +385,12 @@ class MapElites():
       evo.global_stats.reset.remote()
       self.evolver.global_counter.set_idxs.remote(list(range(self.evolver.config.N_EVO_MAPS)))
       self.g_idxs = set(range(self.evolver.config.N_EVO_MAPS))
-      evo.saveMaps(evo.genes)
+      if not hasattr(self, 'mutated_idxs'):
+          evo.saveMaps(evo.genes)
+      else:
+          evo.saveMaps(evo.genes, self.mutated_idxs)
 #     evo.log()
+      self.mutated_idxs = set()
       if self.n_gen % 10 == 0:
          self.log_me()
 
@@ -461,7 +465,7 @@ class MapElites():
          archive = pickle.load(f)
          # NOTE: (Elite) individuals saved in the grid will have overlapping indexes.
          # TODO: Save all elite maps; do inference on one of them.
-         algo = EvoDEAPQD(self,
+         algo = EvoDEAPQD(
                  self.qdSimple,
                  self.toolbox,
                                archive['container'],
@@ -527,7 +531,7 @@ class MapElites():
       #    ind_domain = (0., 1.)                     # The domain (min/max values) of the individual genomes
       # The domain (min/max values) of the features
 #     features_domain = [(0, 2000), (0, 2000)]
-      features_domain = [(0, 20000), (0, 20000)]
+      features_domain = [(0, 2000), (0, 2000)]
       # The domain (min/max values) of the fitness
       fitness_domain = [(-np.inf, np.inf)]
       # The number of evaluations of the initial batch ('batch' = population)
