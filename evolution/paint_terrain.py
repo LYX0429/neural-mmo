@@ -204,7 +204,7 @@ class Chromosome():
          add_ptrn = True
       else: 
           add_ptrn = np.random.randint(0, min(5, self.max_patterns - n_patterns))
-          for p in np.random.choice(self.patterns, np.random.randint(1, int(n_patterns//5))):
+          for p in np.random.choice(self.patterns, np.random.randint(0, max(1, int(n_patterns//5)))):
              p.mutate()
 
       for i in range(0, min(5, n_patterns)):
@@ -229,7 +229,7 @@ class Chromosome():
       for p in self.patterns:
          p.paint(multi_hot)
       flat_map = np.argmax(multi_hot, axis=0)
-      self.flat_mat, self.multi_hot = flat_map, multi_hot
+      self.flat_map, self.multi_hot = flat_map, multi_hot
 
       return flat_map, multi_hot
 

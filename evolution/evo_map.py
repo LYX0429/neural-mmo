@@ -280,9 +280,17 @@ class EvolverNMMO(LambdaMuEvolver):
       self.LAMBDA_MU = config.EVO_ALGO == 'Simple'
       self.MAP_ELITES = config.EVO_ALGO == 'MAP-Elites'
 
+      if self.CPPN or self.MAP_ELITES:
+         # g_idxs we might use
+         self.g_idxs_reserve = set([i for i in range(self.n_pop*10)])
+
       if self.PATTERN_GEN:
          self.max_primitives = self.map_width**2 / 4
 
+         from evolution.paint_terrain import Chromosome
+         self.Chromosome = Chromosome
+         self.chromosomes = {}
+         self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
          if self.MAP_ELITES:
             self.me = MapElites(
                   evolver=self,
@@ -290,14 +298,8 @@ class EvolverNMMO(LambdaMuEvolver):
                   )
             self.init_pop()
             # Do MAP-Elites using qdpy
-         from evolution.paint_terrain import Chromosome
-         self.Chromosome = Chromosome
-         self.chromosomes = {}
-         self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
 
       elif self.CPPN:
-         # g_idxs we might use
-         self.g_idxs_reserve = set([i for i in range(self.n_pop*10)])
          self.neat_to_g = {}
          self.n_epoch = -1
          evolver = self
@@ -503,6 +505,8 @@ class EvolverNMMO(LambdaMuEvolver):
          checkpoint_maps = False
       if self.PATTERN_GEN:
          # map index, (map_arr, multi_hot), atk_mults
+         if mutated is None:
+            mutated = list(self.chromosomes.keys())
          maps = [(i, (self.chromosomes[i][0].paint_map(), self.chromosomes[i][1])) for i in mutated]
          [self.validate_spawns(m[1][0][0], m[1][0][1]) for m in maps]
          maps = dict(maps)

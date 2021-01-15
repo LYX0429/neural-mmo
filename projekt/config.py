@@ -15,10 +15,10 @@ class Config(core.Config):
 
    ENV_NAME                = 'Neural_MMO'
    ENV_VERSION             = '1.5'
-   NUM_WORKERS             = 4
+   NUM_WORKERS             = 6
    NUM_GPUS_PER_WORKER     = 0
    NUM_GPUS                = 1
-   TRAIN_BATCH_SIZE        = 4000
+   TRAIN_BATCH_SIZE        = 4800 # to match evo, normally 4000
    #TRAIN_BATCH_SIZE        = 400
    ROLLOUT_FRAGMENT_LENGTH = 100
    SGD_MINIBATCH_SIZE      = 128
@@ -115,6 +115,7 @@ EXPLORE_SKILLS = ['exploration']
 HARVEST_SKILLS = ['woodcutting', 'mining']
 
 class TreeOrerock(SmallMap):
+   NEW_EVAL = False
    EVO_MAP = True
    FIXED_MAPS = True
    EVALUATE = True
@@ -140,6 +141,7 @@ class TreeOrerock(SmallMap):
    FITNESS_METRIC       = 'L2'
    MAP = 'PCG'
    INFER_IDX = 0
+   N_EVAL = 20
 
 class EvoNMMO(TreeOrerock):
 

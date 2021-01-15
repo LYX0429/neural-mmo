@@ -3,6 +3,7 @@ from pathlib import Path
 from collections import defaultdict
 from pdb import set_trace as T
 from typing import Dict
+import json
 
 import gym
 from matplotlib import pyplot as plt
@@ -19,6 +20,7 @@ from ray.rllib.policy import Policy
 from ray.rllib.policy.rnn_sequencing import add_time_dimension
 from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID, SampleBatch
 from ray.rllib.utils.spaces.flexdict import FlexDict
+from forge.blade.lib.enums import Water
 from torch import nn
 from tqdm import tqdm
 
@@ -26,6 +28,7 @@ import projekt
 from forge.blade.io.action.static import Action
 from forge.blade.io.stimulus.static import Stimulus
 from forge.blade.lib.log import InkWell
+from forge.blade.core. terrain import Save, MapGenerator
 from forge.ethyr.torch import io, policy
 from forge.ethyr.torch.policy import baseline
 from forge.trinity import Env, evaluator
@@ -140,6 +143,8 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
          return stats
 
+      return {}
+
 
 #Neural MMO observation space
 def observationSpace(config):
@@ -182,8 +187,7 @@ def actionSpace(config):
 
    return atns
 
-def plot_diversity(x, y, div_names, model_name, map_name, map_idx, render=True):
-   my_dpi = 96
+def plot_diversity(x, y, div_names, exp_name, render=False):
    colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
             'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
             'fuchsia', 'deeppink', 'olive', 'orange', 'maroon', 'lightcoral', 'firebrick', 'black', 'dimgrey', 'tomato',
@@ -191,25 +195,41 @@ def plot_diversity(x, y, div_names, model_name, map_name, map_idx, render=True):
             'cyan', 'lightsalmon', 'springgreen', 'mediumblue', 'dodgerblue', 'mediumpurple', 'darkslategray', 'goldenrod',
             'indigo', 'steelblue', 'coral', 'mistyrose', 'indianred']
 #   fig, ax = plt.subplots(figsize=(800/my_dpi, 400/my_dpi), dpi=my_dpi)
-   fig, axs = plt.subplots(len(div_names)) 
-   exp_name = 'diversity_MODEL_{}_MAP_{}_ID_{}.png'.format(model_name, map_name, map_idx)
+   fig, axs = plt.subplots(len(div_names) + 1) 
    fig.suptitle(exp_name)
+   plt.subplots_adjust(right=0.78)
    for i, div_name in enumerate(div_names):
       ax = axs[i]
-      ax.errorbar(x, y[:,i,:].mean(axis=0), yerr=y[:,i,:].std(axis=0), label=div_name)
-      ax.legend()
+      markers, caps, bars = ax.errorbar(x, y[:,i,:].mean(axis=0), yerr=y[:,i,:].std(axis=0), label=div_name, alpha=1)
+      [bar.set_alpha(0.2) for bar in bars]
+      plt.text(0.8, 0.8-i*0.162, '{:.2}'.format(y[:,i,:].mean()), fontsize=12, transform=plt.gcf().transFigure)
+     #ax.text(0.8, 0.2, '{:.2}'.format(y[:,i,:].mean()))
+      ax.legend(loc='upper left')
+      if div_name == 'mean pairwise L2':
+         ax.set_ylim(0, 10000)
+      elif div_name == 'differential entropy':
+         ax.set_ylim(20, 50)
+   ax.set_ylabel('diversity')
    #markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
    #                                   ecolor='purple')
    #[bar.set_alpha(0.03) for bar in bars]
-   plt.ylabel('diversity')
-   plt.xlabel('tick')
+  #plt.ylabel('diversity')
   #plt.subplots_adjust(top=0.9)
   #plt.legend()
-   plt.savefig(os.path.join('experiment', exp_name), dpi=my_dpi)
+   ax = axs[i+1]
+   ax.errorbar(x, y[:,i+1,:].mean(axis=0), yerr=y[:,i+1,:].std(axis=0), label='lifespans')
+  #ax.text(10, 0, '{:.2}'.format(y[:,i+1,:].mean()))
+  #plt.ylabel('lifespans')
+   ax.set_ylabel('lifespans')
+   ax.set_ylim(0, 1000)
+   plt.text(0.8, 0.8-(i+1)*0.162, '{:.2}'.format(y[:,i+1,:].mean()), fontsize=12, transform=plt.gcf().transFigure)
+   plt.xlabel('tick')
+   plt.tight_layout()
+   ax.legend(loc='upper left')
+
 
    if render:
       plt.show()
-   plt.close()
 
 
 
@@ -221,6 +241,9 @@ class RLLibEvaluator(evaluator.Base):
       self.trainer  = trainer
 
       self.model    = self.trainer.get_policy('policy_0').model
+      if self.config.MAP != 'PCG':
+#        self.config.ROOT = self.config.MAP
+         self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
       self.env      = projekt.rllib_wrapper.RLLibEnv({'config': config})
 
       self.env.reset(idx=self.config.INFER_IDX, step=False)
@@ -229,32 +252,131 @@ class RLLibEvaluator(evaluator.Base):
       self.obs      = self.env.step({})[0]
 
       self.state    = {}
+      self.eval_path_map = os.path.join('eval_experiment', self.config.MAP.split('/')[-1])
+
+      try:
+         os.mkdir(self.eval_path_map)
+      except FileExistsError:
+         print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+
+      self.eval_path_map = os.path.join(self.eval_path_map, str(self.config.INFER_IDX))
+
+      try:
+         os.mkdir(self.eval_path_map)
+      except FileExistsError:
+         print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+
+      self.eval_path_model = os.path.join(self.eval_path_map, self.config.MODEL.split('/')[-1])
+
+      try:
+         os.mkdir(self.eval_path_model)
+      except FileExistsError:
+         print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
 
    def test(self):
-      if self.config.MAP != 'PCG':
-         self.config.ROOT = self.config.MAP
-         self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
 
+      model_name = self.config.MODEL.split('/')[-1]
+      map_name = self.config.MAP.split('/')[-1] 
+      map_idx = self.config.INFER_IDX
+      exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps.png'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
+      # Render the map in case we hadn't already
+      map_arr = self.env.realm.map.np()
+      map_generator = MapGenerator(self.config)
+      t_start = self.config.TERRAIN_BORDER
+      t_end = self.config.TERRAIN_SIZE - self.config.TERRAIN_BORDER
+      Save.render(map_arr[t_start:t_end, t_start:t_end],
+            map_generator.textures, os.path.join(self.eval_path_map, '{} map {}.png'.format(self.config.MAP.split('/')[-1], self.config.INFER_IDX)))
       ts = np.arange(self.config.EVALUATION_HORIZON)
-      n_evals = 20
-      div_mat = np.zeros((n_evals, len(DIV_CALCS), self.config.EVALUATION_HORIZON))
+      n_evals = self.config.N_EVAL
+      n_metrics = len(DIV_CALCS) + 1 
+      n_skills = len(self.config.SKILLS)
+      div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON))
+      heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
+      final_stats = []
 
-      for i in range(n_evals):
-         self.env.reset(idx=self.config.INFER_IDX)
-         self.obs = self.env.step({})[0]
-         self.state = {}
-         self.registry = OverlayRegistry(self.env, self.model, self.trainer, self.config)
-         divs = np.zeros((len(DIV_CALCS), self.config.EVALUATION_HORIZON))
-         for t in tqdm(range(self.config.EVALUATION_HORIZON)):
-            self.tick(None, None)
-#           print(len(self.env.realm.players.entities))
-            div_stats = self.env.get_agent_stats()
-            for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
-               diversity = calc_diversity(div_stats, verbose=False)
-               divs[j, t] = diversity
-            div_mat[i] = divs
-      plot_diversity(ts, div_mat, [d[1] for d in DIV_CALCS], self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
-      print('Diversity: {}'.format(diversity))
+      if self.config.NEW_EVAL:
+         for i in range(n_evals):
+            data_path = os.path.join(self.eval_path_model, '{} eval.npy'.format(exp_name))
+            self.env.reset(idx=self.config.INFER_IDX)
+            self.obs = self.env.step({})[0]
+            self.state = {}
+            self.registry = OverlayRegistry(self.env, self.model, self.trainer, self.config)
+            # array of data: diversity scores, lifespans...
+            divs = np.zeros((len(DIV_CALCS) + 1, self.config.EVALUATION_HORIZON))
+            for t in tqdm(range(self.config.EVALUATION_HORIZON)):
+               self.tick(None, None)
+   #           print(len(self.env.realm.players.entities))
+               div_stats = self.env.get_agent_stats()
+               for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
+                  diversity = calc_diversity(div_stats, verbose=False)
+                  divs[j, t] = diversity
+               lifespans = div_stats['lifespans']
+               divs[j + 1, t] = np.mean(lifespans)
+               div_mat[i] = divs
+               for _, ent in self.env.realm.players.entities.items():
+                  r, c = ent.pos
+                  for si, skill in enumerate(self.config.SKILLS):
+                     if skill == 'exploration':
+                        xp = ent.exploration_grid.sum()
+                     else:
+                        xp = getattr(ent.skills, skill).exp
+                     heatmaps[i, t, si, r, c] = xp
+            final_stats.append(div_stats)
+         with open(data_path, 'wb') as f:
+            np.save(f, np.array(final_stats))
+            np.save(f, div_mat)
+            np.save(f, heatmaps)
+      else:
+         with open(data_path, 'rb') as f:
+            final_stats = np.load(f, allow_pickle=True)
+            div_mat = np.load(f)
+            heatmaps = np.load(f)
+
+      plot_name = 'diversity {}'.format(exp_name)
+      plot_diversity(ts, div_mat, [d[1] for d in DIV_CALCS], exp_name)
+      plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
+      plt.close()
+      heat_out = heatmaps.mean(axis=0).mean(axis=0)
+      for s_heat, s_name in zip(heat_out, self.config.SKILLS):
+         fig, ax = plt.subplots()
+         ax.title.set_text('{} heatmap'.format(s_name))
+         mask = self.env.realm.map.np() == [Water.index or Lava.index or Stone.index]
+         s_heat = np.ma.masked_where((mask==True), s_heat)
+         s_heat = np.flip(s_heat, 0)
+#        s_heat = np.log(s_heat + 1)
+         im = ax.imshow(s_heat, cmap='cool')
+         ax.set_xlim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
+         ax.set_ylim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
+         cbar = ax.figure.colorbar(im, ax=ax)
+         cbar.ax.set_ylabel('{} (log(xp)/tick)'.format(s_name))
+         plt.savefig(os.path.join(self.eval_path_model, '{} heatmap {}'.format(s_name, exp_name)))
+
+      mean_divs = {}
+      means_np = div_mat.mean(axis=-1).mean(axis=0)
+      stds_np = div_mat.mean(axis=-1).std(axis=0)
+      for j, (_, div_name) in enumerate(DIV_CALCS):
+         mean_divs[div_name] = {}
+         mean_divs[div_name]['mean'] = means_np[j]
+         mean_divs[div_name]['std'] = stds_np[j]
+      mean_divs['lifespans'] = means_np[j+1]
+      with open(os.path.join(self.eval_path_model, 'stats.json'), 'w') as outfile:
+         json.dump(mean_divs, outfile, indent=2)
+
+      from sklearn.manifold import TSNE
+      tsne = TSNE(n_components=2, random_state=0)
+      final_agent_skills = np.vstack([stats['skills'] for stats in final_stats])
+      X_2d = tsne.fit_transform(final_agent_skills)
+      plt.close()
+      plt.figure()
+      plt.title('TSNE plot of agents')
+      colors = np.hstack([stats['lifespans'] for stats in final_stats])
+     #colors = lifespans
+      sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
+      cbar = plt.colorbar(sc)
+      cbar.ax.set_ylabel('lifespans')
+      plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
+
+#     print('Diversity: {}'.format(diversity))
 
       log = InkWell()
       log.update(self.env.terminal())
