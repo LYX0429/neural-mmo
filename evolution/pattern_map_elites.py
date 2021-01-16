@@ -73,13 +73,16 @@ class Individual():
 
 
 class NMMOGrid(Grid):
-    def __init__(self, save_path, render, map_generator, *args, **kwargs):
+    def __init__(self, save_path, config, map_generator, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        render = config.TERRAIN_RENDER
+        self.border = config.TERRAIN_BORDER
         self.save_path = save_path
         self.render = render
         self.map_generator = map_generator
 
     def add(self, individual):
+        border = self.border
         index = super(NMMOGrid, self).add(individual)
 
         if index is not None:
@@ -91,12 +94,10 @@ class NMMOGrid(Grid):
                 pass
             Save.np(individual.data['chromosome'][0].flat_map, map_path)
            #if render == True:
-            Save.render(individual.data['chromosome'][0].flat_map, self.map_generator.textures, map_path + '.png')
-#           individual.data['ind_idx'] = tuple(individual.features)
+            Save.render(individual.data['chromosome'][0].flat_map[border:-border, border:-border], self.map_generator.textures, map_path + '.png')
+            individual.data['ind_idx'] = self.index_grid((individual.features))
 #           print('add ind with idx {}'.format(tuple(individual.features)))
-            return index
-
-        return None
+        return index
 
 class EvoDEAPQD(DEAPQDAlgorithm):
    def __init__(self, qd_fun, *args, **kwargs):
@@ -226,10 +227,10 @@ class MapElites():
       idx = individual.data['ind_idx']
 
 #     print('mutate {}'.format(idx))
-      if isinstance(idx, tuple):
-          idx = self.g_idxs.pop()
+      idx = self.g_idxs.pop()
       self.mutated_idxs.add(idx)
       individual.data['ind_idx'] = idx
+      # = self.container.index_grid(np.clip(inddividual.features, 0, 2000))
       #FIXME: big hack
       chrom, atk_mults = individual.data['chromosome']
       atk_mults = self.evolver.mutate_mults(atk_mults)
@@ -358,27 +359,27 @@ class MapElites():
       # update the elites to avoid stagnation (since simulation is stochastic)
       invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
       elite_idxs = [container.index_grid(np.clip(ind.features, 0, 2000)) for ind in invalid_elites]
-
-      if len(elite_idxs) > 0 and len(container) > 1 and np.random.random() < 0.1:
+      if len(container) > self.evolver.config.N_EVO_MAPS and np.random.random() < 0.1:
+          for el in invalid_elites:
+             if el in container:
+                 try:
+                     container.discard(el, also_from_depot=True)
+                 except ValueError as v:
+                     # FIXME: why?
+                     print(v)
+             #FIXME: iterate through diff. features
           [ind.data.update({'ind_idx':idx}) for ind, idx in zip(invalid_elites, elite_idxs)]
           self.evolver.global_counter.set_idxs.remote(elite_idxs)
           self.evolver.trainer.train()
           self.stats = ray.get(evo.global_stats.get.remote())
           elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_elites)
-
           for el, el_fit in zip(invalid_elites, elite_fitnesses):
-             #FIXME: iterate through diff. features
+             evo.genes.pop(el.data['ind_idx'])
              el.fitness.values = el_fit[0]
 #            el.features = np.clip(el_fit[1], self.features_domain[0][0], self.features_domain[0][1])
              el.features = np.clip(el_fit[1], 0, 2000)
-
-             if el in container:
-                 try:
-                     container.discard(el)
-                 except ValueError as v:
-                     # FIXME: why?
-                     print(v)
-          container.update(invalid_elites)
+          nb_updated = container.update(invalid_elites, issue_warning=True)
+          print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(elite_idxs)))
       #nb_el_updated = container.update()
 
 
@@ -394,7 +395,7 @@ class MapElites():
       evo.log()
       self.mutated_idxs = set()
       if self.n_gen % 10 == 0:
-         self.log_me()
+         self.log_me(container)
 
 
    def evaluate(self, individual, elite=False):
@@ -573,14 +574,13 @@ class MapElites():
       # Create container
       grid = NMMOGrid(
                   self.save_path,
-                  self.evolver.config.TERRAIN_RENDER,
+                  self.evolver.config,
                   self.evolver.map_generator,
                   shape=nb_bins,
                   max_items_per_bin=max_items_per_bin,
                   fitness_domain=fitness_domain,
                   features_domain=features_domain,
                   storage_type=list)
-      self.grid = grid
       parallelism_type = 'sequential'
 #     parallelism_type = 'multiprocessing'
       with ParallelismManager(parallelism_type,
@@ -602,10 +602,10 @@ class MapElites():
          self.algo = algo
          # Run the illumination process !
          algo.run()
-      self.log_me()
+      self.log_me(container)
 
-   def log_me(self):
-      grid = self.grid
+   def log_me(self, container):
+      grid = container
       algo = self.algo
       log_base_path = self.log_base_path
       # Print results info

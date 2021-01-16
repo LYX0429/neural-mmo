@@ -560,7 +560,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
          if self.config.TERRAIN_RENDER:
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
-            Save.render(map_arr, self.map_generator.textures, png_path)
+            Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
 
          if self.n_epoch % 100 == 0:
             if self.n_epoch != 0:
