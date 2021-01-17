@@ -20,10 +20,10 @@ from ray.rllib.policy import Policy
 from ray.rllib.policy.rnn_sequencing import add_time_dimension
 from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID, SampleBatch
 from ray.rllib.utils.spaces.flexdict import FlexDict
-from forge.blade.lib.enums import Water
+from forge.blade.lib.enums import Water, Lava, Stone
 from torch import nn
 from tqdm import tqdm
-
+from plot_diversity import heatmap
 import projekt
 from forge.blade.io.action.static import Action
 from forge.blade.io.stimulus.static import Stimulus
@@ -205,10 +205,12 @@ def plot_diversity(x, y, div_names, exp_name, render=False):
       plt.text(0.8, 0.8-i*0.162, '{:.2}'.format(y[:,i,:].mean()), fontsize=12, transform=plt.gcf().transFigure)
      #ax.text(0.8, 0.2, '{:.2}'.format(y[:,i,:].mean()))
       ax.legend(loc='upper left')
-      if div_name == 'mean pairwise L2':
-         ax.set_ylim(0, 10000)
-      elif div_name == 'differential entropy':
-         ax.set_ylim(20, 50)
+#     if div_name == 'mean pairwise L2':
+#        ax.set_ylim(0, 50000)
+      if div_name == 'differential entropy':
+         ax.set_ylim(20, 57)
+      if div_name == 'discrete entropy':
+         ax.set_ylim(-13, -7)
    ax.set_ylabel('diversity')
    #markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
    #                                   ecolor='purple')
@@ -227,9 +229,9 @@ def plot_diversity(x, y, div_names, exp_name, render=False):
    plt.tight_layout()
    ax.legend(loc='upper left')
 
-
    if render:
       plt.show()
+
 
 
 
@@ -278,7 +280,7 @@ class RLLibEvaluator(evaluator.Base):
       model_name = self.config.MODEL.split('/')[-1]
       map_name = self.config.MAP.split('/')[-1] 
       map_idx = self.config.INFER_IDX
-      exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps.png'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
+      exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
       # Render the map in case we hadn't already
       map_arr = self.env.realm.map.np()
       map_generator = MapGenerator(self.config)
@@ -291,12 +293,13 @@ class RLLibEvaluator(evaluator.Base):
       n_metrics = len(DIV_CALCS) + 1 
       n_skills = len(self.config.SKILLS)
       div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON))
-      heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
+#     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
+      heatmaps = np.zeros((n_evals, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
       final_stats = []
 
+      data_path = os.path.join(self.eval_path_model, '{} eval.npy'.format(exp_name))
       if self.config.NEW_EVAL:
          for i in range(n_evals):
-            data_path = os.path.join(self.eval_path_model, '{} eval.npy'.format(exp_name))
             self.env.reset(idx=self.config.INFER_IDX)
             self.obs = self.env.step({})[0]
             self.state = {}
@@ -320,7 +323,9 @@ class RLLibEvaluator(evaluator.Base):
                         xp = ent.exploration_grid.sum()
                      else:
                         xp = getattr(ent.skills, skill).exp
-                     heatmaps[i, t, si, r, c] = xp
+#                    heatmaps[i, t, si, r, c] = xp
+                     heatmaps[i, si, r, c] += xp
+                  heatmaps[i, si+1, r, c] += 1
             final_stats.append(div_stats)
          with open(data_path, 'wb') as f:
             np.save(f, np.array(final_stats))
@@ -336,11 +341,13 @@ class RLLibEvaluator(evaluator.Base):
       plot_diversity(ts, div_mat, [d[1] for d in DIV_CALCS], exp_name)
       plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
       plt.close()
-      heat_out = heatmaps.mean(axis=0).mean(axis=0)
-      for s_heat, s_name in zip(heat_out, self.config.SKILLS):
+#     heat_out = heatmaps.mean(axis=0).mean(axis=0)
+      # mean over evals
+      heat_out = heatmaps.mean(axis=0)
+      for s_heat, s_name in zip(heat_out, self.config.SKILLS + ['visited']):
          fig, ax = plt.subplots()
          ax.title.set_text('{} heatmap'.format(s_name))
-         mask = self.env.realm.map.np() == [Water.index or Lava.index or Stone.index]
+         mask = (self.env.realm.map.np() == Water.index ) + (self.env.realm.map.np() == Lava.index) + (self.env.realm.map.np() == Stone.index)
          s_heat = np.ma.masked_where((mask==True), s_heat)
          s_heat = np.flip(s_heat, 0)
 #        s_heat = np.log(s_heat + 1)
@@ -349,7 +356,7 @@ class RLLibEvaluator(evaluator.Base):
          ax.set_ylim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
          cbar = ax.figure.colorbar(im, ax=ax)
          cbar.ax.set_ylabel('{} (log(xp)/tick)'.format(s_name))
-         plt.savefig(os.path.join(self.eval_path_model, '{} heatmap {}'.format(s_name, exp_name)))
+         plt.savefig(os.path.join(self.eval_path_model, '{} heatmap {}.png'.format(s_name, exp_name)))
 
       mean_divs = {}
       means_np = div_mat.mean(axis=-1).mean(axis=0)
@@ -375,6 +382,32 @@ class RLLibEvaluator(evaluator.Base):
       cbar = plt.colorbar(sc)
       cbar.ax.set_ylabel('lifespans')
       plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
+      plt.close()
+      plt.figure()
+      p1 = plt.bar(np.arange(final_agent_skills.shape[0]), final_agent_skills.mean(axis=1), 5, yerr=final_agent_skills.std(axis=1))
+      plt.title('agent bars {}'.format(exp_name))
+      plt.close()
+      plt.figure()
+      p1 = plt.bar(np.arange(final_agent_skills.shape[1]), final_agent_skills.mean(axis=0), 1, yerr=final_agent_skills.std(axis=0))
+      plt.xticks(np.arange(final_agent_skills.shape[1]), self.config.SKILLS)
+      plt.ylabel('experience points')
+      plt.title('skill bars {}'.format(exp_name))
+      plt.savefig(os.path.join(self.eval_path_model, 'skill bars {}.png'.format(exp_name)))
+      plt.close()
+      plt.figure()
+      plt.title('agent-skill matrix {}'.format(exp_name))
+      im, cbar = heatmap(final_agent_skills, {}, self.config.SKILLS)
+      plt.savefig('agent-skill matrix {}'.format(exp_name))
+      if final_agent_skills.shape[1] == 2:
+         plot_div_2d(final_stats)
+#        plt.figure()
+#        plt.title('Agents')
+#        sc = plt.scatter(final_agent_skills[:, 0], final_agent_skills[:, 1], c=colors)
+#        cbar = plt.colorbar(sc)
+#        cbar.ax.set_ylabel('lifespans')
+#        plt.ylabel('woodcutting')
+#        plt.xlabel('mining')
+#        plt.savefig(os.path.join(self.eval_path_model, 'agents scatter.png'.format(exp_name)))
 
 #     print('Diversity: {}'.format(diversity))
 
@@ -389,7 +422,7 @@ class RLLibEvaluator(evaluator.Base):
       '''Compute actions and overlays for a single timestep
       Args:
           pos: Camera position (r, c) from the server)
-          cmd: Console command from the server
+          cmd: Consol command from the server
       '''
       #Compute batch of actions
       actions, self.state, _ = self.trainer.compute_actions(
@@ -679,8 +712,16 @@ class SanePPOTrainer(ppo.PPOTrainer):
                )
          path = os.path.abspath(path)
       else:
-         T()
-         path = 'experiment/{}/checkpoint'.format(model)
+         path = os.path.join(model, 'path.txt')
+         path = os.path.join('evo_experiment', path)
+         with open(path) as f:
+            path = f.read().splitlines()[0]
+         path = os.path.abspath(path)
+         #FIXME dumb hack
+
+#     else:
+#        T()
+#        path = 'experiment/{}/checkpoint'.format(model)
 
       print('Loading from: {}'.format(path))
       super().restore(path)

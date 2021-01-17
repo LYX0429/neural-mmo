@@ -181,6 +181,9 @@ class EvoNMMO(TreeOrerock):
    EVO_ALGO = 'Simple'  # Simple, MAP-Elites
    N_PROC = 6
    PRETRAINED = False
+#  MAP_DIMS = ['woodcutting', 'mining']
+   ME_DIMS = ['range', 'mage', 'melee']
+   ME_BIN_SIZE = 20
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS

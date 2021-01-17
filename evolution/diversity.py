@@ -256,6 +256,8 @@ def calc_discrete_entropy(agent_stats, skill_headers=None):
 
 
 def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False):
+   if 'skills' not in agent_stats:
+      return 0
    agent_skills = agent_stats['skills']
    lifespans = agent_stats['lifespans']
    assert len(agent_skills) == len(lifespans)

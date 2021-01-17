@@ -7,6 +7,7 @@ import warnings
 from pdb import set_trace as TT
 from timeit import default_timer as timer
 
+import json
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -87,7 +88,8 @@ class NMMOGrid(Grid):
 
         if index is not None:
 
-            map_path = os.path.join(self.save_path, 'maps', 'map' + '('+ ', '.join([str(f) for f in self.index_grid(individual.features)]) + ')')
+            index_str = '('+ ', '.join([str(f) for f in self.index_grid(individual.features)]) + ')'
+            map_path = os.path.join(self.save_path, 'maps', 'map' + index_str)
             try:
                 os.makedirs(map_path)
             except FileExistsError:
@@ -97,6 +99,10 @@ class NMMOGrid(Grid):
             Save.render(individual.data['chromosome'][0].flat_map[border:-border, border:-border], self.map_generator.textures, map_path + '.png')
             individual.data['ind_idx'] = self.index_grid((individual.features))
 #           print('add ind with idx {}'.format(tuple(individual.features)))
+            json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + index_str + 'json')
+            with open(json_path, 'w') as json_file:
+               json.dump(individual.data['chromosome'][1], json_file)
+
         return index
 
 class EvoDEAPQD(DEAPQDAlgorithm):
@@ -152,9 +158,10 @@ class MapElites():
        # Store batch in container
        nb_updated = container.update(init_batch, issue_warning=show_warnings)
 
+       # FIXME: we should warn about this when not reloading!
        if nb_updated == 0:
+          print('Warning: empty container/grid')
           pass
-   #      TT()
    #      raise ValueError("No individual could be added to the container !")
 
        else:
@@ -217,10 +224,10 @@ class MapElites():
 
    def compile(self):
 
-       TT()
+       pass
 
    def gen_individual(self):
-       TT()
+       pass
 
    def mutate(self, individual):
       evo = self.evolver
@@ -293,6 +300,8 @@ class MapElites():
       self.mutated_idxs = set()
       self.stats = None
       self.g_idxs = list(range(self.evolver.config.N_EVO_MAPS))
+      feature_names = self.evolver.config.ME_DIMS
+      self.feature_idxs = [self.evolver.config.SKILLS.index(n) for n in feature_names]
 
    def init_toolbox(self):
        fitness_weight = -1.0
@@ -304,7 +313,7 @@ class MapElites():
 #                     features=list)
 
        # Create Toolbox
-       self.max_size = max_size = 40
+       self.max_size = max_size = self.evolver.config.ME_BIN_SIZE
        toolbox = base.Toolbox()
        #     toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=2)
        toolbox.register("expr", self.expr)
@@ -332,12 +341,13 @@ class MapElites():
        # toolbox.register("mutate", tools.mutPolynomialBounded, low=ind_domain[0], up=ind_domain[1], eta=eta, indpb=mutation_pb)
        # toolbox.register("select", tools.selRandom) # MAP-Elites = random selection on a grid container
        self.toolbox = toolbox
+       self.max_skill = 2000
 
    def init_pop(self, n):
       return [Individual(rank=i, evolver=self.evolver) for i in range(n)]
 
    def expr_mutate(self):
-       TT()
+       pass
 
    def protectedDiv(left, right):
        try:
@@ -357,9 +367,9 @@ class MapElites():
       self.g_idxs = set(range(self.evolver.config.N_EVO_MAPS))
       self.stats = None
       # update the elites to avoid stagnation (since simulation is stochastic)
-      invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
-      elite_idxs = [container.index_grid(np.clip(ind.features, 0, 2000)) for ind in invalid_elites]
       if len(container) > self.evolver.config.N_EVO_MAPS and np.random.random() < 0.1:
+          invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
+          elite_idxs = [container.index_grid(np.clip(ind.features, 0, self.max_skill)) for ind in invalid_elites]
           for el in invalid_elites:
              if el in container:
                  try:
@@ -377,7 +387,7 @@ class MapElites():
              evo.genes.pop(el.data['ind_idx'])
              el.fitness.values = el_fit[0]
 #            el.features = np.clip(el_fit[1], self.features_domain[0][0], self.features_domain[0][1])
-             el.features = np.clip(el_fit[1], 0, 2000)
+             el.features = np.clip(el_fit[1], 0, self.max_skill)
           nb_updated = container.update(invalid_elites, issue_warning=True)
           print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(elite_idxs)))
       #nb_el_updated = container.update()
@@ -417,7 +427,7 @@ class MapElites():
       # if we have to run any sims, run the parallelized rllib trainer object
 
       if elite:
-         TT()
+         raise Exception
 
       if self.stats is None or ind_idx not in self.stats:
 #        print("Training batch 1")
@@ -441,7 +451,7 @@ class MapElites():
          #features = evo.chromosomes[ind_idx][0].features
       individual.fitness.values = [score]
       individual.fitness.valid = True
-      features = [features[-3], features[-2]]
+      features = [features[i] for i in self.feature_idxs]
       individual.features = features
       self.idxs.add(ind_idx)
 
@@ -529,12 +539,13 @@ class MapElites():
    #   dimension = args.dimension                # The dimension of the target problem (i.e. genomes size)
       max_size = self.max_size
    # The number of features to take into account in the container
-      nb_features = 2
-      nb_bins = [max_size, max_size]
+      nb_features = len(self.feature_idxs)
+      assert nb_features == len(self.evolver.config.ME_DIMS)
+      nb_bins = [max_size for _ in range(nb_features)]
       #    ind_domain = (0., 1.)                     # The domain (min/max values) of the individual genomes
       # The domain (min/max values) of the features
 #     features_domain = [(0, 2000), (0, 2000)]
-      self.features_domain = features_domain = [(0, 2000), (0, 2000)]
+      self.features_domain = features_domain = [(0, self.max_skill) for i in range(nb_features)]
       # The domain (min/max values) of the fitness
       fitness_domain = [(-np.inf, np.inf)]
       # The number of evaluations of the initial batch ('batch' = population)
