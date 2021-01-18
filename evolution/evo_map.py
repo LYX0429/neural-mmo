@@ -880,8 +880,9 @@ class EvolverNMMO(LambdaMuEvolver):
       '''
 
 #     T()
-#     for g_hash, (_, atk_mults) in self.genes.items():
-      for g_hash, (_, _, atk_mults) in self.genes.items():
+#     for g_hash, gene in self.genes.items():
+      for g_hash, gene in self.genes.items():
+         atk_mults = gene[-1]
          global_stats.add_mults.remote(g_hash, atk_mults)
 
    def evolve_generation(self):

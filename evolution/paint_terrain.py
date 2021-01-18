@@ -221,7 +221,7 @@ class Chromosome():
 
 
    def paint_map(self):
-      if self.flat_map is not None:
+      if hasattr(self, 'flat_map') and self.flat_map is not None:
          return self.flat_map, self.multi_hot
       multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_width))
       multi_hot[self.default_tile, :, :] = 1e-10
