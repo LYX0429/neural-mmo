@@ -75,16 +75,16 @@ def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, in
       print('lifespans')
       print(a_lifespans)
 
-   if len(lifespans) == 1:
-      score = 0
-   else:
-      mean = np.average(a_skills, axis=0, weights=weights)
-      cov = np.cov(a_skills,rowvar=0, aweights=weights)
+  #if len(a_lifespans) == 1:
+  #   score = 0
+  #else:
+   mean = np.average(a_skills, axis=0, weights=weights)
+   cov = np.cov(a_skills,rowvar=0, aweights=weights)
 #     cov = np.array([[2,1],[1,2]])
- #    T()
-      gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
-      infos['gaussian'] = gaussian
-      score = gaussian.entropy()
+#    T()
+   gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
+   infos['gaussian'] = gaussian
+   score = gaussian.entropy()
 
 #  print(np.array(a_skills))
    if verbose:

@@ -879,7 +879,9 @@ class EvolverNMMO(LambdaMuEvolver):
       ''' Send (some) gene information to a global object to be retrieved by parallel environments.
       '''
 
-      for g_hash, (_, atk_mults) in self.genes.items():
+#     T()
+#     for g_hash, (_, atk_mults) in self.genes.items():
+      for g_hash, (_, _, atk_mults) in self.genes.items():
          global_stats.add_mults.remote(g_hash, atk_mults)
 
    def evolve_generation(self):

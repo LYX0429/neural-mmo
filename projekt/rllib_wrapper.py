@@ -424,6 +424,10 @@ class RLLibEvaluator(evaluator.Base):
           pos: Camera position (r, c) from the server)
           cmd: Consol command from the server
       '''
+      stats = self.env.get_agent_stats()
+      score = DIV_CALCS[1][0](stats, verbose=True)
+      print(score)
+
       #Compute batch of actions
       actions, self.state, _ = self.trainer.compute_actions(
             self.obs, state=self.state, policy_id='policy_0')

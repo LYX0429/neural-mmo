@@ -180,6 +180,7 @@ if __name__ == '__main__':
 
          print('loading evolver from save file')
       # change params on reload here
+      evolver.config.RENDER = config.RENDER
       evolver.config.NENT = config.NENT
       evolver.config.MODEL = 'reload'
       evolver.reloading = True
