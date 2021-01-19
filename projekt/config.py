@@ -142,6 +142,7 @@ class TreeOrerock(SmallMap):
    MAP = 'PCG'
    INFER_IDX = 0
    N_EVAL = 20
+   EVO_VERBOSE          = True
 
 class EvoNMMO(TreeOrerock):
 

@@ -69,6 +69,7 @@ class Individual():
 #             'map_arr':   map_arr,
 #             'atk_muts':  atk_mults
               }
+      self.score_hists = []
 
 
 
@@ -86,9 +87,11 @@ class NMMOGrid(Grid):
         border = self.border
         index = super(NMMOGrid, self).add(individual)
 
+        ind_idx = self.index_grid(individual.features)
+
         if index is not None:
 
-            index_str = '('+ ', '.join([str(f) for f in self.index_grid(individual.features)]) + ')'
+            index_str = '('+ ', '.join([str(f) for f in ind_idx]) + ')'
             map_path = os.path.join(self.save_path, 'maps', 'map' + index_str)
             try:
                 os.makedirs(map_path)
@@ -237,6 +240,7 @@ class MapElites():
       idx = self.g_idxs.pop()
       self.mutated_idxs.add(idx)
       individual.data['ind_idx'] = idx
+      individual.score_hists = []
       # = self.container.index_grid(np.clip(inddividual.features, 0, 2000))
       #FIXME: big hack
       chrom, atk_mults = individual.data['chromosome']
@@ -367,10 +371,10 @@ class MapElites():
       self.g_idxs = set(range(self.evolver.config.N_EVO_MAPS))
       self.stats = None
       # update the elites to avoid stagnation (since simulation is stochastic)
-      if len(container) > self.evolver.config.N_EVO_MAPS and np.random.random() < 0.1:
+      if self.evolver.LEARNING_PROGRESS or len(container) > self.evolver.config.N_EVO_MAPS and np.random.random() < 0.1:
           invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
           elite_idxs = [container.index_grid(np.clip(ind.features, 0, self.max_skill)) for ind in invalid_elites]
-          for el in invalid_elites:
+          for el, el_idx in zip(invalid_elites, elite_idxs):
              if el in container:
                  try:
                      container.discard(el, also_from_depot=True)
@@ -380,8 +384,7 @@ class MapElites():
              #FIXME: iterate through diff. features
           [ind.data.update({'ind_idx':idx}) for ind, idx in zip(invalid_elites, elite_idxs)]
           self.evolver.global_counter.set_idxs.remote(elite_idxs)
-          self.evolver.trainer.train()
-          self.stats = ray.get(evo.global_stats.get.remote())
+          self.train_and_log()
           elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_elites)
           for el, el_fit in zip(invalid_elites, elite_fitnesses):
              evo.genes.pop(el.data['ind_idx'])
@@ -406,6 +409,28 @@ class MapElites():
       self.mutated_idxs = set()
       if self.n_gen % 10 == 0:
          self.log_me(container)
+      self.evolver.score_hists = {}
+
+   def train_and_log(self):
+      train_stats = self.evolver.trainer.train()
+      stats = ray.get(self.evolver.global_stats.get.remote())
+      [self.evolver.score_hists.update({key: [self.evolver.calc_diversity(val)]}) if key not in self.evolver.score_hists else self.evolver.score_hists[key].append(self.evolver.calc_diversity(val)) for key, val in stats.items()]
+
+
+   def train_mutants(self):
+      '''Throw away policy learning here to mitigate unstable map populations.'''
+     #if not self.evolver.n_epoch == 0:
+   #     save_dir = self.evolver.trainer.save()
+      if self.evolver.LEARNING_PROGRESS:
+         self.train_and_log()
+   #     self.evolver.trainer.restore(save_dir)
+      else:
+         train_stats = self.evolver.trainer.train()
+     #else:
+     #   train_stats = self.evolver.trainer.train()
+
+   def train_elites(self):
+      self.evolver.trainer.train()
 
 
    def evaluate(self, individual, elite=False):
@@ -429,20 +454,31 @@ class MapElites():
       if elite:
          raise Exception
 
-      if self.stats is None or ind_idx not in self.stats:
-#        print("Training batch 1")
-         evo.trainer.train()
-         self.stats = ray.get(evo.global_stats.get.remote())
+      if ind_idx in self.evolver.score_hists:
+         individual.score_hists += self.evolver.score_hists.pop(ind_idx)
 
-      if ind_idx not in self.stats:
-         print("Training batch 2")
-         evo.trainer.train()
+      if self.stats is None or ind_idx not in self.stats or len(individual.score_hists) < 2:
+#        print("Training batch 1")
+         while len(individual.score_hists) <= 2:
+            self.evolver.score_hists[ind_idx] = []
+            self.train_mutants()
+            individual.score_hists += self.evolver.score_hists.pop(ind_idx)
+      self.stats = ray.get(evo.global_stats.get.remote())
+
+     #if ind_idx not in self.stats:
+     #   print("Training batch 2")
+     #   self.train_mutants()
+     #   self.stats = ray.get(evo.global_stats.get.remote())
       assert ind_idx in self.stats
       ind_stats = self.stats[ind_idx]
 
       if 'skills' not in ind_stats:
          score = 0
-      score = evo.calc_diversity(ind_stats)
+#     score = evo.calc_diversity(ind_stats)
+      if evo.LEARNING_PROGRESS:
+         score = (individual.score_hists[-1] - individual.score_hists[0]) / len(individual.score_hists)
+      else:
+         score = individual.score_hists[ind_idx][-1]
       features = calc_mean_agent(ind_stats)
 
       if ind_idx in evo.population:

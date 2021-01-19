@@ -273,6 +273,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.CPPN = config.GENOME == 'CPPN'
       self.PATTERN_GEN = config.GENOME == 'Pattern'
       self.RAND_GEN = config.GENOME == 'Random'
+      self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
       self.calc_diversity = diversity_calc(config)
 
       if not (self.CPPN or self.PATTERN_GEN or self.RAND_GEN):
@@ -291,6 +292,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.Chromosome = Chromosome
          self.chromosomes = {}
          self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
+         # TODO: generalize this for tile-flipping, then NEAT
          if self.MAP_ELITES:
             self.me = MapElites(
                   evolver=self,
@@ -455,12 +457,15 @@ class EvolverNMMO(LambdaMuEvolver):
                score = 0
 #              T()
             else:
-               score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=True)
+               score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=self.config.EVO_VERBOSE)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
          last_fitness = last_fitnesses[idx]
          last_fitness.append(score)
-         g.fitness = np.mean(last_fitness)
+         if self.LEARNING_PROGRESS:
+             g.fitness = score = (last_fitness[-1] - last_fitness[0]) / len(last_fitness)
+         else:
+             g.fitness = np.mean(last_fitness)
          g.age += 1
 
          if len(last_fitness) >= self.config.ROLLING_FITNESS:
@@ -928,7 +933,10 @@ class EvolverNMMO(LambdaMuEvolver):
         #else:
          self.score_hists[g_hash].append(score_t)
          self.score_hists[g_hash] = self.score_hists[g_hash][-self.config.ROLLING_FITNESS:]
-         score = np.mean(self.score_hists[g_hash])
+         if self.LEARNING_PROGRESS:
+             score = self.score_hists[-1] - self.score_hists[0]
+         else:
+             score = np.mean(self.score_hists[g_hash])
          game, _, age = self.population[g_hash]
          self.population[g_hash] = (game, score, age + 1)
       super().mutate_gen()

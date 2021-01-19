@@ -595,7 +595,9 @@ class EvoPPOTrainer(ppo.PPOTrainer):
             path = f.read().splitlines()[0]
          path = os.path.abspath(path)
       else:
-         T()
+         path = model
+#        pass
+#        T()
      #else:
      #   raise Exception("Invalid model. {}".format(path))
      #   path = 'experiment/{}/checkpoint'.format(model)
@@ -646,6 +648,7 @@ class EvoPPOTrainer(ppo.PPOTrainer):
    def simulate_unfrozen(self):
       stats = super().train()
 
+      # FIXME: switch this off when already saving for other reasons; control from config
       if self.training_iteration < 100:
          save_interval = 10
       else:

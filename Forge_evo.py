@@ -113,7 +113,7 @@ class Stats:
 
          return
 
-      if mapIdx not in self.stats:
+      if mapIdx not in self.stats or 'skills' not in stats:
          self.stats[mapIdx] = {}
          self.stats[mapIdx]['skills'] = [stats['skills']]
          self.stats[mapIdx]['lifespans'] = [stats['lifespans']]

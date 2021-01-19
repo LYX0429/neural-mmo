@@ -14,32 +14,39 @@ def diversity_calc(config):
    elif config.FITNESS_METRIC == 'Discrete':
       calc_diversity = calc_discrete_entropy_2
    elif config.FITNESS_METRIC == 'Hull':
-       calc_diversity = calc_convex_hull
+      calc_diversity = calc_convex_hull
    elif config.FITNESS_METRIC == 'Sum':
-       calc_diversity = sum_experience
+      calc_diversity = sum_experience
+   elif config.FITNESS_METRIC == 'Lifespans' or config.FITNESS_METRIC == 'ALP':
+      calc_diversity = sum_lifespans
    else:
        raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
    return calc_diversity
 
-   def sum_experience(agent_stats, skill_headers=None, verbose=False):
-      # No need to weight by lifespan.
-      agent_skills = agent_stats['skills']
-      lifespans = agent_stats['lifespans']
-      a_skills = np.vstack(agent_skills)
-      a_lifespans = np.hstack(lifespans)
-   #  weights = sigmoid_lifespan(a_lifespans)
-      n_agents, n_skills = a_skills.shape
-   #  avg_skill = (weights * a_skills).sum() / (n_agents * n_skills)
-      mean_xp = a_skills.sum() / (n_agents * n_skills)
-      if verbose:
-         print('skills')
-         print(a_skills.T)
-         print('lifespans')
-         print(a_lifespans)
-         print('mean xp:', mean_xp)
-         print()
+def sum_lifespans(agent_stats, skill_headers=None, verbose=False):
+   lifespans = np.hstack(agent_stats['lifespans'])
+   return lifespans.mean()
+   
 
-      return mean_xp
+def sum_experience(agent_stats, skill_headers=None, verbose=False):
+   # No need to weight by lifespan.
+   agent_skills = agent_stats['skills']
+   lifespans = agent_stats['lifespans']
+   a_skills = np.vstack(agent_skills)
+   a_lifespans = np.hstack(lifespans)
+#  weights = sigmoid_lifespan(a_lifespans)
+   n_agents, n_skills = a_skills.shape
+#  avg_skill = (weights * a_skills).sum() / (n_agents * n_skills)
+   mean_xp = a_skills.sum() / (n_agents * n_skills)
+   if verbose:
+      print('skills')
+      print(a_skills.T)
+      print('lifespans')
+      print(a_lifespans)
+      print('mean xp:', mean_xp)
+      print()
+
+   return mean_xp
 
 def sigmoid_lifespan(x):
    res = 1 / (1 + np.exp(0.1*(-x+50)))
