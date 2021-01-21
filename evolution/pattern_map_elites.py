@@ -91,7 +91,10 @@ class NMMOGrid(Grid):
 
         if index is not None:
 
-            index_str = '('+ ', '.join([str(f) for f in ind_idx]) + ')'
+            if len(ind_idx) == 1:
+               index_str = '(' + str(ind_idx[0]) + ',)'
+            else:
+               index_str = '('+ ', '.join([str(f) for f in ind_idx]) + ')'
             map_path = os.path.join(self.save_path, 'maps', 'map' + index_str)
             try:
                 os.makedirs(map_path)
@@ -305,7 +308,8 @@ class MapElites():
       self.stats = None
       self.g_idxs = list(range(self.evolver.config.N_EVO_MAPS))
       feature_names = self.evolver.config.ME_DIMS
-      self.feature_idxs = [self.evolver.config.SKILLS.index(n) for n in feature_names]
+#     self.feature_idxs = [self.evolver.config.SKILLS.index(n) for n in feature_names]
+      self.feature_idxs = [i for i in range(len(feature_names))]
 
    def init_toolbox(self):
        fitness_weight = -1.0
@@ -345,7 +349,8 @@ class MapElites():
        # toolbox.register("mutate", tools.mutPolynomialBounded, low=ind_domain[0], up=ind_domain[1], eta=eta, indpb=mutation_pb)
        # toolbox.register("select", tools.selRandom) # MAP-Elites = random selection on a grid container
        self.toolbox = toolbox
-       self.max_skill = 2000
+#      self.max_skill = 2000
+       self.max_skill = self.evolver.config.MAX_STEPS
 
    def init_pop(self, n):
       return [Individual(rank=i, evolver=self.evolver) for i in range(n)]
@@ -365,13 +370,12 @@ class MapElites():
       self.algo.current_iteration = self.n_gen
       evo = self.evolver
       evo.n_epoch = self.n_gen
-      self.n_gen += 1
       self.idxs = set()
       evo.global_stats.reset.remote()
       self.g_idxs = set(range(self.evolver.config.N_EVO_MAPS))
       self.stats = None
       # update the elites to avoid stagnation (since simulation is stochastic)
-      if self.evolver.LEARNING_PROGRESS or len(container) > self.evolver.config.N_EVO_MAPS and np.random.random() < 0.1:
+      if self.n_gen > 0 and (self.evolver.LEARNING_PROGRESS or len(container) > self.evolver.config.N_EVO_MAPS and np.random.random() < 0.1):
           invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
           elite_idxs = [container.index_grid(np.clip(ind.features, 0, self.max_skill)) for ind in invalid_elites]
           for el, el_idx in zip(invalid_elites, elite_idxs):
@@ -385,7 +389,8 @@ class MapElites():
           [ind.data.update({'ind_idx':idx}) for ind, idx in zip(invalid_elites, elite_idxs)]
           self.evolver.global_counter.set_idxs.remote(elite_idxs)
           self.train_and_log()
-          elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_elites)
+          elite_fitnesses = [self.evaluate(el, elite=True) for el in invalid_elites]
+#         elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_elites)
           for el, el_fit in zip(invalid_elites, elite_fitnesses):
              evo.genes.pop(el.data['ind_idx'])
              el.fitness.values = el_fit[0]
@@ -407,9 +412,10 @@ class MapElites():
           evo.saveMaps(evo.genes, self.mutated_idxs)
       evo.log()
       self.mutated_idxs = set()
-      if self.n_gen % 10 == 0:
+      if self.n_gen % 100 == 0:
          self.log_me(container)
       self.evolver.score_hists = {}
+      self.n_gen += 1
 
    def train_and_log(self):
       train_stats = self.evolver.trainer.train()
@@ -441,6 +447,12 @@ class MapElites():
          mean_agent = skill_mat.mean(axis=0)
 
          return mean_agent
+
+      def calc_mean_lifetime(ind_stats):
+         mean_lifetime = [np.hstack(ind_stats['lifetimes']).mean()]
+
+         return mean_lifetime
+
       evo = self.evolver
 
       if ind_idx not in evo.genes:
@@ -451,18 +463,20 @@ class MapElites():
          pass
       # if we have to run any sims, run the parallelized rllib trainer object
 
-      if elite:
-         raise Exception
-
       if ind_idx in self.evolver.score_hists:
          individual.score_hists += self.evolver.score_hists.pop(ind_idx)
 
       if self.stats is None or ind_idx not in self.stats or len(individual.score_hists) < 2:
 #        print("Training batch 1")
+#        if not elite and not self.evolver.n_epoch == 0:
+#           save_dir = self.evolver.trainer.save()
+         self.evolver.score_hists[ind_idx] = []
          while len(individual.score_hists) <= 2:
-            self.evolver.score_hists[ind_idx] = []
             self.train_mutants()
             individual.score_hists += self.evolver.score_hists.pop(ind_idx)
+#        if not elite and not self.evolver.n_epoch == 0:
+#           self.evolver.trainer.defaultModel()
+#           self.evolver.trainer.load_checkpoint(save_dir)
       self.stats = ray.get(evo.global_stats.get.remote())
 
      #if ind_idx not in self.stats:
@@ -479,7 +493,8 @@ class MapElites():
          score = (individual.score_hists[-1] - individual.score_hists[0]) / len(individual.score_hists)
       else:
          score = individual.score_hists[ind_idx][-1]
-      features = calc_mean_agent(ind_stats)
+#     features = calc_mean_agent(ind_stats)
+      features = calc_mean_lifetime(ind_stats)
 
       if ind_idx in evo.population:
           (game, old_score, age) = evo.population[ind_idx]
@@ -487,7 +502,7 @@ class MapElites():
          #features = evo.chromosomes[ind_idx][0].features
       individual.fitness.values = [score]
       individual.fitness.valid = True
-      features = [features[i] for i in self.feature_idxs]
+#     features = [features[i] for i in self.feature_idxs]
       individual.features = features
       self.idxs.add(ind_idx)
 

@@ -139,6 +139,7 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
          stats = {
                'skills': stats,
                'lifespans': lifespans,
+               'lifetimes': self.lifetimes,
                }
 
          return stats

@@ -117,9 +117,11 @@ class Stats:
          self.stats[mapIdx] = {}
          self.stats[mapIdx]['skills'] = [stats['skills']]
          self.stats[mapIdx]['lifespans'] = [stats['lifespans']]
+         self.stats[mapIdx]['lifetimes'] = [stats['lifetimes']]
       else:
          self.stats[mapIdx]['skills'].append(stats['skills'])
          self.stats[mapIdx]['lifespans'].append(stats['lifespans'])
+         self.stats[mapIdx]['lifetimes'].append(stats['lifetimes'])
    def get(self):
       return self.stats
    def reset(self):

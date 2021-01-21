@@ -24,7 +24,7 @@ def diversity_calc(config):
    return calc_diversity
 
 def sum_lifespans(agent_stats, skill_headers=None, verbose=False):
-   lifespans = np.hstack(agent_stats['lifespans'])
+   lifespans = np.hstack(agent_stats['lifetimes'])
    return lifespans.mean()
    
 
