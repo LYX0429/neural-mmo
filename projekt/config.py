@@ -143,6 +143,7 @@ class TreeOrerock(SmallMap):
    INFER_IDX = 0
    N_EVAL = 20
    EVO_VERBOSE          = True
+   EVO_SAVE_INTERVAL    = 5
 
 class EvoNMMO(TreeOrerock):
 

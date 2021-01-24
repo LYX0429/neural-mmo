@@ -422,8 +422,20 @@ class MapElites():
           evo.saveMaps(evo.genes, self.mutated_idxs)
       evo.log()
       self.mutated_idxs = set()
-      if self.n_gen % 100 == 0:
+
+      if self.n_gen > 0 and self.n_gen % self.evolver.config.EVO_SAVE_INTERVAL == 0:
          self.log_me(container)
+         algo = self.algo
+         self.algo = None
+         toolbox = self.toolbox
+         self.toolbox = None
+#        for k, v in inspect.getmembers(self.algo):
+#           if k.startswith('_') and k != '__class__': #or inspect.ismethod(v):
+#              setattr(self, k, lambda x: None)
+         evo.save()
+         algo.save(os.path.join(self.save_path, 'ME_archive.p'))
+         self.algo = algo
+         self.toolbox = toolbox
       self.evolver.score_hists = {}
       self.n_gen += 1
 
@@ -468,23 +480,26 @@ class MapElites():
          pass
       # if we have to run any sims, run the parallelized rllib trainer object
 
+      individual.score_hists = []
       if ind_idx in self.evolver.score_hists:
          individual.score_hists += self.evolver.score_hists.pop(ind_idx)
 
       if self.stats is None or ind_idx not in self.stats or len(individual.score_hists) < 2:
          print("Training batch 1")
         #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
-        ##  save_dir = self.evolver.trainer.save_checkpoint(os.path.join(self.save_path, 'temp_checkpoints'))
-        #   save_dir = self.evolver.trainer.save()
+         if self.evolver.n_epoch == 0:
+         #  save_dir = self.evolver.trainer.save_checkpoint(os.path.join(self.save_path, 'temp_checkpoints'))
+            save_dir = self.evolver.trainer.save()
          self.evolver.score_hists[ind_idx] = []
          while len(individual.score_hists) <= 2:
             self.train_mutants()
             individual.score_hists += self.evolver.score_hists.pop(ind_idx)
         #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
-        #   self.evolver.trainer = None
-        #   del(self.evolver.trainer)
-        #   self.evolver.restore(trash_trainer=True)
-        ##  self.evolver.trainer.load_checkpoint(save_dir)
+         if True:
+            del(self.evolver.trainer)
+            self.evolver.trainer = None
+            self.evolver.restore(trash_trainer=True)
+         #  self.evolver.trainer.load_checkpoint(save_dir)
       self.stats = ray.get(evo.global_stats.get.remote())
 
      #if ind_idx not in self.stats:
@@ -515,18 +530,6 @@ class MapElites():
       self.idxs.add(ind_idx)
 
 
-      if self.n_gen > 0 and self.n_gen % 100 == 0:
-         algo = self.algo
-         self.algo = None
-         toolbox = self.toolbox
-         self.toolbox = None
-#        for k, v in inspect.getmembers(self.algo):
-#           if k.startswith('_') and k != '__class__': #or inspect.ismethod(v):
-#              setattr(self, k, lambda x: None)
-         evo.save()
-         algo.save(os.path.join(self.save_path, 'ME_archive.p'))
-         self.algo = algo
-         self.toolbox = toolbox
 
       return [[score], features]
 
