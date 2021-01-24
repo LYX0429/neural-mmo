@@ -594,9 +594,8 @@ class EvolverNMMO(LambdaMuEvolver):
 
       return game
 
-   def restore(self, trash_data=False, inference=False):
+   def restore(self, trash_trainer=False, inference=False):
       '''
-      trash_data: to avoid undetermined weirdness when reloading
       '''
       self.calc_diversity = diversity_calc(self.config)
       self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.EVO_DIR, 'maps', 'map')
@@ -609,7 +608,7 @@ class EvolverNMMO(LambdaMuEvolver):
       global TRAINER
       self.trainer = TRAINER
 
-      if self.trainer is None:
+      if self.trainer is None or trash_trainer:
 
          # Create policies
          policies = createPolicies(self.config)
@@ -710,7 +709,7 @@ class EvolverNMMO(LambdaMuEvolver):
    def genRandMap(self, g_hash=None):
       print('genRandMap {}'.format(g_hash))
       if self.n_epoch > 0 or self.reloading:
-         print('generating new random map when I probably should not be... \n\n')
+         print('generating new random map when I probably should not be...')
 #     map_arr= np.random.randint(1, self.n_tiles,
 #                                 (self.map_width, self.map_height))
       if self.CPPN:
@@ -1009,7 +1008,7 @@ class EvolverNMMO(LambdaMuEvolver):
        copyfile(self.evolver_path, self.evolver_path + '.bkp')
        pickle.dump(self, save_file)
        self.population = population
-       self.restore()
+       self.restore(trash_trainer=True)
 
    def init_pop(self):
        if not self.config.PRETRAINED and not self.reloading:

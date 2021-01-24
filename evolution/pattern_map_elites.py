@@ -310,47 +310,53 @@ class MapElites():
       feature_names = self.evolver.config.ME_DIMS
 #     self.feature_idxs = [self.evolver.config.SKILLS.index(n) for n in feature_names]
       self.feature_idxs = [i for i in range(len(feature_names))]
+      try:
+         os.mkdir(os.path.join(self.save_path, 'temp_checkpoints'))
+      except FileExistsError:
+         pass
 
    def init_toolbox(self):
-       fitness_weight = -1.0
-       creator.create("FitnessMin", base.Fitness, weights=(fitness_weight, ))
-       creator.create("Individual",
-                      Individual,
-                      evolver=self.evolver)
-#                     fitness=creator.FitnessMin,
-#                     features=list)
+      fitness_weight = -1.0
+      creator.create("FitnessMin", base.Fitness, weights=(fitness_weight, ))
+      creator.create("Individual",
+                     Individual,
+                     evolver=self.evolver)
+#                    fitness=creator.FitnessMin,
+#                    features=list)
 
-       # Create Toolbox
-       self.max_size = max_size = self.evolver.config.ME_BIN_SIZE
-       toolbox = base.Toolbox()
-       #     toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=2)
-       toolbox.register("expr", self.expr)
-       toolbox.register("individual", tools.initIterate, creator.Individual,
-                        toolbox.expr)
-       toolbox.register("population", self.init_pop)
-       toolbox.register("compile", self.compile)  # gp.compile, pset=pset)
-       # toolbox.register("evaluate", evalSymbReg, points=[x/10. for x in range(-10,10)])
-       toolbox.register("evaluate", self.evaluate)  # , points=points)
-       # toolbox.register("select", tools.selTournament, tournsize=3)
-       toolbox.register("select", tools.selRandom)
-       toolbox.register("mate", self.mate)
-       # gp.genFull, min_=0, max_=2)
-       toolbox.register("expr_mut", self.expr_mutate)
-       # , expr=toolbox.expr_mut, pset=pset)
-       toolbox.register("mutate", self.mutate)
-#      toolbox.decorate(
-#          "mate",
-#          gp.staticLimit(key=operator.attrgetter("height"),
-#                         max_value=max_size))
-#      toolbox.decorate(
-#          "mutate",
-#          gp.staticLimit(key=operator.attrgetter("height"),
-#                         max_value=max_size))
-       # toolbox.register("mutate", tools.mutPolynomialBounded, low=ind_domain[0], up=ind_domain[1], eta=eta, indpb=mutation_pb)
-       # toolbox.register("select", tools.selRandom) # MAP-Elites = random selection on a grid container
-       self.toolbox = toolbox
-#      self.max_skill = 2000
-       self.max_skill = self.evolver.config.MAX_STEPS
+      # Create Toolbox
+      self.max_size = max_size = self.evolver.config.ME_BIN_SIZE
+      toolbox = base.Toolbox()
+      #     toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=2)
+      toolbox.register("expr", self.expr)
+      toolbox.register("individual", tools.initIterate, creator.Individual,
+                       toolbox.expr)
+      toolbox.register("population", self.init_pop)
+      toolbox.register("compile", self.compile)  # gp.compile, pset=pset)
+      # toolbox.register("evaluate", evalSymbReg, points=[x/10. for x in range(-10,10)])
+      toolbox.register("evaluate", self.evaluate)  # , points=points)
+      # toolbox.register("select", tools.selTournament, tournsize=3)
+#     toolbox.register("select", tools.selRandom)
+      toolbox
+      toolbox.register("mate", self.mate)
+      # gp.genFull, min_=0, max_=2)
+      toolbox.register("expr_mut", self.expr_mutate)
+      # , expr=toolbox.expr_mut, pset=pset)
+      toolbox.register("mutate", self.mutate)
+#     toolbox.decorate(
+#         "mate",
+#         gp.staticLimit(key=operator.attrgetter("height"),
+#                        max_value=max_size))
+#     toolbox.decorate(
+#         "mutate",
+#         gp.staticLimit(key=operator.attrgetter("height"),
+#                        max_value=max_size))
+      # toolbox.register("mutate", tools.mutPolynomialBounded, low=ind_domain[0], up=ind_domain[1], eta=eta, indpb=mutation_pb)
+      # toolbox.register("select", tools.selRandom) # MAP-Elites = random selection on a grid container
+      toolbox.register("select", self.select_max_lifetime)
+      self.toolbox = toolbox
+#     self.max_skill = 2000
+      self.max_skill = self.evolver.config.MAX_STEPS
 
    def init_pop(self, n):
       return [Individual(rank=i, evolver=self.evolver) for i in range(n)]
@@ -363,6 +369,9 @@ class MapElites():
            return left / right
        except ZeroDivisionError:
            return 1
+   
+   def select_max_lifetime(self, container, k):
+      return sorted(container, key=lambda ind: ind.features[0], reverse=True)[:k]
 
    def iteration_callback(self, i, batch, container, logbook):
       print('pattern_map_elites iteration {}'.format(self.n_gen))
@@ -376,7 +385,8 @@ class MapElites():
       self.stats = None
       # update the elites to avoid stagnation (since simulation is stochastic)
       if self.n_gen > 0 and (self.evolver.LEARNING_PROGRESS or len(container) > self.evolver.config.N_EVO_MAPS and np.random.random() < 0.1):
-          invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
+#         invalid_elites = np.random.choice(container, min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS), replace=False)
+          invalid_elites = sorted(container, key=lambda ind: ind.features[0], reverse=True)[:min(max(1, len(container) - 6), self.evolver.config.N_EVO_MAPS)]
           elite_idxs = [container.index_grid(np.clip(ind.features, 0, self.max_skill)) for ind in invalid_elites]
           for el, el_idx in zip(invalid_elites, elite_idxs):
              if el in container:
@@ -425,15 +435,10 @@ class MapElites():
 
    def train_mutants(self):
       '''Throw away policy learning here to mitigate unstable map populations.'''
-     #if not self.evolver.n_epoch == 0:
-   #     save_dir = self.evolver.trainer.save()
       if self.evolver.LEARNING_PROGRESS:
          self.train_and_log()
-   #     self.evolver.trainer.restore(save_dir)
       else:
          train_stats = self.evolver.trainer.train()
-     #else:
-     #   train_stats = self.evolver.trainer.train()
 
    def train_elites(self):
       self.evolver.trainer.train()
@@ -467,16 +472,19 @@ class MapElites():
          individual.score_hists += self.evolver.score_hists.pop(ind_idx)
 
       if self.stats is None or ind_idx not in self.stats or len(individual.score_hists) < 2:
-#        print("Training batch 1")
-#        if not elite and not self.evolver.n_epoch == 0:
-#           save_dir = self.evolver.trainer.save()
+         print("Training batch 1")
+        #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
+        ##  save_dir = self.evolver.trainer.save_checkpoint(os.path.join(self.save_path, 'temp_checkpoints'))
+        #   save_dir = self.evolver.trainer.save()
          self.evolver.score_hists[ind_idx] = []
          while len(individual.score_hists) <= 2:
             self.train_mutants()
             individual.score_hists += self.evolver.score_hists.pop(ind_idx)
-#        if not elite and not self.evolver.n_epoch == 0:
-#           self.evolver.trainer.defaultModel()
-#           self.evolver.trainer.load_checkpoint(save_dir)
+        #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
+        #   self.evolver.trainer = None
+        #   del(self.evolver.trainer)
+        #   self.evolver.restore(trash_trainer=True)
+        ##  self.evolver.trainer.load_checkpoint(save_dir)
       self.stats = ray.get(evo.global_stats.get.remote())
 
      #if ind_idx not in self.stats:
@@ -490,7 +498,7 @@ class MapElites():
          score = 0
 #     score = evo.calc_diversity(ind_stats)
       if evo.LEARNING_PROGRESS:
-         score = (individual.score_hists[-1] - individual.score_hists[0]) / len(individual.score_hists)
+         score = (individual.score_hists[-1] - individual.score_hists[-2])#/ len(individual.score_hists)
       else:
          score = individual.score_hists[ind_idx][-1]
 #     features = calc_mean_agent(ind_stats)
@@ -507,7 +515,7 @@ class MapElites():
       self.idxs.add(ind_idx)
 
 
-      if self.n_gen % 10 == 0:
+      if self.n_gen > 0 and self.n_gen % 100 == 0:
          algo = self.algo
          self.algo = None
          toolbox = self.toolbox
@@ -544,7 +552,7 @@ class MapElites():
                                log_base_path=self.log_base_path,
                                iteration_callback_fn=self.iteration_callback)
          self.algo = algo
-         algo.current_iteration = archive['current_iteration']
+#        algo.current_iteration = archive['current_iteration']
 #        algo.start_time = timer()
 #        algo.run(archive['container'])
          if not self.evolver.config.RENDER:
