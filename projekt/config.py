@@ -107,6 +107,7 @@ class TreeOrerock(SmallMap):
 #  TERRAIN_FOREST_HIGH  = 0.725
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.85
+   GRIDDLY = False
 
 
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
@@ -160,3 +161,6 @@ class Combat(EvoNMMO):
 class All(EvoNMMO):
    SKILLS = ALL_SKILLS
 
+class Griddly(EvoNMMO):
+   GRIDDLY = True
+   REGISTERED = False  #FIXME: hack. Do not set this.

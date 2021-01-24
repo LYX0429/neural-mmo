@@ -408,16 +408,19 @@ def mapPolicy(agentID,
 
 # Generate RLlib policies
 def createPolicies(config):
-    obs = projekt.env.observationSpace(config)
-    atns = projekt.env.actionSpace(config)
-    policies = {}
+    if config.GRIDDLY:
+       return
+    else: 
+       obs = projekt.env.observationSpace(config)
+       atns = projekt.env.actionSpace(config)
+       policies = {}
 
-    for i in range(config.NPOLICIES):
-        params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
-        key = mapPolicy(i
-                #, config
-                )
-        policies[key] = (None, obs, atns, params)
+       for i in range(config.NPOLICIES):
+           params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
+           key = mapPolicy(i
+                   #, config
+                   )
+           policies[key] = (None, obs, atns, params)
 
     return policies
 
