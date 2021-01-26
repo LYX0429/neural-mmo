@@ -107,62 +107,67 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
       for entID, ent in self.dead.items():
          lifetime = ent.history.timeAlive.val
          self.lifetimes.append(lifetime)
-         if not self.config.EVO_MAP:
+         if not (self.config.EVO_MAP and not self.config.FIXED_MAPS):
             if not self.config.EVALUATE and len(self.lifetimes) >= 1000:
                lifetime = np.mean(self.lifetimes)
                print('Lifetime: {}'.format(lifetime))
                dones['__all__'] = True
 
       self.env_step += time.time() - env_post
-      skills = {}
       self.n_step += 1
       # are we doing evolution? 
-      if self.config.EVO_MAP:# and not self.config.RENDER:
+      if self.config.EVO_MAP and not self.config.FIXED_MAPS:# and not self.config.RENDER:
          if self.n_step >= self.config.MAX_STEPS or self.config.RENDER:
             global_stats = ray.get_actor('global_stats')
             # reset the env manually, to load from the new updated population of maps
 #           print('resetting env {} after {} steps'.format(self.worldIdx, self.n_step))
             dones['__all__'] = True
-            a_skills = None
-            for d, player in self.realm.players.items():
-               player_packet = player.packet()
-               a_skills = player_packet['skills']
-               a_skill_vals = {}
-               for k, v in a_skills.items():
-                  if not isinstance(v, dict):
-                     continue
-                  if k in ['exploration']:
-                     continue
-                  if k in ['cooking', 'smithing', 'level']:
-                     continue
-                  a_skill_vals[k] = v['exp']
-                  if k in ['fishing', 'hunting', 'constitution']:
-                     # FIXME: hack -- just easier on the eyes, mostly. Don't change config.RESOURCE !
-                     a_skill_vals[k] -= 1154
-               # a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 10
-               a_skill_vals['exploration'] = player.exploration_grid.sum() * 20
-               # timeAlive will only add expressivity if we fit more than one gaussian.
-               a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
-               skills[d] = a_skill_vals
-            if a_skills:
-               stats = np.zeros((len(skills), len(self.headers)))
-              #stats = np.zeros((len(skills), 1))
-               lifespans = np.zeros((len(skills)))
-               # over agents
-               for i, a_skills in enumerate(skills.values()):
-                  # over skills
-                  for j, k in enumerate(self.headers):
-                     if k not in ['level', 'cooking', 'smithing']:
-       #             if k in ['exploration']:
-                        stats[i, j] = a_skills[k]
-                        j += 1
-                  lifespans[i] = a_skills['time_alive']
-               stats = {
-                     'skills': stats,
-                     'lifespans': lifespans,
-                     }
-               global_stats.add.remote(stats, self.worldIdx)
+            stats = self.get_agent_stats
+            global_stats.add.remote(stats, self.worldIdx)
       return obs, rewards, dones, infos
+
+   def get_agent_stats(self):
+      skills = {}
+      a_skills = None
+      for d, player in self.realm.players.items():
+         player_packet = player.packet()
+         a_skills = player_packet['skills']
+         a_skill_vals = {}
+         for k, v in a_skills.items():
+            if not isinstance(v, dict):
+               continue
+            if k in ['exploration']:
+               continue
+            if k in ['cooking', 'smithing', 'level']:
+               continue
+            a_skill_vals[k] = v['exp']
+            if k in ['fishing', 'hunting', 'constitution']:
+               # FIXME: hack -- just easier on the eyes, mostly. Don't change config.RESOURCE !
+               a_skill_vals[k] -= 1154
+         # a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 10
+         a_skill_vals['exploration'] = player.exploration_grid.sum() * 20
+         # timeAlive will only add expressivity if we fit more than one gaussian.
+         a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
+         skills[d] = a_skill_vals
+      if a_skills:
+         stats = np.zeros((len(skills), len(self.headers)))
+        #stats = np.zeros((len(skills), 1))
+         lifespans = np.zeros((len(skills)))
+         # over agents
+         for i, a_skills in enumerate(skills.values()):
+            # over skills
+            for j, k in enumerate(self.headers):
+               if k not in ['level', 'cooking', 'smithing']:
+ #             if k in ['exploration']:
+                  stats[i, j] = a_skills[k]
+                  j += 1
+            lifespans[i] = a_skills['time_alive']
+         stats = {
+               'skills': stats,
+               'lifespans': lifespans,
+               }
+         return stats
+
 
 #Neural MMO observation space
 def observationSpace(config):

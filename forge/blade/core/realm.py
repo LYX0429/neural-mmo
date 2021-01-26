@@ -137,7 +137,7 @@ class PlayerManager(EntityGroup):
          if len(self.entities) >= self.config.NENT:
             break
 
-         if self.config.EVO_MAP:
+         if self.config.EVO_MAP:# and not self.config.EVALUATE:
             r, c = self.evo_spawn()
          else:
             r, c   = self.config.SPAWN()

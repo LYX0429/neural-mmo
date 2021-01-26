@@ -163,6 +163,8 @@ class Chromosome():
       self.weights =  [2/3,  1/3]
       # some MAP-Elites dimensions
       self.features = None
+      self.flat_map = None
+      self.multi_hot = None
 
 #  def init_endpoint_pattern(self, p):
 #     p = p(
@@ -201,28 +203,33 @@ class Chromosome():
       if n_patterns == 0:
          add_ptrn = True
       else: 
-          add_ptrn = np.random.random() < 0.3
-          for p in np.random.choice(self.patterns, np.random.randint(1, 10)):
+          add_ptrn = np.random.randint(0, min(5, self.max_patterns - n_patterns))
+          for p in np.random.choice(self.patterns, np.random.randint(0, max(1, int(n_patterns//5)))):
              p.mutate()
 
-      if np.random.random() < 0.3 and n_patterns > 0:
-         self.patterns.pop(np.random.randint(n_patterns))
+      for i in range(0, min(5, n_patterns)):
+         self.patterns.pop(np.random.randint(n_patterns-i))
       if add_ptrn and n_patterns < self.max_patterns:
          p = np.random.choice(self.pattern_templates)
          p = p.generate(p, self.n_tiles, self.map_width)
          self.patterns.append(p)
-      self.update_features()
+      self.flat_map = None
+      self.multi_hot = None
+#     self.update_features()
 
       return self.paint_map()
 
 
    def paint_map(self):
+      if hasattr(self, 'flat_map') and self.flat_map is not None:
+         return self.flat_map, self.multi_hot
       multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_width))
       multi_hot[self.default_tile, :, :] = 1e-10
 
       for p in self.patterns:
          p.paint(multi_hot)
       flat_map = np.argmax(multi_hot, axis=0)
+      self.flat_map, self.multi_hot = flat_map, multi_hot
 
       return flat_map, multi_hot
 

@@ -49,9 +49,16 @@ class Input(nn.Module):
       entityLookup = {}
 
       egocentric = {
-         'Tile': {
-            'Discrete':   (1, 2)
-         },
+#<<<<<<< HEAD
+#         'Tile': {
+#            'Discrete':   (1, 2)
+#         },
+#=======
+#         ###'Tile': {
+#         ###   'Discrete':   (1, 2)
+#         ###},
+#         #   'Continuous': (2, 3),
+#>>>>>>> 1da409b483f1fe09d551de818c85748990ccbf40
          #'Entity': {
          #'Continuous': (2, 3),
          #'Discrete':   (2, 3)
@@ -76,9 +83,9 @@ class Input(nn.Module):
       #Zero out continuous tile embeddings (was 0.15)
       #Zero out continuous index embedding
       #Set stim=4, 4000 batch
-      inp['Tile']['Discrete'][:, :, 1] += 7 + 15
-      inp['Tile']['Discrete'][:, :, 2] += 7 + 15 + 15
-      x = inp['Tile']['Discrete'][0]
+      ###inp['Tile']['Discrete'][:, :, 1] += 7 + 15
+      ###inp['Tile']['Discrete'][:, :, 2] += 7 + 15 + 15
+      ###x = inp['Tile']['Discrete'][0]
 
       inp['Entity']['Discrete'] *= 0
       tileWeight = torch.Tensor([0.0, 0.0, 0.02, 0.02])
