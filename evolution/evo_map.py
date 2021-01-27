@@ -319,6 +319,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_config.pop_size = self.config.N_EVO_MAPS
          self.neat_config.elitism = int(self.lam * self.config.N_EVO_MAPS)
          self.neat_config.survival_threshold = self.mu
+         self.neat_config.num_outputs = self.n_tiles
          self.neat_pop = neat.population.Population(self.neat_config)
          stats = neat.statistics.StatisticsReporter()
          self.neat_pop.add_reporter(stats)
@@ -635,6 +636,7 @@ class EvolverNMMO(LambdaMuEvolver):
          griddly_config = {}
 
       if self.trainer is None or trash_trainer:
+         del(self.trainer)
 
          # Create policies
          policies = createPolicies(self.config)
@@ -938,7 +940,6 @@ class EvolverNMMO(LambdaMuEvolver):
 
       for g_hash, (game, score, age) in self.population.items():
         #print(self.config.SKILLS)
-         T()
          score = self.calc_diversity(stats[g_hash], verbose=False)
          self.population[g_hash] = (game, score, age)
 
@@ -1038,7 +1039,7 @@ class EvolverNMMO(LambdaMuEvolver):
        copyfile(self.evolver_path, self.evolver_path + '.bkp')
        pickle.dump(self, save_file)
        self.population = population
-       self.restore(trash_trainer=True)
+       self.restore(trash_trainer=False)
 
    def init_pop(self):
        if not self.config.PRETRAINED and not self.reloading:

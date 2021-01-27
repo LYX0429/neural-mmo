@@ -28,12 +28,7 @@ def get_tile_data(griddly=False):
          TILE_PROBS[val.index] = TILE_PROB_DICT[val.tex]
       #print('pcg TILE_TYPES:', TILE_TYPES)
    else:
-      TILE_PROB_DICT = OrderedDict({
-            'lava':      0.01,
-            'grass':     0.49,
-            'water':     0.2,
-            'shrub':     0.3,
-            })
+      from griddly_nmmo.map_gen import TILE_PROB_DICT
       TILE_TYPES = [k for k in TILE_PROB_DICT]
       TILE_PROBS = [TILE_PROB_DICT[tile_type] for tile_type in TILE_TYPES]
    return TILE_TYPES, TILE_PROBS

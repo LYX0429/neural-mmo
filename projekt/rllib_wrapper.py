@@ -626,6 +626,7 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #     self.reset_envs()
       stats = self.simulate_unfrozen()
       self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.send_agent_stats()))
+#     self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset()))
 #     return self.simulate_frozen()
 #     if self.training_iteration % 2 == 0:
 #        return self.simulate_unfrozen()

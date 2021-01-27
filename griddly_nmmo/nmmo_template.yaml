@@ -1,0 +1,294 @@
+Version: "0.1"
+Environment:
+  Name: nmmo_template
+  Description: An NMMO-type game. The idea is to set up an open-ended system wherein agents can progress from hunter\
+   \ gathering, to agriculture, to basic civilization.
+  Observers:
+    Sprite2D:
+      TileSize: 16
+      BackgroundTile: oryx/oryx_tiny_galaxy/tg_sliced/tg_world/tg_world_floor_panel_metal_a.png
+    Isometric:
+      TileSize: [32, 48]
+      BackgroundTile: oryx/oryx_iso_dungeon/grass-1.png
+     #BackgroundTile: mushy/ground/train_324_0003-61.png
+      IsoTileHeight: 16
+      IsoTileDepth: 4
+  Variables:
+    - Name: player_resources
+      InitialValue: 0
+    - Name: player_dead
+      InitialValue: 0
+      PerPlayer: true
+    - Name: gather_skill
+      InitialValue: 0
+      PerPlayer: true
+    - Name: woodcut_skill
+      InitialValue: 0
+      PerPayer: true
+    - Name: mine_skill
+      InitialValue: 0
+      PerPlayer: true
+    - Name: drink_skill
+      InitialValue: 0
+      PerPlayer: true
+  Player:
+    Count: 1
+    Observer:
+      RotateWithAvatar: true
+      TrackAvatar: true
+      Height: 7
+      Width: 7
+      OffsetX: 0
+      OffsetY: 0
+    AvatarObject: gnome
+  Termination:
+    Lose:
+      #FIXME: This is broken, probably because gnomes are also player avatars.
+#     - eq: [gnome:count, 0] # If all the gnomes are dead
+    Win:
+#     - eq: [_score, 10] # First player to 10 reward points
+
+  Levels: # An initial placeholder level will be added at runtime using python.
+
+Actions:
+  - Name: tick_state
+    InputMapping:
+      Inputs:
+        1:
+          Description: Tick the gnome's internal state
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Commands:
+            # if hunger > 0: hunger -= 1, health += 1
+            - gt:
+                Arguments: [hunger, 0]
+                Commands:
+                  - decr : hunger
+                  - incr: health
+            # if hunger == 0, health -= 1
+            - eq:
+                Arguments: [hunger, 0]
+                Commands:
+                  - decr: health
+            # if thirst > 0: thirst -= 1, health += 1
+            - gt:
+                Arguments: [thirst, 0]
+                Commands:
+                  - decr : thirst
+                  - incr: health
+            # if thirst == 0, health -= 1
+            - eq:
+                Arguments: [thirst, 0]
+                Commands:
+                  - decr: health
+            # if health < 0, die
+            - lt:
+                Arguments: [health, 0]
+                Commands:
+                  - incr: player_dead
+                  - reward: -1
+                  - set_tile: 1
+                 #- remove: true
+            # keep ticking
+            - exec:
+                Action: tick_state
+                Delay: ${_delay}
+
+        Dst:
+            Object: gnome
+
+  - Name: spawn_forest
+    InputMapping:
+      Inputs:
+        1:
+          Description: Respawn a depleted forest after some time.
+          VectorToDest: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: forest
+          Commands:
+            - spawn: forest
+        Dst:
+          Object: _empty
+
+  - Name: craft_campfire
+    InputMapping:
+       Inputs:
+          1:
+             Description: Craft a fire out of materials.
+             VectorToDest: [0, 1]
+       Relative: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Commands:
+             - spawn: campfire
+        Dst:
+           Object: _empty
+
+  - Name: gather
+    Behaviours:
+      # gnomes can gather forest
+      - Src:
+          Object: gnome
+          Commands:
+            # leaves give +5 hunger
+#           - add: [hunger, 5]
+            - incr: gather_skill
+
+        Dst:
+          Object: forest
+          Commands:
+            - add: [src.hunger, 5]
+#           - decr: leaves
+            - exec:
+                Action: spawn_forest
+                Delay: ${_forest_respawn}
+            - remove: true
+      - Src:
+          Object: gnome
+          Commands:
+            # water gives +5 thirst
+            - add: [thirst, 5]
+            - incr: drink_skill
+        Dst:
+          Object: water
+
+      - Src:
+          Object: gnome
+          Commands:
+            - add: [wood, 1]
+            - incr: woodcut_skill
+        Dst:
+          Object: tree
+          Commands:
+              - remove: true
+
+      - Src:
+          Object: gnome
+          Commands:
+            - add: [ore, 1]
+            - incr: mine_skill
+        Dst:
+          Object: iron_ore
+          Commands:
+            - remove: true
+
+  - Name: move
+    Behaviours:
+      # gnomes will disintegrate in lava
+      - Src:
+          Object: gnome
+          Commands:
+            - set_tile: 1
+            - reward: -1
+            - incr: player_dead
+           #- remove: true
+        Dst:
+          Object: lava
+          Commands:
+            - set_tile: 1 # the lave rises a bit
+
+      # gnomes can move into empty spaces
+      - Src:
+          Object: gnome
+          Commands:
+            - mov: _dest # mov will move the object, _dest is the destination location of the action
+        Dst:
+          Object: _empty
+
+Objects:
+  - Name: forest
+    MapCharacter: S
+    Variables:
+      # Actions are applied to the destination object first.
+      - Name: leaves
+        InitialValue: 1
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/bush-1.png
+
+  - Name: tree
+    MapCharacter: T
+    Observers:
+      Isometric:
+        - Image: deadtrees/deadtree3_00.png
+          Offset: [0, 0]
+
+  - Name: iron_ore
+    MapCharacter: O
+    Observers:
+       Isometric:
+#         - Image: blocks/Ruby 8.png
+          - Image: tiles/tiles_out-70.png
+#         - Image: mushy/rocks/train_419_0000-32.png
+            TileSize: [10, 100]
+            Offset: [0, 20]
+
+  - Name: water
+    MapCharacter: W
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/water-1.png
+#       - Image: mushy/water/train_419_0000-32.png
+          Offset: [0, 2]
+
+  - Name: stone
+    MapCharacter: R
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/wall-grey-1.png
+          Offset: [0, 15]
+
+  - Name: lava
+    MapCharacter: L
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/lava-1.png
+       #- Image: mushy/ground/train_429_0003-56.png
+          Offset: [0, 4]
+        - Image: oryx/oryx_iso_dungeon/lava-1.png
+       #- Image: mushy/ground/train_429_0003-56.png
+          Offset: [0, 2]
+
+  - Name: campfire 
+    MapCharacter: C
+    Observers:
+       Isometric:
+          - Image: mushy/water/train_419_0000-1.png
+            Offset: [0, 0]
+
+  - Name: gnome
+    InitialActions:
+      # Start ticking hunger after an initial grace period.
+      - Action: tick_state
+        Delay: ${_init_delay}
+    MapCharacter: H
+    Variables:
+      - Name: health
+        InitialValue: 20
+      - Name: hunger
+        InitialValue: 20
+      - Name: thirst
+        InitialValue: 20
+      - Name: wood
+        InitialValue: 0
+      - Name: ore
+        InitialValue: 0
+    Observers:
+      Sprite2D:
+        - Image: oryx/oryx_tiny_galaxy/tg_sliced/tg_monsters/tg_monsters_jelly_d1.png
+      Block2D:
+        - Shape: square
+          Color: [0.6, 0.2, 0.2]
+          Scale: 0.5
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/avatars/gnome-1.png
+          #FIXME: shitty death symbol, also rarely renders, or only when other gnomes nearby
+        - Image: stratega/selected.png

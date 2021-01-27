@@ -1,6 +1,6 @@
 from pdb import set_trace as T
 import numpy as np
-from skimage.draw import line, rectangle, rectangle_perimeter, disk, circle_perimeter
+from skimage.draw import line, rectangle, rectangle_perimeter, circle, circle_perimeter
 from scipy.stats import multivariate_normal
 
 class PaintPattern():
@@ -139,7 +139,8 @@ class Circle(CircleType):
       super(Circle, self).__init__(r, c, radius, tile_i, intensity, map_width)
 
    def paint(self, map_arr):
-      rr, cc = disk((self.r, self.c), self.radius, shape=(self.map_width, self.map_width))
+#     rr, cc = disk((self.r, self.c), self.radius, shape=(self.map_width, self.map_width))
+      rr, cc = circle(self.r, self.c, self.radius, shape=(self.map_width, self.map_width))
       map_arr[self.tile_i, rr, cc] += self.intensity
 
 

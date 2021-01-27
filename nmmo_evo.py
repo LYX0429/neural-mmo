@@ -22,9 +22,11 @@ import python_griddly
 from evolution.evo_map import EvolverNMMO
 from forge.ethyr.torch import utils
 from griddly import GymWrapperFactory, gd
-from griddly.nmmo.map_gen import MapGen
-from griddly.nmmo.wrappers import NMMOWrapper
+from griddly_nmmo.map_gen import MapGen
+from griddly_nmmo.wrappers import NMMOWrapper
 from projekt import rllib_wrapper
+
+TRAIN_RENDER = True
 
 reshp = (1, 2, 0)
 
@@ -193,7 +195,7 @@ class NMMO(MultiAgentEnv):
        self.config = config
        self.map_gen = MapGen(config['config'])
        yaml_path = 'nmmo.yaml'
-       self.init_tiles, self.probs = self.map_gen.get_init_tiles(yaml_path)
+       self.init_tiles, self.probs, self.skill_names = self.map_gen.get_init_tiles(yaml_path)
        self.chars_to_terrain = dict([(v, k) for (k, v) in self.map_gen.chars.items()])
        level_string = self.map_gen.gen_map(self.init_tiles, self.probs)
        env = gym.make('GDY-nmmo-v0',
@@ -203,7 +205,7 @@ class NMMO(MultiAgentEnv):
        self.env = env
 
        self.env.reset(level_id=None, level_string=level_string)
-       #     self.env.reset(level_id=0)
+      #self.env.reset(level_id=0)
        if isinstance(self.env.observation_space, list):
           self.observation_space = self.env.observation_space[0]
        else:
@@ -218,30 +220,32 @@ class NMMO(MultiAgentEnv):
 
     def reset(self):
        self.lifetimes = dict([(i, 0) for i in range(self.env.player_count)])
-       self.skills = dict([(i, 0) for i in range(self.env.player_count)])
+       self.skills = dict([(skill_name, dict([(i, 0) for i in range(self.env.player_count)])) for skill_name in self.skill_names])
 #      env = gym.make('GDY-nmmo-v0',
 #                     player_observer_type=gd.ObserverType.VECTOR,
 #                     global_observer_type=gd.ObserverType.ISOMETRIC)
 #      env = NMMOWrapper(env)
 #      self.env = env
        global_counter = ray.get_actor("global_counter")
-       self.mapIdx = ray.get(global_counter.get.remote())
-       fPath = os.path.join(self.config['config'].ROOT + str(self.mapIdx), 'map.npy')
-       map_arr = np.load(fPath)
-       map_str = map_arr.astype('U'+str(1 + len(str(self.config['config'].NENT))))
-       for i, char in enumerate(self.init_tiles):
-          j = self.chars_to_terrain[char]
-          j = self.map_gen.tile_types.index(j)
-          map_str[map_arr==j] = char
+       if self.config['config'].TEST:
+          map_str_out = self.map_gen.gen_map(self.init_tiles, self.probs)
+       else:
+          self.mapIdx = ray.get(global_counter.get.remote())
+          fPath = os.path.join(self.config['config'].ROOT + str(self.mapIdx), 'map.npy')
+          map_arr = np.load(fPath)
+          map_str = map_arr.astype('U'+str(1 + len(str(self.config['config'].NENT))))
+          for i, char in enumerate(self.init_tiles):
+             j = self.chars_to_terrain[char]
+             j = self.map_gen.tile_types.index(j)
+             map_str[map_arr==j] = char
 
-       #TODO: WTFFFF??? WHY 8?!
-       for i, (x, y) in enumerate(np.vstack(np.where(map_arr==8)).transpose()):
-          map_str[x, y] = self.map_gen.player_char + str(i+1)
+          #TODO: WTFFFF??? WHY 8?!
+          for i, (x, y) in enumerate(np.vstack(np.where(map_arr==8)).transpose()):
+             map_str[x, y] = self.map_gen.player_char + str(i+1)
 
-#      level_string = self.map_gen.gen_map(self.init_tiles, self.probs)
-       map_str_out = np.append(map_str, np.zeros((map_str.shape[1], 1), dtype=map_str.dtype),axis=1)
-       map_str_out[:, -1] = '\n'
-       map_str_out = ' '.join(s for s in map_str_out.reshape(-1))
+          map_str_out = np.append(map_str, np.zeros((map_str.shape[1], 1), dtype=map_str.dtype),axis=1)
+          map_str_out[:, -1] = '\n'
+          map_str_out = ' '.join(s for s in map_str_out.reshape(-1))
        obs = self.env.reset(level_id=None, level_string=map_str_out)
        [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
 
@@ -253,8 +257,8 @@ class NMMO(MultiAgentEnv):
        obs, rew, dones, info = self.env.step(a)
        [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
        [self.lifetimes.update({k: v+1}) if k not in self.env.deads else None for (k, v) in self.lifetimes.items()]
-       [self.skills.update({k: self.env.get_state()['GlobalVariables']['player_skill'][k+1]}) for k in range(self.env.player_count)]
-       self.render()
+       if TRAIN_RENDER:
+          self.render()
 
        return obs, rew, dones, info
 
@@ -262,8 +266,9 @@ class NMMO(MultiAgentEnv):
         return self.env.render(observer=observer)
 
     def send_agent_stats(self):
-        global_stats = ray.get_actor('global_stats')
-        global_stats.add.remote(
+       [self.skills[skill_name].update({k: self.env.get_state()['GlobalVariables'][skill_name][k+1]}) for k in range(self.env.player_count) for skill_name in self.skill_names]
+       global_stats = ray.get_actor('global_stats')
+       global_stats.add.remote(
               {
                  'skills': [self.skills[i] for i in self.skills],
                  'lifespans': [],
@@ -310,7 +315,7 @@ if __name__ == '__main__':
     wrapper = GymWrapperFactory()
     yaml_path = 'nmmo.yaml'
     map_gen = MapGen(config)
-    init_tiles, probs = map_gen.get_init_tiles(yaml_path)
+    init_tiles, probs, skill_names = map_gen.get_init_tiles(yaml_path)
 
     try:
         evolver_path = os.path.join(save_path, 'evolver')
@@ -357,6 +362,7 @@ if __name__ == '__main__':
 #  print(torch.cuda.is_available())
 #  print(torch.cuda.current_device())
 
+    unregister()
     wrapper.build_gym_from_yaml(
         'nmmo',
         yaml_path,
