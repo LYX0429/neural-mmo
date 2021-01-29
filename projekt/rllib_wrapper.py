@@ -600,7 +600,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       else:
          path = model
 #        pass
-#        T()
      #else:
      #   raise Exception("Invalid model. {}".format(path))
      #   path = 'experiment/{}/checkpoint'.format(model)
@@ -612,7 +611,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       return 'policy_{}'.format(idx)
 
    def model(self, policyID):
-      T()
       model = self.get_policy(policyID).model
      #print('sending evo trainer model to gpu\n')
     #     model.cuda()
@@ -641,7 +639,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
         #actions, self.state, _ = self.compute_actions(
         #      self.obs, state=self.state, policy_id='policy_0')
 #     self.registry.step(self.obs, pos, cmd,
-         T()
 
          self.workers.foreach_env(lambda env: env.step(actions, env.id))
 
@@ -732,7 +729,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
          #FIXME dumb hack
 
 #     else:
-#        T()
 #        path = 'experiment/{}/checkpoint'.format(model)
 
       print('Loading from: {}'.format(path))

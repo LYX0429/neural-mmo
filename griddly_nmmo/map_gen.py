@@ -8,13 +8,16 @@ np.set_printoptions(threshold=5000, linewidth=200)
 
 TILE_PROB_DICT = OrderedDict({
                'lava':     0.10,
-               'grass':    0.40,
+               'grass':    0.395,
                'water':    0.10,
                'stone':    0.10,
                'forest':   0.10,
                'tree':     0.10,
                'iron_ore': 0.10,
+              #'chicken_spawn': 0.005
             })
+temp = np.sum([v for v in TILE_PROB_DICT.values()])
+[TILE_PROB_DICT.update({k: v/temp}) for k, v in TILE_PROB_DICT.items()]
 
 
 def replace_vars(yaml_contents, var_dict):
@@ -37,7 +40,6 @@ def replace_vars(yaml_contents, var_dict):
        #    type(yaml_contents)))
 
 class MapGen():
-    MAP_WIDTH = 50
     INIT_DELAY = 10 # how long to wait before decrementing hunger & thirst
     INIT_HEALTH = 10
     INIT_THIRST = 10
@@ -49,6 +51,7 @@ class MapGen():
     def __init__(self, config=None):
         if config is not None:
             self.N_PLAYERS = config.NENT
+            self.MAP_WIDTH = config.TERRAIN_SIZE
         else:
             self.N_PLAYERS = 8
         self.VAR_DICT = {
@@ -73,7 +76,7 @@ class MapGen():
                 }
         self.border_tile = 'lava'
 
-    def get_init_tiles(self, yaml_path):
+    def get_init_tiles(self, yaml_path, write_game_file=False):
         # Using a template to generate the runtime file allows for preservation of comments and structure. And possibly other tricks... (evolution of game entities and mechanics)
         yaml_path_og = os.path.join(griddly.__path__[0], 'resources', 'games',  yaml_path)
         yaml_path = os.path.join('griddly_nmmo',  yaml_path)
@@ -105,12 +108,13 @@ class MapGen():
            if 'skill' in var_str:
               skills.append(var_str)
         #HACK: scale delays to num players
-        replace_vars(contents, self.VAR_DICT)
-        #FIXME: sloppy redundancy
-        with open(yaml_path, 'w') as f:
-            yaml.safe_dump(contents, f, default_style=None, default_flow_style=False)
-        with open(yaml_path_og, 'w') as f:
-            yaml.safe_dump(contents, f, default_style=None, default_flow_style=False)
+        if write_game_file:
+           replace_vars(contents, self.VAR_DICT)
+           #FIXME: sloppy redundancy
+           with open(yaml_path, 'w') as f:
+               yaml.safe_dump(contents, f, default_style=None, default_flow_style=False)
+           with open(yaml_path_og, 'w') as f:
+               yaml.safe_dump(contents, f, default_style=None, default_flow_style=False)
 
         return init_tiles, probs, skills
 

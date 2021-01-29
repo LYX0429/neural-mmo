@@ -1,8 +1,7 @@
 Version: "0.1"
 Environment:
   Name: nmmo_template
-  Description: An NMMO-type game. The idea is to set up an open-ended system wherein agents can progress from hunter\
-   \ gathering, to agriculture, to basic civilization.
+  Description: An NMMO-type game. The idea is to set up an open-ended system wherein agents can progress from hunter gathering, to agriculture, to basic civilization.
   Observers:
     Sprite2D:
       TileSize: 16
@@ -101,6 +100,91 @@ Actions:
         Dst:
             Object: gnome
 
+  - Name: spawn_chicken
+    InputMapping:
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: chicken_spawn
+          Commands:
+            - spawn: chicken
+            - exec:
+                Action: spawn_chicken
+                Delay: 50
+                Randomize: true
+
+        Dst:
+          Object: _empty
+
+  # Define action that cannot be controlled by the player. (In this case the chicken movement)
+  - Name: random_movement
+    InputMapping:
+      Inputs:
+        1:
+          Description: Rotate left
+          OrientationVector: [-1, 0]
+        2:
+          Description: Move forwards
+          OrientationVector: [0, -1]
+          VectorToDest: [0, -1]
+        3:
+          Description: Rotate right
+          OrientationVector: [1, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      # Spider rotates on the spot
+      - Src:
+          Object: chicken
+          Commands:
+            - rot: _dir
+            - exec:
+                Action: random_movement
+                Delay: 3
+                Randomize: true
+        Dst:
+          Object: chicken
+
+      # The chicken and the chicken can move into empty space
+      - Src:
+          Object: chicken
+          Commands:
+            - mov: _dest
+            - exec:
+                Action: random_movement
+                Delay: 3
+                Randomize: true
+        Dst:
+          Object: _empty
+
+#   # The chicken will not move into the wall or the gem, but it needs to keep moving
+#     - Src:
+#         Object: chicken
+#         Commands:
+#           - exec:
+#               Action: random_movement
+#               Delay: 3
+#               Randomize: true
+#       Dst:
+#         Object: [stone, gem, nest]
+
+      # If the chicken runs into lava it dies
+      - Src:
+          Object: chicken
+          Commands:
+            - remove: true
+        Dst:
+          Object: lava
+
+      # If the gnome moves into a chicken
+      - Src:
+          Object: chicken
+        Dst:
+          Object: gnome
+          Commands:
+            - remove: true
+            - reward: -1
+
   - Name: spawn_forest
     InputMapping:
       Inputs:
@@ -117,20 +201,20 @@ Actions:
         Dst:
           Object: _empty
 
-  - Name: craft_campfire
-    InputMapping:
-       Inputs:
-          1:
-             Description: Craft a fire out of materials.
-             VectorToDest: [0, 1]
-       Relative: true
-    Behaviours:
-      - Src:
-          Object: gnome
-          Commands:
-             - spawn: campfire
-        Dst:
-           Object: _empty
+# - Name: craft_campfire
+#   InputMapping:
+#      Inputs:
+#         1:
+#            Description: Craft a fire out of materials.
+#            VectorToDest: [0, 1]
+#      Relative: true
+#   Behaviours:
+#     - Src:
+#         Object: gnome
+#         Commands:
+#            - spawn: campfire
+#       Dst:
+#          Object: _empty
 
   - Name: gather
     Behaviours:
@@ -180,6 +264,19 @@ Actions:
           Commands:
             - remove: true
 
+
+  - Name: attack
+    Behaviours:
+      - Src:
+          Object: gnome
+          Commands:
+#           - incr: health
+          
+        Dst:
+          Object: gnome
+          Commands:
+            - decr: health
+
   - Name: move
     Behaviours:
       # gnomes will disintegrate in lava
@@ -202,6 +299,7 @@ Actions:
             - mov: _dest # mov will move the object, _dest is the destination location of the action
         Dst:
           Object: _empty
+
 
 Objects:
   - Name: forest
@@ -261,8 +359,41 @@ Objects:
     MapCharacter: C
     Observers:
        Isometric:
-          - Image: mushy/water/train_419_0000-1.png
-            Offset: [0, 0]
+          - Image: bonfire.png
+            Offset: [0, 10]
+
+  - Name: chicken
+    InitialActions:
+      - Action: random_movement
+        Delay: 3
+        Randomize: true
+    MapCharacter: 'G'
+    Observers:
+      Sprite2D:
+        - Image: chicken.png
+      Block2D:
+        - Shape: triangle
+          Color: [1.0, 0.0, 0.0]
+          Scale: 0.8
+      Isometric:
+        - Image: chicken.png
+
+
+  - Name: chicken_spawn
+    MapCharacter: 'N'
+    InitialActions:
+      - Action: spawn_chicken
+        Delay: 10
+        Randomize: true
+    Observers:
+      Sprite2D:
+        - Image: oryx/oryx_fantasy/bush-1.png
+      Block2D:
+        - Shape: triangle
+          Color: [0.0, 0.0, 1.0]
+          Scale: 0.8
+      Isometric:
+        - Image: egg.png
 
   - Name: gnome
     InitialActions:

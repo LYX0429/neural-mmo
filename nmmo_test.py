@@ -18,7 +18,6 @@ import griddly
 from griddly import GymWrapperFactory, gd
 from griddly_nmmo.map_gen import MapGen
 from griddly_nmmo.wrappers import NMMOWrapper
-from griddly.util.rts_tools import InvalidMaskingRTSWrapper
 
 if __name__ == '__main__':
 

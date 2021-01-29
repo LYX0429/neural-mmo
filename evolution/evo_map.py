@@ -73,7 +73,7 @@ def calc_diversity_l2():
    pass
 
 def calc_map_diversity():
-   T()
+   pass
 
 class SpawnPoints():
    def __init__(self, map_width, n_players):
@@ -149,7 +149,6 @@ def mate_atk_mults(atk_mults_0, atk_mults_1, single_offspring=False):
 def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
     k_lrg = np.column_stack(np.unravel_index(idx, a.shape))
-    T()
 
     return k_lrg
 
@@ -205,27 +204,30 @@ def mapPolicy(agentID,
         #config
         ):
 
-    #FIXME: Griddly hack
-    return 'default_policy'
+   #FIXME: Griddly hack
+   if agentID == 'default_policy':
+      return 'default_policy'
 
-    return 'policy_{}'.format(agentID % 1)
+   return 'policy_{}'.format(agentID % 1)
 
 
 # Generate RLlib policies
 def createPolicies(config):
     if config.GRIDDLY:
        return
-    else: 
-       obs = projekt.env.observationSpace(config)
-       atns = projekt.env.actionSpace(config)
-       policies = {}
+    obs =  observationSpace(config)
+    atns = actionSpace(config)
+    policies = {}
 
-       for i in range(config.NPOLICIES):
-           params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
+    for i in range(config.NPOLICIES):
+        params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
+        if config.GRIDDLY:
+           key = mapPolicy('default_policy')
+        else:
            key = mapPolicy(i
                    #, config
                    )
-           policies[key] = (None, obs, atns, params)
+        policies[key] = (None, obs, atns, params)
 
     return policies
 
@@ -252,7 +254,11 @@ class DefaultGenome(neat.genome.DefaultGenome):
 
 
 class EvolverNMMO(LambdaMuEvolver):
-   def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12,):
+   def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None):
+      if map_policy is None:
+         self.mapPolicy = mapPolicy
+      else:
+         self.mapPolicy = map_policy
       self.gen_mults = gen_atk_mults
       self.mutate_mults = mutate_atk_mults
       self.mate_mults = mate_atk_mults
@@ -312,9 +318,13 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_to_g = {}
          self.n_epoch = -1
          evolver = self
+         if self.config.GRIDDLY:
+            neat_config_path = 'config_cppn_nmmo_griddly'
+         else:
+            neat_config_path = 'config_cppn_nmmo'
          self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
                             neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
-                            'config_cppn_nmmo')
+                            neat_config_path)
          self.neat_config.fitness_threshold = np.float('inf')
          self.neat_config.pop_size = self.config.N_EVO_MAPS
          self.neat_config.elitism = int(self.lam * self.config.N_EVO_MAPS)
@@ -439,7 +449,6 @@ class EvolverNMMO(LambdaMuEvolver):
             continue
 
          if g_idx not in stats:
-#           T()
             print('Missing stats for map {}, training again.'.format(g_idx))
 #           print('Missing stats for map {}, using old stats.'.format(g_idx))
             self.trainer.train()
@@ -463,7 +472,6 @@ class EvolverNMMO(LambdaMuEvolver):
          else:
             if 'skills' not in stats[g_idx]:
                score = 0
-#              T()
             else:
                score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=self.config.EVO_VERBOSE)
         #self.population[g_hash] = (None, score, None)
@@ -471,7 +479,7 @@ class EvolverNMMO(LambdaMuEvolver):
          last_fitness = last_fitnesses[idx]
          last_fitness.append(score)
          if self.LEARNING_PROGRESS:
-             g.fitness = score = (last_fitness[-1] - last_fitness[0]) / len(last_fitness)
+             g.fitness = score = (last_fitness[-2] - last_fitness[-1])
          else:
              g.fitness = np.mean(last_fitness)
          g.age += 1
@@ -551,7 +559,7 @@ class EvolverNMMO(LambdaMuEvolver):
          if self.CPPN:
             # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
             if not i in maps:
-                T()
+               raise Exception
             map_arr, atk_mults = maps[i]
          elif self.RAND_GEN:
             map_arr, atk_mults = maps[i]
@@ -568,7 +576,7 @@ class EvolverNMMO(LambdaMuEvolver):
             pass
 
          if map_arr is None:
-            T()
+            raise Exception
          Save.np(map_arr, path)
 
          if self.config.TERRAIN_RENDER:
@@ -689,7 +697,7 @@ class EvolverNMMO(LambdaMuEvolver):
             'multiagent': {
                 "policies": policies,
                 "policy_mapping_fn":
-                mapPolicy
+                self.mapPolicy
             },
             'model': model_config,
             **griddly_config
@@ -909,7 +917,6 @@ class EvolverNMMO(LambdaMuEvolver):
       ''' Send (some) gene information to a global object to be retrieved by parallel environments.
       '''
 
-#     T()
 #     for g_hash, gene in self.genes.items():
       for g_hash, gene in self.genes.items():
          atk_mults = gene[-1]

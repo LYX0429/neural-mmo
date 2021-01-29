@@ -1,5 +1,4 @@
 import copy
-import numpy as np
 import os
 import pickle
 import sys
@@ -27,6 +26,7 @@ from griddly_nmmo.wrappers import NMMOWrapper
 from projekt import rllib_wrapper
 
 TRAIN_RENDER = True
+#TRAIN_RENDER = False
 
 reshp = (1, 2, 0)
 
@@ -79,7 +79,8 @@ def createEnv(config):
 
 
 def mapPolicy(agentID):
-    return 'policy_{}'.format(agentID % config.NPOLICIES)
+   return 'default_policy'
+#  return 'policy_{}'.format(agentID % config.NPOLICIES)
 
 
 # Generate RLlib policies
@@ -191,19 +192,18 @@ class Stats:
 
 class NMMO(MultiAgentEnv):
     def __init__(self, config):
-       import python_griddly
        self.config = config
        self.map_gen = MapGen(config['config'])
        yaml_path = 'nmmo.yaml'
-       self.init_tiles, self.probs, self.skill_names = self.map_gen.get_init_tiles(yaml_path)
+       self.init_tiles, self.probs, self.skill_names = self.map_gen.get_init_tiles(yaml_path, write_game_file=False)
        self.chars_to_terrain = dict([(v, k) for (k, v) in self.map_gen.chars.items()])
        level_string = self.map_gen.gen_map(self.init_tiles, self.probs)
+       self.env = None
        env = gym.make('GDY-nmmo-v0',
                       player_observer_type=gd.ObserverType.VECTOR,
                       global_observer_type=gd.ObserverType.ISOMETRIC)
        env = NMMOWrapper(env)
        self.env = env
-
        self.env.reset(level_id=None, level_string=level_string)
       #self.env.reset(level_id=0)
        if isinstance(self.env.observation_space, list):
@@ -214,19 +214,25 @@ class NMMO(MultiAgentEnv):
              self.observation_space.high.transpose(reshp))
        #     self.observation_space.shape = self.env.observation_space[0].shape
        self.action_space = self.env.action_space
+       self.action_space = gym.spaces.MultiDiscrete(self.env.action_space.nvec)
+       del(self.env)
+       self.env = None
        self.lifetimes = {}
       #del (self.env)
       #self.env = None
 
     def reset(self):
+
+       if self.env is None:
+          env = gym.make('GDY-nmmo-v0',
+                         player_observer_type=gd.ObserverType.VECTOR,
+                         global_observer_type=gd.ObserverType.ISOMETRIC)
+          env = NMMOWrapper(env)
+          self.env = env
        self.lifetimes = dict([(i, 0) for i in range(self.env.player_count)])
        self.skills = dict([(skill_name, dict([(i, 0) for i in range(self.env.player_count)])) for skill_name in self.skill_names])
-#      env = gym.make('GDY-nmmo-v0',
-#                     player_observer_type=gd.ObserverType.VECTOR,
-#                     global_observer_type=gd.ObserverType.ISOMETRIC)
-#      env = NMMOWrapper(env)
-#      self.env = env
        global_counter = ray.get_actor("global_counter")
+
        if self.config['config'].TEST:
           map_str_out = self.map_gen.gen_map(self.init_tiles, self.probs)
        else:
@@ -234,12 +240,14 @@ class NMMO(MultiAgentEnv):
           fPath = os.path.join(self.config['config'].ROOT + str(self.mapIdx), 'map.npy')
           map_arr = np.load(fPath)
           map_str = map_arr.astype('U'+str(1 + len(str(self.config['config'].NENT))))
+
           for i, char in enumerate(self.init_tiles):
              j = self.chars_to_terrain[char]
              j = self.map_gen.tile_types.index(j)
              map_str[map_arr==j] = char
 
           #TODO: WTFFFF??? WHY 8?!
+
           for i, (x, y) in enumerate(np.vstack(np.where(map_arr==8)).transpose()):
              map_str[x, y] = self.map_gen.player_char + str(i+1)
 
@@ -257,6 +265,7 @@ class NMMO(MultiAgentEnv):
        obs, rew, dones, info = self.env.step(a)
        [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
        [self.lifetimes.update({k: v+1}) if k not in self.env.deads else None for (k, v) in self.lifetimes.items()]
+
        if TRAIN_RENDER:
           self.render()
 
@@ -271,10 +280,14 @@ class NMMO(MultiAgentEnv):
        global_stats.add.remote(
               {
                  'skills': [self.skills[i] for i in self.skills],
-                 'lifespans': [],
-                 'lifetimes': [self.lifetimes[i] for i in self.lifetimes],
+                 'lifespans': [self.lifetimes[i] for i in range(len(self.lifetimes))],
+                 'lifetimes': [self.lifetimes[i] for i in range(len(self.lifetimes))],
                  },
               self.mapIdx)
+
+    def __reduce__(self):
+       pass
+#      T()
 
 
 if __name__ == '__main__':
@@ -315,7 +328,7 @@ if __name__ == '__main__':
     wrapper = GymWrapperFactory()
     yaml_path = 'nmmo.yaml'
     map_gen = MapGen(config)
-    init_tiles, probs, skill_names = map_gen.get_init_tiles(yaml_path)
+    init_tiles, probs, skill_names = map_gen.get_init_tiles(yaml_path, write_game_file=True)
 
     try:
         evolver_path = os.path.join(save_path, 'evolver')
@@ -352,6 +365,7 @@ if __name__ == '__main__':
             config,
             n_proc=config.N_PROC,
             n_pop=config.N_EVO_MAPS,
+            map_policy=mapPolicy,
         )
 #  print(torch.__version__)
 
@@ -368,7 +382,7 @@ if __name__ == '__main__':
         yaml_path,
         level=0,
         player_observer_type=gd.ObserverType.VECTOR,
-        global_observer_type=gd.ObserverType.ISOMETRIC,
+    #   global_observer_type=gd.ObserverType.ISOMETRIC,
     )
 
     rllib_config = {
@@ -379,7 +393,7 @@ if __name__ == '__main__':
         "train_batch_size": 128,
         "sgd_minibatch_size": 128,
         "model": {
-            "conv_filters": [[32, (5, 7), 3]],
+            "conv_filters": [[32, (7, 7), 3]],
            },
       # "no_done_at_end": True,
         "env_config": {
@@ -392,11 +406,14 @@ if __name__ == '__main__':
 
     if config.TEST:
        env = NMMO(rllib_config['env_config'])
+
        for i in range(20):
           env.reset()
+
           for j in range(1000):
              obs, rew, done, infos = env.step(dict([(i, val) for (i, val) in env.action_space.sample().items()]))
              env.render()
+
              if done['__all__']:
                 break
 
@@ -413,6 +430,3 @@ if __name__ == '__main__':
        else:
            unregister()
            evolver.evolve()
-
-
-

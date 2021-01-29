@@ -15,7 +15,8 @@ import evolution
 from evolution.evo_map import EvolverNMMO
 from evolution.diversity import calc_differential_entropy
 from forge.ethyr.torch import utils
-from pcg import TILE_TYPES
+from pcg import get_tile_data
+TILE_TYPES, TILE_PROBS = get_tile_data(griddly=False)
 #from projekt import env, rlutils
 from projekt import rllib_wrapper
 
@@ -109,11 +110,11 @@ class Stats:
       if config.RENDER:
 #        print(self.headers)
 #        print(stats)
-         calc_differential_entropy(stats)
+         calc_differential_entropy(stats, verbose=True)
 
          return
 
-      if mapIdx not in self.stats or 'skills' not in stats:
+      if mapIdx not in self.stats or 'skills' not in self.stats[mapIdx]:
          self.stats[mapIdx] = {}
          self.stats[mapIdx]['skills'] = [stats['skills']]
          self.stats[mapIdx]['lifespans'] = [stats['lifespans']]

@@ -145,6 +145,7 @@ class TreeOrerock(SmallMap):
    N_EVAL = 20
    EVO_VERBOSE          = True
    EVO_SAVE_INTERVAL    = 5
+   GRIDDLY = False
 
 
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
