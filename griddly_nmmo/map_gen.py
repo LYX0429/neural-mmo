@@ -54,7 +54,7 @@ class MapGen():
             self.MAP_WIDTH = config.TERRAIN_SIZE
         else:
             self.N_PLAYERS = 8
-            self.MAP_WIDTH = 20
+            self.MAP_WIDTH = 50
         self.VAR_DICT = {
                 '${_init_delay}':    self.INIT_DELAY * self.N_PLAYERS,
                 '${_delay}':         1 * self.N_PLAYERS,
@@ -115,6 +115,7 @@ class MapGen():
            with open(yaml_path, 'w') as f:
                yaml.safe_dump(contents, f, default_style=None, default_flow_style=False)
            with open(yaml_path_og, 'w') as f:
+               print('saving nmmo game mechanics at {}'.format(yaml_path_og))
                yaml.safe_dump(contents, f, default_style=None, default_flow_style=False)
 
         return init_tiles, probs, skills

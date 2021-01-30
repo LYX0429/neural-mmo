@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     yaml_path = 'nmmo.yaml'
     map_gen = MapGen()
-    init_tiles, probs, tile_names = map_gen.get_init_tiles(yaml_path)
+    init_tiles, probs, tile_names = map_gen.get_init_tiles(yaml_path, write_game_file=True)
 
     wrapper.build_gym_from_yaml('nmmo', yaml_path, level=0,
              player_observer_type=gd.ObserverType.VECTOR,

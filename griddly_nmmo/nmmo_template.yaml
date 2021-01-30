@@ -175,15 +175,15 @@ Actions:
             - remove: true
         Dst:
           Object: lava
+          Commands:
+            - remove: true
+            - reward: -1
 
       # If the gnome moves into a chicken
       - Src:
           Object: chicken
         Dst:
           Object: gnome
-          Commands:
-            - remove: true
-            - reward: -1
 
   - Name: spawn_forest
     InputMapping:
@@ -201,32 +201,32 @@ Actions:
         Dst:
           Object: _empty
 
-# - Name: craft_campfire
-#   InputMapping:
-#      Inputs:
-#         1:
-#            Description: Craft a fire out of materials.
-#            VectorToDest: [0, 1]
-#      Relative: true
-#   Behaviours:
-#     - Src:
-#         Object: gnome
-#         Commands:
-#            - spawn: campfire
-#       Dst:
-#          Object: _empty
+  - Name: craft_campfire
+    InputMapping:
+       Inputs:
+          1:
+             Description: Craft a fire out of materials.
+             VectorToDest: [0, 1]
+       Relative: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Commands:
+             - spawn: campfire
+        Dst:
+           Object: _empty
 
 
-# - Name: attack
-#   Behaviours:
-#     - Src:
-#         Object: gnome
-#         Commands:
-#         
-#       Dst:
-#         Object: gnome
-#         Commands:
-#           - decr: health
+  - Name: attack
+    Behaviours:
+      - Src:
+          Object: gnome
+          Commands:
+          
+        Dst:
+          Object: gnome
+          Commands:
+            - decr: health
 
   - Name: gather
     Behaviours:

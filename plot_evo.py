@@ -27,7 +27,7 @@ def plot_exp(exp_name, render=False):
             else:
                 if curr_epoch not in results:
                     results[curr_epoch] = {}
-                map_id = int(row[0])
+                map_id = row[0]
                 results[curr_epoch][map_id] = row[1]
     ep_scores = []
     i = 0
