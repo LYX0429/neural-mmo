@@ -69,13 +69,15 @@ class Individual():
 #             'atk_muts':  atk_mults
               }
       self.score_hists = []
+      self.age = 0
 
 
 
 
 class NMMOGrid(Grid):
-    def __init__(self, save_path, config, map_generator, *args, **kwargs):
+    def __init__(self, evolver, save_path, config, map_generator, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.evolver = evolver
         render = config.TERRAIN_RENDER
         self.border = config.TERRAIN_BORDER
         self.save_path = save_path
@@ -83,32 +85,35 @@ class NMMOGrid(Grid):
         self.map_generator = map_generator
 
     def add(self, individual):
-        border = self.border
-        index = super(NMMOGrid, self).add(individual)
+       border = self.border
+       index = super(NMMOGrid, self).add(individual)
 
-        ind_idx = self.index_grid(individual.features)
+       ind_idx = self.index_grid(individual.features)
+       self.evolver.score_hists[ind_idx] = individual.score_hists
+       if self.evolver.LEARNING_PROGRESS:
+          self.evolver.ALPs[ind_idx] = individual.ALPs
 
-        if index is not None:
+       if index is not None:
 
-            if len(ind_idx) == 1:
-               index_str = '(' + str(ind_idx[0]) + ',)'
-            else:
-               index_str = '('+ ', '.join([str(f) for f in ind_idx]) + ')'
-            map_path = os.path.join(self.save_path, 'maps', 'map' + index_str)
-            try:
-                os.makedirs(map_path)
-            except FileExistsError:
-                pass
-            Save.np(individual.data['chromosome'][0].flat_map, map_path)
-           #if render == True:
-            Save.render(individual.data['chromosome'][0].flat_map[border:-border, border:-border], self.map_generator.textures, map_path + '.png')
-            individual.data['ind_idx'] = self.index_grid((individual.features))
-#           print('add ind with idx {}'.format(tuple(individual.features)))
-            json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + index_str + 'json')
-            with open(json_path, 'w') as json_file:
-               json.dump(individual.data['chromosome'][1], json_file)
+           if len(ind_idx) == 1:
+              index_str = '(' + str(ind_idx[0]) + ',)'
+           else:
+              index_str = '('+ ', '.join([str(f) for f in ind_idx]) + ')'
+           map_path = os.path.join(self.save_path, 'maps', 'map' + index_str)
+           try:
+               os.makedirs(map_path)
+           except FileExistsError:
+               pass
+           Save.np(individual.data['chromosome'][0].flat_map, map_path)
+          #if render == True:
+           Save.render(individual.data['chromosome'][0].flat_map[border:-border, border:-border], self.map_generator.textures, map_path + '.png')
+           individual.data['ind_idx'] = self.index_grid((individual.features))
+#          print('add ind with idx {}'.format(tuple(individual.features)))
+           json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + index_str + 'json')
+           with open(json_path, 'w') as json_file:
+              json.dump(individual.data['chromosome'][1], json_file)
 
-        return index
+       return index
 
 class EvoDEAPQD(DEAPQDAlgorithm):
    def __init__(self, qd_fun, *args, **kwargs):
@@ -184,45 +189,45 @@ class MapElites():
        # Begin the generational process
 
        for i in range(1, niter + 1):
-           start_time = timer()
-           # Select the next batch individuals
-           batch = toolbox.select(container, batch_size)
+          start_time = timer()
+          # Select the next batch individuals
+          batch = toolbox.select(container, batch_size)
 
-           ## Vary the pool of individuals
-           offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
-           #for o in batch:
-           #    newO = toolbox.clone(o)
-           #    ind, = toolbox.mutate(newO)
-           #    del ind.fitness.values
-           #    offspring.append(ind)
+          ## Vary the pool of individuals
+          offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
+          #for o in batch:
+          #    newO = toolbox.clone(o)
+          #    ind, = toolbox.mutate(newO)
+          #    del ind.fitness.values
+          #    offspring.append(ind)
 
-           # Evaluate the individuals with an invalid fitness
-           invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-#          print('{} invalid individuals'.format(len(invalid_ind)))
-           fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+          # Evaluate the individuals with an invalid fitness
+          invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+#         print('{} invalid individuals'.format(len(invalid_ind)))
+          fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
 
-           for ind, fit in zip(invalid_ind, fitnesses):
-               ind.fitness.values = fit[0]
-               ind.features = fit[1]
+          for ind, fit in zip(invalid_ind, fitnesses):
+              ind.fitness.values = fit[0]
+              ind.features = fit[1]
 
-           # Replace the current population by the offspring
-           nb_updated = container.update(offspring, issue_warning=show_warnings)
+          # Replace the current population by the offspring
+          nb_updated = container.update(offspring, issue_warning=show_warnings)
 
-           # Update the hall of fame with the generated individuals
+          # Update the hall of fame with the generated individuals
 
-           if halloffame is not None:
-               halloffame.update(container)
+          if halloffame is not None:
+              halloffame.update(container)
 
-           # Append the current generation statistics to the logbook
-           record = stats.compile(container) if stats else {}
-           logbook.record(iteration=i, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+          # Append the current generation statistics to the logbook
+          record = stats.compile(container) if stats else {}
+          logbook.record(iteration=i, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
 
-           if verbose:
-               print(logbook.stream)
-           # Call callback function
+          if verbose:
+              print(logbook.stream)
+          # Call callback function
 
-           if iteration_callback != None:
-               iteration_callback(i, batch, container, logbook)
+          if iteration_callback != None:
+              iteration_callback(i, batch, container, logbook)
 
        return batch, logbook
 
@@ -307,8 +312,8 @@ class MapElites():
       self.stats = None
       self.g_idxs = list(range(self.evolver.config.N_EVO_MAPS))
       feature_names = self.evolver.config.ME_DIMS
-#     self.feature_idxs = [self.evolver.config.SKILLS.index(n) for n in feature_names]
-      self.feature_idxs = [i for i in range(len(feature_names))]
+      self.feature_idxs = [self.evolver.config.SKILLS.index(n) for n in feature_names]
+#     self.feature_idxs = [i for i in range(len(feature_names))]
       try:
          os.mkdir(os.path.join(self.save_path, 'temp_checkpoints'))
       except FileExistsError:
@@ -391,13 +396,14 @@ class MapElites():
              if el in container:
                  try:
                      container.discard(el, also_from_depot=True)
+                     self.evolver.flush_elite(el_idx)
                  except ValueError as v:
                      # FIXME: why?
                      print(v)
              #FIXME: iterate through diff. features
           [ind.data.update({'ind_idx':idx}) for ind, idx in zip(invalid_elites, elite_idxs)]
           self.evolver.global_counter.set_idxs.remote(elite_idxs)
-          self.train_and_log()
+          self.evolver.train_and_log()
           elite_fitnesses = [self.evaluate(el, elite=True) for el in invalid_elites]
 #         elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_elites)
           for el, el_fit in zip(invalid_elites, elite_fitnesses):
@@ -435,26 +441,10 @@ class MapElites():
          algo.save(os.path.join(self.save_path, 'ME_archive.p'))
          self.algo = algo
          self.toolbox = toolbox
-      self.evolver.score_hists = {}
+      # Remove mutants after each iteration, since they have either been added to the container/archive, or deleted.
+      #FIXME: why wouldn't it be?
+      [self.evolver.flush_individual(gi) if gi in self.evolver.population else None for gi in self.g_idxs]
       self.n_gen += 1
-
-   def train_and_log(self):
-      self.evolver.train_and_log()
-#     train_stats = self.evolver.trainer.train()
-#     stats = ray.get(self.evolver.global_stats.get.remote())
-#     [self.evolver.score_hists.update({key: [self.evolver.calc_diversity(val)]}) if key not in self.evolver.score_hists else self.evolver.score_hists[key].append(self.evolver.calc_diversity(val)) for key, val in stats.items()]
-
-
-   def train_mutants(self):
-      '''Throw away policy learning here to mitigate unstable map populations.'''
-      if self.evolver.LEARNING_PROGRESS:
-         self.train_and_log()
-      else:
-         train_stats = self.evolver.trainer.train()
-
-   def train_elites(self):
-      self.evolver.trainer.train()
-
 
    def evaluate(self, individual, elite=False):
       ind_idx = individual.data['ind_idx']
@@ -480,53 +470,46 @@ class MapElites():
          pass
       # if we have to run any sims, run the parallelized rllib trainer object
 
-      individual.score_hists = []
-      if ind_idx in self.evolver.score_hists:
-         individual.score_hists += self.evolver.score_hists.pop(ind_idx)
-
       if self.stats is None or ind_idx not in self.stats or len(individual.score_hists) < 2:
          print("Training batch 1")
         #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
-         if self.evolver.n_epoch == 0:
-         #  save_dir = self.evolver.trainer.save_checkpoint(os.path.join(self.save_path, 'temp_checkpoints'))
-            save_dir = self.evolver.trainer.save()
-         self.evolver.score_hists[ind_idx] = []
-         while len(individual.score_hists) <= 2:
-            self.train_mutants()
-            individual.score_hists += self.evolver.score_hists.pop(ind_idx)
+#        if self.evolver.n_epoch == 0:
+#        #  save_dir = self.evolver.trainer.save_checkpoint(os.path.join(self.save_path, 'temp_checkpoints'))
+#           save_dir = self.evolver.trainer.save()
+#        self.evolver.score_hists[ind_idx] = []
+         while ind_idx not in self.evolver.score_hists or len(self.evolver.score_hists[ind_idx]) <= 1:
+            self.evolver.train_and_log()
+            if self.evolver.LEARNING_PROGRESS:
+               while len(self.evolver.score_hists[ind_idx]) <= 2:
+                  self.evolver.train_and_log()
+      individual.score_hists = self.evolver.score_hists[ind_idx]
         #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
-         if True:
-            del(self.evolver.trainer)
-            self.evolver.trainer = None
-            self.evolver.restore(trash_trainer=True)
+#        if True:
+#           del(self.evolver.trainer)
+#           self.evolver.trainer = None
+#           self.evolver.restore(trash_trainer=True)
          #  self.evolver.trainer.load_checkpoint(save_dir)
       self.stats = ray.get(evo.global_stats.get.remote())
 
-     #if ind_idx not in self.stats:
-     #   print("Training batch 2")
-     #   self.train_mutants()
-     #   self.stats = ray.get(evo.global_stats.get.remote())
       assert ind_idx in self.stats
       ind_stats = self.stats[ind_idx]
-
-      if 'skills' not in ind_stats:
-         score = 0
-#     score = evo.calc_diversity(ind_stats)
-      if evo.LEARNING_PROGRESS:
-         score = (individual.score_hists[-1] - individual.score_hists[-2])#/ len(individual.score_hists)
-      else:
-         score = individual.score_hists[ind_idx][-1]
-#     features = calc_mean_agent(ind_stats)
-      features = calc_mean_lifetime(ind_stats)
+      score = self.evolver.get_score(ind_idx)
+      if self.evolver.LEARNING_PROGRESS:
+         individual.ALPs = self.evolver.ALPs[ind_idx]
+      features = calc_mean_agent(ind_stats)
+#     features = calc_mean_lifetime(ind_stats)
 
       if ind_idx in evo.population:
           (game, old_score, age) = evo.population[ind_idx]
           evo.population[ind_idx] = (game, score, age)
+      else:
+          evo.population[ind_idx] = (None, score, individual.age)
          #features = evo.chromosomes[ind_idx][0].features
       individual.fitness.values = [score]
       individual.fitness.valid = True
-#     features = [features[i] for i in self.feature_idxs]
-      individual.features = features
+      features = [features[i] for i in self.feature_idxs]
+#     individual.features = features
+      individual.age += 1
       self.idxs.add(ind_idx)
 
 
@@ -646,6 +629,7 @@ class MapElites():
 
       # Create container
       grid = NMMOGrid(
+                  self.evolver,
                   self.save_path,
                   self.evolver.config,
                   self.evolver.map_generator,

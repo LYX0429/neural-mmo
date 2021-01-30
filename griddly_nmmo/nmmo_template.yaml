@@ -216,6 +216,18 @@ Actions:
 #       Dst:
 #          Object: _empty
 
+
+# - Name: attack
+#   Behaviours:
+#     - Src:
+#         Object: gnome
+#         Commands:
+#         
+#       Dst:
+#         Object: gnome
+#         Commands:
+#           - decr: health
+
   - Name: gather
     Behaviours:
       # gnomes can gather forest
@@ -264,18 +276,6 @@ Actions:
           Commands:
             - remove: true
 
-
-  - Name: attack
-    Behaviours:
-      - Src:
-          Object: gnome
-          Commands:
-#           - incr: health
-          
-        Dst:
-          Object: gnome
-          Commands:
-            - decr: health
 
   - Name: move
     Behaviours:

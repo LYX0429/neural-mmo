@@ -6,6 +6,7 @@ import pickle
 import random
 import sys
 import time
+from pathlib import Path
 from pdb import set_trace as T
 from shutil import copyfile
 from typing import Dict
@@ -15,6 +16,7 @@ import ray
 import scipy
 from ray import rllib
 from ray.rllib.agents.callbacks import DefaultCallbacks
+from ray.rllib.agents.trainer_template import build_trainer
 from ray.rllib.env import BaseEnv
 from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.policy import Policy
@@ -23,21 +25,21 @@ from ray.rllib.policy.sample_batch import SampleBatch
 import neat
 import neat.nn
 import projekt
+from evolution.diversity import diversity_calc
 from evolution.lambda_mu import LambdaMuEvolver
 from evolution.pattern_map_elites import MapElites
 from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
 from forge.ethyr.torch import utils
+from forge.trinity.overlay import OverlayRegistry
 from pcg import get_tile_data
+from plot_evo import plot_exp
 #from projekt import rlutils
 #from projekt.evaluator import Evaluator
-from projekt.rllib_wrapper import RLLibEvaluator, EvoPPOTrainer, LogCallbacks, observationSpace, actionSpace, frozen_execution_plan
+from projekt.rllib_wrapper import (EvoPPOTrainer, LogCallbacks, RLLibEvaluator,
+                                   actionSpace, frozen_execution_plan,
+                                   observationSpace)
 from pureples.shared.visualize import draw_net
-from plot_evo import plot_exp
-from evolution.diversity import diversity_calc
-from forge.trinity.overlay import OverlayRegistry
-from ray.rllib.agents.trainer_template import build_trainer
-from pathlib import Path
 
 np.set_printoptions(threshold=sys.maxsize,
                     linewidth=120,
@@ -205,6 +207,7 @@ def mapPolicy(agentID,
         ):
 
    #FIXME: Griddly hack
+
    if agentID == 'default_policy':
       return 'default_policy'
 
@@ -221,6 +224,7 @@ def createPolicies(config):
 
     for i in range(config.NPOLICIES):
         params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
+
         if config.GRIDDLY:
            key = mapPolicy('default_policy')
         else:
@@ -307,6 +311,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.chromosomes = {}
          self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
          # TODO: generalize this for tile-flipping, then NEAT
+
          if self.MAP_ELITES:
             self.me = MapElites(
                   evolver=self,
@@ -319,6 +324,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_to_g = {}
          self.n_epoch = -1
          evolver = self
+
          if self.config.GRIDDLY:
             neat_config_path = 'config_cppn_nmmo_griddly'
          else:
@@ -346,6 +352,39 @@ class EvolverNMMO(LambdaMuEvolver):
       stats = ray.get(self.global_stats.get.remote())
       [self.score_hists.update({key: [self.calc_diversity(val)]}) if key not in self.score_hists else self.score_hists[key].append(self.calc_diversity(val)) for key, val in stats.items()]
 
+   def get_score(self, g_idx):
+      if self.LEARNING_PROGRESS:
+         score = (self.score_hists[g_idx][-2] - self.score_hists[g_idx][-1])
+
+         if g_idx not in self.ALPs:
+             self.ALPs[g_idx] = []
+         self.ALPs[g_idx].append(score)
+         score = abs(np.mean(self.ALPs[g_idx]))
+      else:
+          score = np.mean(self.score_hists[g_idx])
+
+      if len(self.score_hists[g_idx]) >= self.config.ROLLING_FITNESS:
+         self.score_hists[g_idx] = self.score_hists[g_idx][-self.config.ROLLING_FITNESS:]
+
+      if self.LEARNING_PROGRESS:
+         if len(self.ALPs[g_idx]) >= self.config.ROLLING_FITNESS:
+            self.ALPs[g_idx] = self.ALPs[g_idx][-self.config.ROLLING_FITNESS:]
+
+      return score
+
+   def flush_elite(self, gi):
+      self.score_hists.pop(gi)
+      if self.LEARNING_PROGRESS:
+         self.ALPs.pop(gi)
+
+   def flush_individual(self, gi):
+      self.g_idxs_reserve.add(gi)
+      self.population.pop(gi)
+      self.genes.pop(gi)
+      self.score_hists.pop(gi)
+      if self.LEARNING_PROGRESS:
+         self.ALPs.pop(gi)
+ 
 
    def neat_eval_fitness(self, genomes, neat_config):
       if self.n_epoch == 0:
@@ -375,6 +414,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #        if self.n_epoch == 0 or idx not in self.last_fitnesses:
 #            self.last_fitnesses[idx] = []
          # neat-python indexes starting from 1
+
          if idx in self.neat_to_g:
              g_idx = self.neat_to_g[idx]
              neat_to_g[idx] = g_idx
@@ -382,7 +422,7 @@ class EvolverNMMO(LambdaMuEvolver):
              (map_arr, multi_hot), atk_mults = self.genes[g_idx]
          else:
             g_idx = g_idxs.pop()
-            new_g_idxs.add(g_idx)   
+            new_g_idxs.add(g_idx)
             neat_to_g[idx] = g_idx
             self.genes[g_idx] = (None, g.atk_mults)
 
@@ -430,13 +470,10 @@ class EvolverNMMO(LambdaMuEvolver):
          g_idxs_out.add(g_idx)
          maps[g_idx] = map_arr, g.atk_mults
       # remove dead guys
+
       for ni, gi in self.neat_to_g.items():
           if ni not in neat_to_g:
-              self.g_idxs_reserve.add(gi)
-              self.population.pop(gi)
-              self.genes.pop(gi)
-              self.score_hists.pop(gi)
-              self.ALPs.pop(gi)
+             self.flush_individual(gi)
       self.neat_to_g = neat_to_g
       self.maps = maps
       neat_idxs = list(neat_idxs)
@@ -448,6 +485,7 @@ class EvolverNMMO(LambdaMuEvolver):
       global_stats = self.global_stats
       self.send_genes(global_stats)
       _ = self.train_and_log()
+
       if self.LEARNING_PROGRESS: # and self.n_epoch == 0:
           _ = self.train_and_log()
 #     stats = ray.get(global_stats.get.remote())
@@ -493,23 +531,13 @@ class EvolverNMMO(LambdaMuEvolver):
 #        last_fitness = last_fitnesses[idx]
 #        last_fitness.append(score)
          if self.LEARNING_PROGRESS:
-             if len(self.score_hists[g_idx]) <2:
-                 #FIXME: SHOULD NOT be happening FUCK
-                 _ = self.train_and_log()
-                #T()
-             g.fitness = score = (self.score_hists[g_idx][-2] - self.score_hists[g_idx][-1])
-             if g_idx not in self.ALPs:
-                 self.ALPs[g_idx] = []
-             self.ALPs[g_idx].append(score)
-             g.fitness = score = abs(np.mean(self.ALPs[g_idx]))
-         else:
-             g.fitness = np.mean(self.score_hists[g_idx])
-         g.age += 1
+            if len(self.score_hists[g_idx]) <2:
+                #FIXME: SHOULD NOT be happening FUCK
+                _ = self.train_and_log()
+         score = self.get_score(g_idx)
 
-         if len(self.score_hists[g_idx]) >= self.config.ROLLING_FITNESS:
-            self.score_hists[g_idx] = self.score_hists[g_idx][-self.config.ROLLING_FITNESS:]
-         if len(self.ALPs[g_idx]) >= self.config.ROLLING_FITNESS:
-            self.ALPs[g_idx] = self.ALPs[g_idx][-self.config.ROLLING_FITNESS:]
+         g.fitness = score
+         g.age += 1
 #        new_fitness_hist[idx] = last_fitness
 #        self.score_hists[g_idx] = new_fitness_hist[idx]
          self.population[g_idx] = (None, score, g.age)
@@ -548,8 +576,10 @@ class EvolverNMMO(LambdaMuEvolver):
          mutated = self.genes.keys()
       else:
          checkpoint_maps = False
+
       if self.PATTERN_GEN:
          # map index, (map_arr, multi_hot), atk_mults
+
          if mutated is None:
             mutated = list(self.chromosomes.keys())
          maps = [(i, (self.chromosomes[i][0].paint_map(), self.chromosomes[i][1])) for i in mutated]
@@ -582,6 +612,7 @@ class EvolverNMMO(LambdaMuEvolver):
       for i in mutated:
          if self.CPPN:
             # TODO: find a way to mutate attack multipliers alongside the map-generating CPPNs?
+
             if not i in maps:
                raise Exception
             map_arr, atk_mults = maps[i]
@@ -736,6 +767,7 @@ class EvolverNMMO(LambdaMuEvolver):
           )
 
          # Print model size
+
          if not self.config.GRIDDLY:
             utils.modelSize(trainer.defaultModel())
          trainer.restore(self.config.MODEL)
@@ -759,6 +791,7 @@ class EvolverNMMO(LambdaMuEvolver):
       best_g = self.config.INFER_IDX
       global_counter.set.remote(best_g)
       self.config.EVALUATE = True
+
       if not self.trainer:
          self.restore()
       evaluator = RLLibEvaluator(self.config, self.trainer)
@@ -766,6 +799,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
    def genRandMap(self, g_hash=None):
       print('genRandMap {}'.format(g_hash))
+
       if self.n_epoch > 0 or self.reloading:
          print('generating new random map when I probably should not be...')
 #     map_arr= np.random.randint(1, self.n_tiles,
@@ -989,6 +1023,7 @@ class EvolverNMMO(LambdaMuEvolver):
         #else:
          self.score_hists[g_hash].append(score_t)
          self.score_hists[g_hash] = self.score_hists[g_hash][-self.config.ROLLING_FITNESS:]
+
          if self.LEARNING_PROGRESS:
              score = self.score_hists[-1] - self.score_hists[0]
          else:
@@ -1086,4 +1121,3 @@ class EvolverNMMO(LambdaMuEvolver):
        self.saveMaps(self.genes, list(self.genes.keys()))
        # reload latest model from evolution moving forward
        self.config.MODEL = 'reload'
-
