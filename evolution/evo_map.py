@@ -249,7 +249,7 @@ class DefaultGenome(neat.genome.DefaultGenome):
    def mutate(self, config):
       super().mutate(config)
       self.atk_mults = mutate_atk_mults(self.atk_mults)
-      self.age += 1
+      self.age = 0
 
 
 
@@ -288,6 +288,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.RAND_GEN = config.GENOME == 'Random'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
       self.calc_diversity = diversity_calc(config)
+      self.ALPs = {}
 
       if not (self.CPPN or self.PATTERN_GEN or self.RAND_GEN):
          raise Exception('Invalid genome')
@@ -339,6 +340,13 @@ class EvolverNMMO(LambdaMuEvolver):
          pass
 
 
+
+   def train_and_log(self):
+      _ = self.trainer.train()
+      stats = ray.get(self.global_stats.get.remote())
+      [self.score_hists.update({key: [self.calc_diversity(val)]}) if key not in self.score_hists else self.score_hists[key].append(self.calc_diversity(val)) for key, val in stats.items()]
+
+
    def neat_eval_fitness(self, genomes, neat_config):
       if self.n_epoch == 0:
          self.last_map_idx = -1
@@ -352,6 +360,7 @@ class EvolverNMMO(LambdaMuEvolver):
          elif self.epoch_reloaded < self.n_epoch + 11:
             self.reloading = False
 
+      # Remove old individuals from score history to make way for new ones
       maps = {}
       global_counter = ray.get_actor("global_counter")
       neat_idxs = set([idx for idx, _ in genomes])
@@ -363,8 +372,8 @@ class EvolverNMMO(LambdaMuEvolver):
       skip_idxs = set()
 
       for idx, g in genomes:
-         if self.n_epoch == 0 or idx not in self.last_fitnesses:
-             self.last_fitnesses[idx] = []
+#        if self.n_epoch == 0 or idx not in self.last_fitnesses:
+#            self.last_fitnesses[idx] = []
          # neat-python indexes starting from 1
          if idx in self.neat_to_g:
              g_idx = self.neat_to_g[idx]
@@ -426,6 +435,8 @@ class EvolverNMMO(LambdaMuEvolver):
               self.g_idxs_reserve.add(gi)
               self.population.pop(gi)
               self.genes.pop(gi)
+              self.score_hists.pop(gi)
+              self.ALPs.pop(gi)
       self.neat_to_g = neat_to_g
       self.maps = maps
       neat_idxs = list(neat_idxs)
@@ -436,27 +447,29 @@ class EvolverNMMO(LambdaMuEvolver):
       self.saveMaps(maps, new_g_idxs)
       global_stats = self.global_stats
       self.send_genes(global_stats)
-      train_stats = self.trainer.train()
-      stats = ray.get(global_stats.get.remote())
+      _ = self.train_and_log()
+      if self.LEARNING_PROGRESS: # and self.n_epoch == 0:
+          _ = self.train_and_log()
+#     stats = ray.get(global_stats.get.remote())
 #     headers = ray.get(global_stats.get_headers.remote())
-     #n_epis = train_stats['episodes_this_iter']
-     #assert n_epis == self.n_pop
-      for g_idx in g_idxs_out:
+#    #n_epis = train_stats['episodes_this_iter']
+#    #assert n_epis == self.n_pop
+#     for g_idx in g_idxs_out:
 #        g_idx = neat_to_g[idx]
-         #FIXME: hack
+#        #FIXME: hack
 
-         if g_idx in skip_idxs:
-            continue
+#        if g_idx in skip_idxs:
+#           continue
 
-         if g_idx not in stats:
-            print('Missing stats for map {}, training again.'.format(g_idx))
+#        if g_idx not in stats:
+#           print('Missing stats for map {}, training again.'.format(g_idx))
 #           print('Missing stats for map {}, using old stats.'.format(g_idx))
-            self.trainer.train()
-            stats = ray.get(global_stats.get.remote())
-            continue
+#           self.trainer.train()
+#           stats = ray.get(global_stats.get.remote())
+#           continue
 
-      last_fitnesses = self.last_fitnesses
-      new_fitness_hist = {}
+#     last_fitnesses = self.last_fitnesses
+#     new_fitness_hist = {}
 
       for idx, g in genomes:
          g_idx = neat_to_g[idx]
@@ -470,26 +483,37 @@ class EvolverNMMO(LambdaMuEvolver):
          if g_idx not in g_idxs_out:
             score = 0
          else:
-            if 'skills' not in stats[g_idx]:
-               score = 0
-            else:
-               score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=self.config.EVO_VERBOSE)
+#           if 'skills' not in stats[g_idx]:
+#              score = 0
+#           else:
+           score = self.score_hists[g_idx][-1]
+#              score = self.calc_diversity(stats[g_idx], skill_headers=self.config.SKILLS, verbose=self.config.EVO_VERBOSE)
         #self.population[g_hash] = (None, score, None)
 #        print('Map {}, diversity score: {}\n'.format(idx, score))
-         last_fitness = last_fitnesses[idx]
-         last_fitness.append(score)
+#        last_fitness = last_fitnesses[idx]
+#        last_fitness.append(score)
          if self.LEARNING_PROGRESS:
-             g.fitness = score = (last_fitness[-2] - last_fitness[-1])
+             if len(self.score_hists[g_idx]) <2:
+                 #FIXME: SHOULD NOT be happening FUCK
+                 _ = self.train_and_log()
+                #T()
+             g.fitness = score = (self.score_hists[g_idx][-2] - self.score_hists[g_idx][-1])
+             if g_idx not in self.ALPs:
+                 self.ALPs[g_idx] = []
+             self.ALPs[g_idx].append(score)
+             g.fitness = score = abs(np.mean(self.ALPs[g_idx]))
          else:
-             g.fitness = np.mean(last_fitness)
+             g.fitness = np.mean(self.score_hists[g_idx])
          g.age += 1
 
-         if len(last_fitness) >= self.config.ROLLING_FITNESS:
-            last_fitness = last_fitness[-self.config.ROLLING_FITNESS:]
-         new_fitness_hist[idx] = last_fitness
-         self.score_hists[g_idx] = new_fitness_hist[idx]
+         if len(self.score_hists[g_idx]) >= self.config.ROLLING_FITNESS:
+            self.score_hists[g_idx] = self.score_hists[g_idx][-self.config.ROLLING_FITNESS:]
+         if len(self.ALPs[g_idx]) >= self.config.ROLLING_FITNESS:
+            self.ALPs[g_idx] = self.ALPs[g_idx][-self.config.ROLLING_FITNESS:]
+#        new_fitness_hist[idx] = last_fitness
+#        self.score_hists[g_idx] = new_fitness_hist[idx]
          self.population[g_idx] = (None, score, g.age)
-      self.last_fitnesses = new_fitness_hist
+#     self.last_fitnesses = new_fitness_hist
       global_stats.reset.remote()
 
       if self.reloading:

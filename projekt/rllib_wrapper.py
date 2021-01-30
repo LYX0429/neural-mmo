@@ -144,7 +144,9 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
          return stats
 
-      return {}
+      return {'skills': [],
+            'lifespans': [],
+            'lifetimes': []}
 
 
 #Neural MMO observation space

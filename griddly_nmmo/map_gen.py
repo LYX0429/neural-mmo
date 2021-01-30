@@ -54,6 +54,7 @@ class MapGen():
             self.MAP_WIDTH = config.TERRAIN_SIZE
         else:
             self.N_PLAYERS = 8
+            self.MAP_WIDTH = 20
         self.VAR_DICT = {
                 '${_init_delay}':    self.INIT_DELAY * self.N_PLAYERS,
                 '${_delay}':         1 * self.N_PLAYERS,

@@ -439,9 +439,10 @@ class MapElites():
       self.n_gen += 1
 
    def train_and_log(self):
-      train_stats = self.evolver.trainer.train()
-      stats = ray.get(self.evolver.global_stats.get.remote())
-      [self.evolver.score_hists.update({key: [self.evolver.calc_diversity(val)]}) if key not in self.evolver.score_hists else self.evolver.score_hists[key].append(self.evolver.calc_diversity(val)) for key, val in stats.items()]
+      self.evolver.train_and_log()
+#     train_stats = self.evolver.trainer.train()
+#     stats = ray.get(self.evolver.global_stats.get.remote())
+#     [self.evolver.score_hists.update({key: [self.evolver.calc_diversity(val)]}) if key not in self.evolver.score_hists else self.evolver.score_hists[key].append(self.evolver.calc_diversity(val)) for key, val in stats.items()]
 
 
    def train_mutants(self):
