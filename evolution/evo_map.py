@@ -1,4 +1,6 @@
 import copy
+from imageio import imread, imsave
+from enum import Enum
 import csv
 import json
 import os
@@ -76,6 +78,91 @@ def calc_diversity_l2():
 
 def calc_map_diversity():
    pass
+
+
+class Tile():
+   pass 
+
+class Terrain:
+   pass
+
+
+class Lava(Tile):
+   index = 0
+   tex = 'lava'
+class Water(Tile):
+   index = 1
+   tex = 'water'
+class Grass(Tile):
+   index = 2
+   tex = 'grass'
+class Scrub(Tile):
+   index = 3
+   tex = 'scrub'
+class Forest(Tile):
+   index = 4
+#     degen = self.Scrub
+   tex = 'forest'
+   #capacity = 3
+   capacity = 1
+   respawnProb = 0.025
+   def __init__(self):
+      super().__init__()
+      self.harvestable = True
+      #self.dropTable = DropTable.DropTable()
+class Stone(Tile):
+   index = 5
+   tex = 'stone'
+class Orerock(Tile):
+   index = 6
+#     degen = Grass
+   tex = 'iron_ore'
+   capacity = 1
+   respawnprob = 0.025
+   def __init__(self):
+      super().__init__()
+      self.harvestable = True
+      #self.dropTable = systems.DropTable()
+      #self.dropTable.add(ore.Copper, 1)
+class Tree(Tile):
+   index = 7
+  #degen = Forest
+   tex = 'tree'
+   capacity = 1
+   respawnProb = 0.025
+   def __init__(self):
+      super().__init__()
+      self.harvestable = True
+class Spawn(Tile):
+   index = 8
+   tex = 'spawn'
+
+class GdyMaterial(Enum):
+
+
+   LAVA     = Lava
+   WATER    = Water
+   GRASS    = Grass
+   SCRUB    = Scrub
+   FOREST   = Forest
+   STONE    = Stone
+   OREROCK  = Orerock
+   TREE     = Tree
+   SPAWN    = Spawn
+
+class GriddlyMapGenerator(MapGenerator):
+   def loadTextures(self):
+      lookup = {}
+      for mat in GdyMaterial:
+         mat = mat.value
+         tex = imread(
+               'resource/assets/tiles/' + mat.tex + '.png')
+         key = mat.tex
+         mat.tex = tex[:, :, :3][::4, ::4]
+         lookup[mat.index] = mat.tex
+         setattr(Terrain, key.upper(), mat.index)
+      self.textures = lookup
+
 
 class SpawnPoints():
    def __init__(self, map_width, n_players):
@@ -263,6 +350,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.mapPolicy = mapPolicy
       else:
          self.mapPolicy = map_policy
+      self.config = config
       self.gen_mults = gen_atk_mults
       self.mutate_mults = mutate_atk_mults
       self.mate_mults = mate_atk_mults
@@ -279,8 +367,10 @@ class EvolverNMMO(LambdaMuEvolver):
       self.mature_age = config.MATURE_AGE
       self.state = {}
       self.done = {}
-      self.map_generator = MapGenerator(config)
-      self.config = config
+      if self.config.GRIDDLY:
+         self.map_generator = GriddlyMapGenerator(self.config)
+      else:
+         self.map_generator = MapGenerator(config)
       self.skill_idxs = {}
       self.idx_skills = {}
       self.reloading = False  # Have we just reloaded? For re-saving elite maps when reloading.
@@ -373,9 +463,13 @@ class EvolverNMMO(LambdaMuEvolver):
       return score
 
    def flush_elite(self, gi):
-      self.score_hists.pop(gi)
+      if gi in self.score_hists:
+         self.score_hists.pop(gi)
+      if gi in self.population:
+         self.population.pop(gi)
       if self.LEARNING_PROGRESS:
-         self.ALPs.pop(gi)
+         if gi in self.ALPs:
+            self.ALPs.pop(gi)
 
    def flush_individual(self, gi):
       self.g_idxs_reserve.add(gi)

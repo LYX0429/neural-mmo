@@ -115,6 +115,10 @@ class NMMOGrid(Grid):
 
        return index
 
+    def save(self):
+       self.evolver = None
+       return super().save()
+
 class EvoDEAPQD(DEAPQDAlgorithm):
    def __init__(self, qd_fun, *args, **kwargs):
       super().__init__(*args, **kwargs)
@@ -340,8 +344,7 @@ class MapElites():
       # toolbox.register("evaluate", evalSymbReg, points=[x/10. for x in range(-10,10)])
       toolbox.register("evaluate", self.evaluate)  # , points=points)
       # toolbox.register("select", tools.selTournament, tournsize=3)
-#     toolbox.register("select", tools.selRandom)
-      toolbox
+      toolbox.register("select", tools.selRandom)
       toolbox.register("mate", self.mate)
       # gp.genFull, min_=0, max_=2)
       toolbox.register("expr_mut", self.expr_mutate)
@@ -357,7 +360,7 @@ class MapElites():
 #                        max_value=max_size))
       # toolbox.register("mutate", tools.mutPolynomialBounded, low=ind_domain[0], up=ind_domain[1], eta=eta, indpb=mutation_pb)
       # toolbox.register("select", tools.selRandom) # MAP-Elites = random selection on a grid container
-      toolbox.register("select", self.select_max_lifetime)
+#     toolbox.register("select", self.select_max_lifetime)
       self.toolbox = toolbox
 #     self.max_skill = 2000
       self.max_skill = self.evolver.config.MAX_STEPS
@@ -425,10 +428,13 @@ class MapElites():
           evo.saveMaps(evo.genes)
       else:
           evo.saveMaps(evo.genes, self.mutated_idxs)
-      evo.log()
+#     evo.log()
       self.mutated_idxs = set()
+      [self.evolver.flush_individual(gi) if gi in self.evolver.population else None for gi in self.g_idxs]
+      self.n_gen += 1
 
-      if self.n_gen > 0 and self.n_gen % self.evolver.config.EVO_SAVE_INTERVAL == 0:
+      if self.n_gen == 1 or self.n_gen > 0 and self.n_gen % self.evolver.config.EVO_SAVE_INTERVAL == 0:
+#     if self.n_gen == 1:
          self.log_me(container)
          algo = self.algo
          self.algo = None
@@ -438,13 +444,13 @@ class MapElites():
 #           if k.startswith('_') and k != '__class__': #or inspect.ismethod(v):
 #              setattr(self, k, lambda x: None)
          evo.save()
+         algo.container.evolver = None
          algo.save(os.path.join(self.save_path, 'ME_archive.p'))
+         algo.container.evolver = self.evolver
          self.algo = algo
          self.toolbox = toolbox
       # Remove mutants after each iteration, since they have either been added to the container/archive, or deleted.
       #FIXME: why wouldn't it be?
-      [self.evolver.flush_individual(gi) if gi in self.evolver.population else None for gi in self.g_idxs]
-      self.n_gen += 1
 
    def evaluate(self, individual, elite=False):
       ind_idx = individual.data['ind_idx']
@@ -471,7 +477,7 @@ class MapElites():
       # if we have to run any sims, run the parallelized rllib trainer object
 
       if self.stats is None or ind_idx not in self.stats or len(individual.score_hists) < 2:
-         print("Training batch 1")
+#        print("Training batch 1")
         #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
 #        if self.evolver.n_epoch == 0:
 #        #  save_dir = self.evolver.trainer.save_checkpoint(os.path.join(self.save_path, 'temp_checkpoints'))
@@ -522,7 +528,6 @@ class MapElites():
       with open(os.path.join(self.save_path, 'ME_archive.p'), "rb") as f:
          archive = pickle.load(f)
          # NOTE: (Elite) individuals saved in the grid will have overlapping indexes.
-         # TODO: Save all elite maps; do inference on one of them.
          algo = EvoDEAPQD(
                  self.qdSimple,
                  self.toolbox,
@@ -538,6 +543,7 @@ class MapElites():
                                log_base_path=self.log_base_path,
                                iteration_callback_fn=self.iteration_callback)
          self.algo = algo
+         algo.container.evolver = self.evolver
 #        algo.current_iteration = archive['current_iteration']
 #        algo.start_time = timer()
 #        algo.run(archive['container'])

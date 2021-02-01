@@ -188,7 +188,7 @@ if __name__ == '__main__':
       evolver.config.MODEL = 'reload'
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
-      evolver.restore()
+      evolver.restore(trash_trainer=True)
       if config.RENDER:
          evolver.config.INFER_IDX = config.INFER_IDX
       if evolver.MAP_ELITES:

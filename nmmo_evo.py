@@ -24,8 +24,10 @@ from griddly import GymWrapperFactory, gd
 from griddly_nmmo.map_gen import MapGen
 from griddly_nmmo.wrappers import NMMOWrapper
 from projekt import rllib_wrapper
+sep = os.pathsep
+os.environ['PYTHONPATH'] = sep.join(sys.path)
 
-TRAIN_RENDER = True
+TRAIN_RENDER = False
 #TRAIN_RENDER = False
 
 reshp = (1, 2, 0)
@@ -412,7 +414,7 @@ if __name__ == '__main__':
 
           for j in range(1000):
              obs, rew, done, infos = env.step(dict([(i, val) for (i, val) in env.action_space.sample().items()]))
-             env.render()
+#            env.render()
 
              if done['__all__']:
                 break
