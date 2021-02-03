@@ -20,7 +20,7 @@ def diversity_calc(config):
    elif config.FITNESS_METRIC == 'Lifespans' or config.FITNESS_METRIC == 'ALP':
       calc_diversity = sum_lifespans
    else:
-       raise Exception('Unsupported fitness function: {}'.format(self.config.FITNESS_METRIC))
+       raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))
    return calc_diversity
 
 def sum_lifespans(agent_stats, skill_headers=None, verbose=False):
@@ -90,7 +90,6 @@ def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, in
    mean = np.average(a_skills, axis=0, weights=weights)
    cov = np.cov(a_skills,rowvar=0, aweights=weights)
 #     cov = np.array([[2,1],[1,2]])
-#    T()
    gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
    infos['gaussian'] = gaussian
    score = gaussian.entropy()

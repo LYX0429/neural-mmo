@@ -151,6 +151,10 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
 #Neural MMO observation space
 def observationSpace(config):
+   if config.GRIDDLY:
+      #TODO: this, not manually!
+      obs = gym.spaces.Box(0, 1, (7, 7, 10))
+      return obs
    obs = FlexDict(defaultdict(FlexDict))
 
    for entity in sorted(Stimulus.values()):
@@ -180,7 +184,11 @@ def observationSpace(config):
    return obs
 
 #Neural MMO action space
-def actionSpace(config):
+def actionSpace(config, n_act_i=3, n_act_j=5):
+   print('WARNING: Are you sure the griddly env action space is {} {}?'.format(n_act_i, n_act_j))
+   if config.GRIDDLY:
+      atns = gym.spaces.MultiDiscrete((n_act_i, n_act_j))
+      return atns
    atns = FlexDict(defaultdict(FlexDict))
 
    for atn in sorted(Action.edges):
@@ -623,10 +631,9 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 
    def train(self):
 #     self.reset()
-#     self.reset_envs()
+      self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset()))
       stats = self.simulate_unfrozen()
       self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.send_agent_stats()))
-#     self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset()))
 #     return self.simulate_frozen()
 #     if self.training_iteration % 2 == 0:
 #        return self.simulate_unfrozen()

@@ -63,16 +63,20 @@ class NMMOWrapper(gym.Wrapper):
         done = {}
         info = {}
         all_done = True
-        [action.update({i: [0,0]}) if (i in self.deads) else action.update({i: list(val)}) for (i, val) in action.items()]
-        action = [action[i] if i in action else np.zeros(len(list(action.values())[0])) for i in range(self.player_count)]
+        [None if (i in self.deads) else action.update({i: list(val)}) for (i, val) in action.items()]
+        action = [action[i] if i in action else [0,0] for i in range(self.player_count)]
 #       action.reverse()
         obs, rew, done, info = self.env.step(action)
         obs = dict([(i, val) for (i, val) in enumerate(obs)])
         rew = dict([(i, rew[i]) for i in range(self.player_count)])
         done = dict([(i, self.env.get_state()['GlobalVariables']['player_dead'][i+1] > 0 and i not in self.deads and False) for i in range(self.player_count)])
-        [self.deads.add(i) if self.env.get_state()['GlobalVariables']['player_dead'][i+1] > 0 else None for i in done] 
-     #  done = dict([(i, False) for i in range(self.player_count)])
         info = dict([(i, info) for i in range(self.player_count)])
+        # Pop anyone who is already dead
+        [(obs.pop(i), rew.pop(i), done.pop(i), info.pop(i)) for i in self.deads]
+        if not len(self.deads) == self.player_count:
+           [self.deads.add(i) if self.env.get_state()['GlobalVariables']['player_dead'][i+1] > 0 else None for i in done] 
+       #[self.deads.add(i) if rew[i] < 0 else None for i in rew] 
+     #  done = dict([(i, False) for i in range(self.player_count)])
 
     #   for player_id, player_action in action.items():
     #       p_obs, p_rew, p_done, p_info = self.step_player(player_id, player_action)
@@ -85,7 +89,8 @@ class NMMOWrapper(gym.Wrapper):
     #       all_done = all_done and p_done
 
        #done['__all__'] = len(self.deads) == self.player_count
-        done['__all__'] = self.n_step >= self.max_steps
+#       done['__all__'] = self.n_step >= self.max_steps
+        done['__all__'] = False
         self.n_step += 1
 
         return obs, rew, done, info

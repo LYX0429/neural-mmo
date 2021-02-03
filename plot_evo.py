@@ -77,7 +77,7 @@ def plot_exp(exp_name, render=False):
     plt.savefig(im_path, dpi=my_dpi)
     if render:
        plt.show()
-    plt.close()
+    plt.close('all')
 
 
 if __name__ == '__main__':

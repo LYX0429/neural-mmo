@@ -10,6 +10,7 @@ import numpy as np
 import ray
 import ray.rllib.agents.ppo as ppo
 import torch
+import griddly_nmmo
 from fire import Fire
 from ray import rllib, tune
 from ray.rllib.env import MultiAgentEnv
@@ -26,9 +27,6 @@ from griddly_nmmo.wrappers import NMMOWrapper
 from projekt import rllib_wrapper
 sep = os.pathsep
 os.environ['PYTHONPATH'] = sep.join(sys.path)
-
-TRAIN_RENDER = False
-#TRAIN_RENDER = False
 
 reshp = (1, 2, 0)
 
@@ -81,8 +79,8 @@ def createEnv(config):
 
 
 def mapPolicy(agentID):
-   return 'default_policy'
-#  return 'policy_{}'.format(agentID % config.NPOLICIES)
+#  return 'default_policy'
+   return 'policy_{}'.format(agentID % config.NPOLICIES)
 
 
 # Generate RLlib policies
@@ -217,13 +215,15 @@ class NMMO(MultiAgentEnv):
        #     self.observation_space.shape = self.env.observation_space[0].shape
        self.action_space = self.env.action_space
        self.action_space = gym.spaces.MultiDiscrete(self.env.action_space.nvec)
+       print('NMMO env action space is {}'.format(self.action_space))
+#      raise Exception
        del(self.env)
        self.env = None
        self.lifetimes = {}
       #del (self.env)
       #self.env = None
 
-    def reset(self):
+    def reset(self, config=None, step=None):
 
        if self.env is None:
           env = gym.make('GDY-nmmo-v0',
@@ -244,14 +244,19 @@ class NMMO(MultiAgentEnv):
           map_str = map_arr.astype('U'+str(1 + len(str(self.config['config'].NENT))))
 
           for i, char in enumerate(self.init_tiles):
+             if char == self.map_gen.player_char:
+                continue
              j = self.chars_to_terrain[char]
              j = self.map_gen.tile_types.index(j)
              map_str[map_arr==j] = char
 
-          #TODO: WTFFFF??? WHY 8?!
-
-          for i, (x, y) in enumerate(np.vstack(np.where(map_arr==8)).transpose()):
-             map_str[x, y] = self.map_gen.player_char + str(i+1)
+          idxs = np.vstack(np.where(map_arr==griddly_nmmo.map_gen.GdyMaterial.SPAWN.value.index)).transpose()
+          np.random.shuffle(idxs)
+          for i, (x, y) in enumerate(idxs):
+             if i < self.config['config'].NENT:
+                map_str[x, y] = self.map_gen.player_char + str(i+1)
+             else:
+                map_str[x, y] = '.'
 
           map_str_out = np.append(map_str, np.zeros((map_str.shape[1], 1), dtype=map_str.dtype),axis=1)
           map_str_out[:, -1] = '\n'
@@ -268,7 +273,7 @@ class NMMO(MultiAgentEnv):
        [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
        [self.lifetimes.update({k: v+1}) if k not in self.env.deads else None for (k, v) in self.lifetimes.items()]
 
-       if TRAIN_RENDER:
+       if self.config['config'].TRAIN_RENDER:
           self.render()
 
        return obs, rew, dones, info
@@ -277,11 +282,12 @@ class NMMO(MultiAgentEnv):
         return self.env.render(observer=observer)
 
     def send_agent_stats(self):
-       [self.skills[skill_name].update({k: self.env.get_state()['GlobalVariables'][skill_name][k+1]}) for k in range(self.env.player_count) for skill_name in self.skill_names]
+       global_vars = self.env.get_state()['GlobalVariables']
+       [self.skills[skill_name].update({k: global_vars[skill_name][k]}) if k in global_vars[skill_name] else self.skills[skill_name].update({k: 0}) for k in range(self.env.player_count) for skill_name in self.config['config'].SKILLS]
        global_stats = ray.get_actor('global_stats')
        global_stats.add.remote(
               {
-                 'skills': [self.skills[i] for i in self.skills],
+                 'skills': [[self.skills[i][j] for i in self.skills] for j in range(self.env.player_count)],
                  'lifespans': [self.lifetimes[i] for i in range(len(self.lifetimes))],
                  'lifetimes': [self.lifetimes[i] for i in range(len(self.lifetimes))],
                  },
@@ -289,7 +295,6 @@ class NMMO(MultiAgentEnv):
 
     def __reduce__(self):
        pass
-#      T()
 
 
 if __name__ == '__main__':
@@ -341,6 +346,7 @@ if __name__ == '__main__':
         # change params on reload here
 #     evolver.config.ROOT = config.ROOT
         evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
+        evolver.config.TRAIN_RENDER = config.TRAIN_RENDER
         evolver.config.INFER_IDX = config.INFER_IDX
         #     evolver.config.SKILLS = config.SKILLS
         #     evolver.config.MODEL = config.MODEL
@@ -384,6 +390,7 @@ if __name__ == '__main__':
         yaml_path,
         level=0,
         player_observer_type=gd.ObserverType.VECTOR,
+        global_observer_type=gd.ObserverType.ISOMETRIC,
     #   global_observer_type=gd.ObserverType.ISOMETRIC,
     )
 

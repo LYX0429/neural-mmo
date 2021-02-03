@@ -1,5 +1,8 @@
 from pdb import set_trace as T
+from imageio import imread, imsave
+from enum import Enum
 import griddly
+from forge.blade.core.terrain import MapGenerator
 import os
 import numpy as np
 import yaml
@@ -8,16 +11,100 @@ np.set_printoptions(threshold=5000, linewidth=200)
 
 TILE_PROB_DICT = OrderedDict({
                'lava':     0.10,
-               'grass':    0.395,
+               'grass':    0.385,
                'water':    0.10,
-               'stone':    0.10,
                'forest':   0.10,
-               'tree':     0.10,
+               'stone':    0.10,
                'iron_ore': 0.10,
+               'tree':     0.10,
+               'gnome_spawn': 0.025,
               #'chicken_spawn': 0.005
             })
 temp = np.sum([v for v in TILE_PROB_DICT.values()])
 [TILE_PROB_DICT.update({k: v/temp}) for k, v in TILE_PROB_DICT.items()]
+
+class Tile():
+   pass 
+
+class Terrain:
+   pass
+
+
+class Lava(Tile):
+   index = 0
+   tex = 'lava'
+class Water(Tile):
+   index = 2
+   tex = 'water'
+class Grass(Tile):
+   index = 1
+   tex = 'grass'
+#class Scrub(Tile):
+#   index = 3
+#   tex = 'scrub'
+class Forest(Tile):
+   index = 3
+#     degen = self.Scrub
+   tex = 'forest'
+   #capacity = 3
+   capacity = 1
+   respawnProb = 0.025
+   def __init__(self):
+      super().__init__()
+      self.harvestable = True
+      #self.dropTable = DropTable.DropTable()
+class Stone(Tile):
+   index = 4
+   tex = 'stone'
+class Orerock(Tile):
+   index = 5
+#     degen = Grass
+   tex = 'iron_ore'
+   capacity = 1
+   respawnprob = 0.025
+   def __init__(self):
+      super().__init__()
+      self.harvestable = True
+      #self.dropTable = systems.DropTable()
+      #self.dropTable.add(ore.Copper, 1)
+class Tree(Tile):
+   index = 6
+  #degen = Forest
+   tex = 'tree'
+   capacity = 1
+   respawnProb = 0.025
+   def __init__(self):
+      super().__init__()
+      self.harvestable = True
+class Spawn(Tile):
+   index = 7
+   tex = 'spawn'
+
+class GdyMaterial(Enum):
+
+
+   LAVA     = Lava
+   WATER    = Water
+   GRASS    = Grass
+#  SCRUB    = Scrub
+   FOREST   = Forest
+   STONE    = Stone
+   OREROCK  = Orerock
+   TREE     = Tree
+   SPAWN    = Spawn
+
+class GriddlyMapGenerator(MapGenerator):
+   def loadTextures(self):
+      lookup = {}
+      for mat in GdyMaterial:
+         mat = mat.value
+         tex = imread(
+               'resource/assets/tiles/' + mat.tex + '.png')
+         key = mat.tex
+         mat.tex = tex[:, :, :3][::4, ::4]
+         lookup[mat.index] = mat.tex
+         setattr(Terrain, key.upper(), mat.index)
+      self.textures = lookup
 
 
 def replace_vars(yaml_contents, var_dict):
@@ -40,12 +127,11 @@ def replace_vars(yaml_contents, var_dict):
        #    type(yaml_contents)))
 
 class MapGen():
-    INIT_DELAY = 10 # how long to wait before decrementing hunger & thirst
+    INIT_DELAY = 0 # how long to wait before decrementing hunger & thirst
     INIT_HEALTH = 10
     INIT_THIRST = 10
     INIT_HUNGER = 10
-    SHRUB_RESPAWN = 15
-
+    SHRUB_RESPAWN = 30
 
 
     def __init__(self, config=None):
@@ -99,15 +185,18 @@ class MapGen():
             if obj['Name'] == 'gnome':
                 self.player_char = obj['MapCharacter']#+ '1'
         assert hasattr(self, 'player_char')
+        init_tiles.append(self.player_char)
+        probs.append(self.probs['gnome_spawn'])
         # Add a placeholder level so that we can make the env from yaml (this will be overwritten during reset)
         level_string = self.gen_map(init_tiles, probs)
         contents['Environment']['Levels'] = [level_string] # placeholder map
         contents['Environment']['Player']['Count'] = self.N_PLAYERS # set num players
         contents['Environment']['Name'] = 'nmmo'
         skills = []
-        for var_str in contents['Environment']['Variables']:
-           if 'skill' in var_str:
-              skills.append(var_str)
+        for var_dict in contents['Environment']['Variables']:
+           var_name = var_dict['Name']
+           if 'skill' in var_name:
+              skills.append(var_name)
         #HACK: scale delays to num players
         if write_game_file:
            replace_vars(contents, self.VAR_DICT)
@@ -124,9 +213,9 @@ class MapGen():
         # max 3 character string in each tile
         # need to take into account column of newlines
         level_string = np.random.choice(init_tiles, size=(self.MAP_WIDTH, self.MAP_WIDTH+1), p=probs).astype(self.utf_enc)
-        idxs = np.where(level_string[1:-1, 1:-2])
+        idxs = np.where(level_string[1:-1, 1:-2] == self.player_char)
         idxs = np.array(list(zip(idxs[0], idxs[1]))) + 1
-        ixs = np.random.choice(len(idxs), self.N_PLAYERS, replace=False)
+        ixs = np.random.choice(len(idxs), min(self.N_PLAYERS, len(idxs)), replace=False)
         coords = idxs[ixs]
         border_tile = self.border_tile
         level_string[0, :] = self.chars[border_tile]

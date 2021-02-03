@@ -160,7 +160,7 @@ class EvoNMMO(TreeOrerock):
  # INFER_IDX = 79766
  # INFER_IDX = 80117
    # How to measure diversity of agents on generated map.
-   FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete', 'Hull', 'Sum'
+   FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete', 'Hull', 'Sum', 'Lifespans'
    GENOME = 'Random'  # CPPN, Pattern, Random
    THRESHOLD = False
    TERRAIN_MODE = 'contract'
@@ -188,12 +188,13 @@ class EvoNMMO(TreeOrerock):
 #  SKILLS = ['woodcutting', 'mining']
 #  SKILLS = ['range', 'mage', 'melee']
    SKILLS = ALL_SKILLS
-   EVO_ALGO = 'Simple'  # Simple, MAP-Elites
+   EVO_ALGO = 'Simple'  # Simple, MAP-Elites, NEAT
    N_PROC = 6
    PRETRAINED = False
 #  MAP_DIMS = ['woodcutting', 'mining']
-   ME_DIMS = ['range', 'mage', 'melee']
-   ME_BIN_SIZE = 20
+   ME_DIMS = ['mining', 'woodcutting']
+   ME_BIN_SIZES = [20, 20]
+   ME_BOUNDS = [(0, 5000), (0, 5000)]
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS
@@ -205,8 +206,13 @@ class All(EvoNMMO):
    SKILLS = ALL_SKILLS
 
 class Griddly(EvoNMMO):
+   TRAIN_RENDER = False
    GRIDDLY = True
    REGISTERED = False  #FIXME: hack. Do not set this.
    TEST = False
    EVO_DIR = 'griddly_scratch_0'
    TERRAIN_BORDER = 1
+   ME_DIMS = ['mine_skill', 'woodcut_skill']
+   ME_BIN_SIZES = [100, 100]
+   ME_BOUNDS = [(0, 50), (0, 50)]
+   SKILLS = ['drink_skill', 'gather_skill', 'woodcut_skill', 'mine_skill']

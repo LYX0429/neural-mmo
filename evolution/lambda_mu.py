@@ -20,7 +20,7 @@ class LambdaMuEvolver():
            n_proc=12,
            n_epochs= 10000
    ):
-       self.genes = {}
+       self.maps = {}
        self.save_path = save_path
        self.evolver_path = os.path.join(self.save_path, 'evolver')
        self.log_path = os.path.join(self.save_path, 'log.csv')
@@ -69,7 +69,7 @@ class LambdaMuEvolver():
       n_proc = 0
 
       for g_hash, (game, score, age) in population.items():
-         map_arr = self.genes[g_hash]
+         map_arr = self.maps[g_hash]
          parent_conn, child_conn = Pipe()
          p = Process(target=self.simulate_game,
                  args=(
@@ -108,13 +108,12 @@ class LambdaMuEvolver():
 
       return self.mutate_gen()
 
-   def log(self, ranked_pop=None):
+   def log(self, ranked_pop=None, verbose=True):
       if ranked_pop is None:
          pop_list = [(g_hash, game, score, age) for g_hash, (game, score, age) in self.population.items() if score is not None]
          ranked_pop = sorted(pop_list, key=lambda tpl: tpl[2])
-      VERBOSE = True
 
-      if VERBOSE:
+      if verbose:
          print('Ranked population: (id, running_mean_score, last_score, age)')
 
       with open(self.log_path, mode='a') as log_file:
@@ -141,11 +140,12 @@ class LambdaMuEvolver():
              else:
                 last_score = -1
 
-             if VERBOSE:
+             if verbose:
                 print('{}, {:2f}, {:2f}, {}'.format(
                    g_hash, score, last_score, age))
              log_writer.writerow([g_hash, score, last_score, age])
-      print('mean score: {}'.format(np.mean(scores)))
+      if verbose:
+         print('mean score: {}'.format(np.mean(scores)))
 
    def mutate_gen(self):
       population = self.population
@@ -204,7 +204,7 @@ class LambdaMuEvolver():
               n_parent = j % len(par_hashes)
               par_hash = par_hashes[n_parent]
               # parent = population[par_hash]
-              par_map = self.genes[par_hash]
+              par_map = self.maps[par_hash]
               # par_game = parent[0]  # get game from (game, score, age) tuple
               g_hash = dead_hashes.pop()
               mutated.append(g_hash)
@@ -215,11 +215,11 @@ class LambdaMuEvolver():
              #child_game = self.make_game(child_map)
               child_game = None
               population[g_hash] = (child_game, None, 0)
-              self.genes[g_hash] = child_map
+              self.maps[g_hash] = child_map
               self.score_hists[g_hash] = []
               j += 1
 
-      self.saveMaps(self.genes, mutated)
+      self.saveMaps(self.maps, mutated)
 
 #     if (self.n_epoch % 10 == 0 or self.n_epoch == 2) and not self.reloading:
       if not self.reloading:
@@ -241,13 +241,13 @@ class LambdaMuEvolver():
          for i in range(self.n_pop):
              rank= self.g_hashes.pop()
 
-            #if rank in self.genes:
-            #    map_arr = self.genes[rank]
+            #if rank in self.maps:
+            #    map_arr = self.maps[rank]
             #else:
              map_arr = self.genRandMap(rank)
              game = None
              self.population[rank]= (game, None, 0)
-             self.genes[rank]= map_arr
+             self.maps[rank]= map_arr
              self.score_hists[rank] = []
 
          try:
