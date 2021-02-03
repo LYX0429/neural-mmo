@@ -376,10 +376,11 @@ class EvolverNMMO(LambdaMuEvolver):
 
 
 
-   def train_and_log(self):
+   def train_and_log(self, maps):
       print('training')
-      _ = self.trainer.train()
-      stats = ray.get(self.global_stats.get.remote())
+      self.global_counter.set_idxs.remote([i for i in maps.keys()])
+      _ = self.trainer.train(maps)
+      self.stats = stats = ray.get(self.global_stats.get.remote())
       [self.score_hists.update({key: [self.calc_diversity(val)]}) if key not in self.score_hists else self.score_hists[key].append(self.calc_diversity(val)) for key, val in stats.items()]
 #     if not np.all([len(self.score_hists[key]) == self.chromosomes[key].age for key in stats.keys()]):
 #        raise Exception
@@ -537,11 +538,11 @@ class EvolverNMMO(LambdaMuEvolver):
       self.last_map_idx = neat_idxs[-1]
       g_idxs_envs = list(g_idxs_out)
       np.random.shuffle(g_idxs_envs)
-      global_counter.set_idxs.remote(g_idxs_envs)
+#     global_counter.set_idxs.remote(g_idxs_envs)
       self.saveMaps(maps, new_g_idxs)
       global_stats = self.global_stats
       self.send_genes(global_stats)
-      _ = self.train_and_log()
+      _ = self.train_and_log(maps)
 
       if self.LEARNING_PROGRESS: # and self.n_epoch == 0:
           _ = self.train_and_log()
@@ -1098,7 +1099,7 @@ class EvolverNMMO(LambdaMuEvolver):
       global_stats = self.global_stats
       self.send_genes(global_stats)
       train_stats = self.trainer.train()
-      stats = ray.get(global_stats.get.remote())
+      stats = self.stats
      #headers = ray.get(global_stats.get_headers.remote())
 #     n_epis = train_stats['episodes_this_iter']
 
@@ -1113,7 +1114,7 @@ class EvolverNMMO(LambdaMuEvolver):
          if g_hash not in stats:
             print('Missing simulation stats for map {}. I assume this is the 0th generation, or re-load? Re-running the training step.'.format(g_hash))
             self.trainer.train()
-            stats = ray.get(global_stats.get.remote())
+            stats = self.stats
 
             break
 

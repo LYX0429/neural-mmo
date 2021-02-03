@@ -629,9 +629,10 @@ class EvoPPOTrainer(ppo.PPOTrainer):
    def defaultModel(self):
       return self.model(self.policyID(0))
 
-   def train(self):
+   def train(self, maps):
 #     self.reset()
-      self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset()))
+      # TODO: pass only the relevant map?
+      self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset(maps=maps)))
       stats = self.simulate_unfrozen()
       self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.send_agent_stats()))
 #     return self.simulate_frozen()
