@@ -8,6 +8,7 @@ from forge.blade.systems.skill import Skills
 from forge.blade.systems.inventory import Inventory
 from forge.blade.entity import entity
 from forge.blade.io.stimulus import Static
+from forge.blade.io import action
 
 class Player(entity.Entity):
    def __init__(self, realm, pos, iden, pop, name='', color=None):
@@ -26,7 +27,9 @@ class Player(entity.Entity):
       #self.chat      = Chat(dataframe)
 
       self.dataframe.init(Static.Entity, self.entID, self.pos)
-      self.exploration_grid = np.zeros(realm.shape, dtype=np.bool)
+#     self.exploration_grid = np.zeros(realm.shape, dtype=np.bool)
+      self.explored = set()
+      self.actions_matched = 0
 
    def applyDamage(self, dmg, style):
       self.resources.food.increment(dmg)
@@ -73,13 +76,17 @@ class Player(entity.Entity):
    def update(self, realm, actions):
       '''Post-action update. Do not include history'''
 #     print('player {} position {} health {}'.format(self.entID, self.pos, self.resources.health.val))
+      if hasattr(realm, 'target_action_sequence') and len(actions) > 0 and self.entID in actions:
+         act = actions[self.entID][action.static.Move][action.static.Direction]
+         if act == realm.target_action_sequence[realm.tick]:
+            self.actions_matched += 1
       if not super().update(realm, actions):
          return
 
       self.resources.update(realm, self, actions)
       self.skills.update(realm, self, actions)
       #self.inventory.update(world, actions)
-      self.exploration_grid[self.pos] = 1
+      self.explored.add(self.pos)
 
    def act(self, world, atnArgs):
       #Right now we only support one arg. So *args for future update

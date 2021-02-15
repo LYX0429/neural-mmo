@@ -34,8 +34,9 @@ from forge.ethyr.torch.policy import baseline
 from forge.trinity import Env, evaluator
 from forge.trinity.dataframe import DataType
 from forge.trinity.overlay import OverlayRegistry
+from forge.blade.io import action
 
-from evolution.diversity import DIV_CALCS
+from evolution.diversity import DIV_CALCS, diversity_calc
 
 from ray.rllib.execution.metric_ops import StandardMetricsReporting
 
@@ -52,6 +53,14 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
       self.headers = self.config.SKILLS
       super().__init__(self.config)
       self.evo_dones = None
+      self.agent_skills = []
+      if config['config'].FITNESS_METRIC == 'Actions':
+         self.ACTION_MATCHING = True
+         self.realm.target_action_sequence = [action.static.South] * config['config'].TRAIN_HORIZON
+         # A list of net actions matched by all dead agents
+         self.actions_matched = []
+      else:
+         self.ACTION_MATCHING = False
 
 
    def init_skill_log(self):
@@ -63,12 +72,14 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
 
    def step(self, decisions, omitDead=False, preprocessActions=True):
+#     print('decisions keys', decisions.keys())
+#     print('ent keys', self.ents.keys())
       obs, rewards, dones, infos = super().step(decisions,
             omitDead=omitDead, preprocessActions=preprocessActions)
 
       t, mmean = len(self.lifetimes), np.mean(self.lifetimes)
 
-      if not self.config.EVALUATE and t >= self.config.TRAIN_HORIZON:
+      if not self.config.EVALUATE and self.realm.tick > self.config.TRAIN_HORIZON:
          dones['__all__'] = True
 
       # are we doing evolution?
@@ -82,71 +93,102 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
       if self.config.EVO_MAP and hasattr(self, 'evo_dones') and self.evo_dones is not None:
          dones = self.evo_dones
          self.evo_dones = None
+#     print('obs keys', obs.keys())
 
       return obs, rewards, dones, infos
 
+
+
    def send_agent_stats(self):
-      global_stats = ray.get_actor('global_stats')
-      stats = self.get_agent_stats()
-      global_stats.add.remote(stats, self.worldIdx)
+#     global_stats = ray.get_actor('global_stats')
+      stats = self.get_all_agent_stats()
+#     global_stats.add.remote(stats, self.worldIdx)
       self.evo_dones = {}
       self.evo_dones['__all__'] = True
 
-   def get_agent_stats(self):
+      return stats
+
+   def get_agent_stats(self, player):
+      player_packet = player.packet()
+      a_skills = player_packet['skills']
+      a_skill_vals = {}
+
+      for k, v in a_skills.items():
+         if not isinstance(v, dict):
+            continue
+
+         if k in ['exploration']:
+            continue
+
+         if k in ['cooking', 'smithing', 'level']:
+            continue
+         a_skill_vals[k] = v['exp']
+
+         if k in ['fishing', 'hunting', 'constitution']:
+            # FIXME: hack -- just easier on the eyes, mostly. Don't change config.RESOURCE !
+            a_skill_vals[k] -= 1154
+      # a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 10
+#     a_skill_vals['exploration'] = player.exploration_grid.sum() * 20
+      a_skill_vals['exploration'] = len(player.explored) * 20
+      # timeAlive will only add expressivity if we fit more than one gaussian.
+      a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
+      if self.ACTION_MATCHING:
+         a_skill_vals['actions_matched'] = player.actions_matched
+
+      return a_skill_vals
+
+   def get_all_agent_stats(self):
       skills = {}
       a_skills = None
 
+      # Get stats of dead (note the order here)
+      l = 0
+      for skill_vals in self.agent_skills:
+         skills[l] = self.agent_skills[s]
+         l += 1
+
+      # Get stats of living
       for d, player in self.realm.players.items():
-         player_packet = player.packet()
-         a_skills = player_packet['skills']
-         a_skill_vals = {}
+         a_skill_vals = self.get_agent_stats(player)
+         skills[d+l] = a_skill_vals
 
-         for k, v in a_skills.items():
-            if not isinstance(v, dict):
-               continue
 
-            if k in ['exploration']:
-               continue
+#     if a_skills:
+      stats = np.zeros((len(skills), len(self.headers)))
+     #stats = np.zeros((len(skills), 1))
+      lifespans = np.zeros((len(skills)))
+      if self.ACTION_MATCHING:
+         actions_matched = np.zeros((len(skills)))
 
-            if k in ['cooking', 'smithing', 'level']:
-               continue
-            a_skill_vals[k] = v['exp']
-
-            if k in ['fishing', 'hunting', 'constitution']:
-               # FIXME: hack -- just easier on the eyes, mostly. Don't change config.RESOURCE !
-               a_skill_vals[k] -= 1154
-         # a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 10
-         a_skill_vals['exploration'] = player.exploration_grid.sum() * 20
-         # timeAlive will only add expressivity if we fit more than one gaussian.
-         a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
-         skills[d] = a_skill_vals
-
-      if a_skills:
-         stats = np.zeros((len(skills), len(self.headers)))
-        #stats = np.zeros((len(skills), 1))
-         lifespans = np.zeros((len(skills)))
+      for i, a_skills in enumerate(skills.values()):
          # over agents
 
-         for i, a_skills in enumerate(skills.values()):
+         for j, k in enumerate(self.headers):
             # over skills
+            if k not in ['level', 'cooking', 'smithing']:
+#             if k in ['exploration']:
+               stats[i, j] = a_skills[k]
+               j += 1
+         lifespans[i] = a_skills['time_alive']
+         if self.ACTION_MATCHING:
+            actions_matched[i] = a_skills['actions_matched']
 
-            for j, k in enumerate(self.headers):
-               if k not in ['level', 'cooking', 'smithing']:
- #             if k in ['exploration']:
-                  stats[i, j] = a_skills[k]
-                  j += 1
-            lifespans[i] = a_skills['time_alive']
-         stats = {
-               'skills': stats,
-               'lifespans': lifespans,
-               'lifetimes': self.lifetimes,
-               }
+      # Add lifespans of the living to those of the dead
+      lifespans = np.hstack((self.lifetimes, lifespans))
+      stats = {
+            'skills': [stats],
+            'lifespans': [lifespans],
+           #'lifetimes': lifetimes,
+            }
+      if self.ACTION_MATCHING:
+         actions_matched = np.hstack((self.actions_matched, actions_matched))
+         stats['actions_matched'] = [actions_matched],
 
-         return stats
+      return stats
 
-      return {'skills': [],
-            'lifespans': [],
-            'lifetimes': []}
+     #return {'skills': [0] * len(self.config.SKILLS),
+     #      'lifespans': [],
+     #      'lifetimes': []}
 
 
 #Neural MMO observation space
@@ -185,8 +227,8 @@ def observationSpace(config):
 
 #Neural MMO action space
 def actionSpace(config, n_act_i=3, n_act_j=5):
-   print('WARNING: Are you sure the griddly env action space is {} {}?'.format(n_act_i, n_act_j))
    if config.GRIDDLY:
+      print('WARNING: Are you sure the griddly env action space is {} {}?'.format(n_act_i, n_act_j))
       atns = gym.spaces.MultiDiscrete((n_act_i, n_act_j))
       return atns
    atns = FlexDict(defaultdict(FlexDict))
@@ -287,6 +329,9 @@ class RLLibEvaluator(evaluator.Base):
          os.mkdir(self.eval_path_model)
       except FileExistsError:
          print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
+
+      if self.config.EVALUATE:
+         self.calc_diversity = diversity_calc(config)
 
    def test(self):
 
@@ -437,8 +482,9 @@ class RLLibEvaluator(evaluator.Base):
           pos: Camera position (r, c) from the server)
           cmd: Consol command from the server
       '''
-      stats = self.env.get_agent_stats()
-      score = DIV_CALCS[1][0](stats, verbose=True)
+      stats = self.env.get_all_agent_stats()
+      score = self.calc_diversity(stats, verbose=True)
+#     score = DIV_CALCS[1][0](stats, verbose=True)
       print(score)
 
       #Compute batch of actions
@@ -553,7 +599,6 @@ def frozen_execution_plan(workers: WorkerSet, config: TrainerConfigDict):
        config['timesteps_per_iteration'] = -1
        config['min_iter_time_s'] = -1
        config['metrics_smoothing_episodes'] = -1
-       print(config.keys())
        EXEC_RETURN = StandardMetricsReporting(train_op, workers, config)
     return EXEC_RETURN
 
@@ -630,14 +675,42 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       return self.model(self.policyID(0))
 
    def train(self, maps):
-#     self.reset()
       # TODO: pass only the relevant map?
-      self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset(maps=maps)))
+#     idxs = iter(maps.keys())
+      idxs = list(maps.keys())
+#     if self.config['env_config']['config'].GRIDDLY:
+#        self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
+      #NOTE: you can't iteratively send indexes to environment with 'foreach_worker', multiprocessing will thwart you
+      i = 0
+      print(self.config['env_config'].keys())
+      if self.config['env_config']['config'].N_PROC == self.config['env_config']['config'].N_EVO_MAPS:
+         for worker in self.workers.remote_workers():
+            fuck_id = idxs[i % len(idxs)]
+            i += 1
+            # FIXME: fucking FUCK this GARBAGE BULLSHIT
+            # FIXME: must have N_PROC = N_EVO_MAPS. Utter fucking trash garbage.
+         #  worker.foreach_env.remote(lambda env: env.set_map(idx=next(idxs), maps=maps))
+            worker.foreach_env.remote(lambda env: env.set_map(idx=fuck_id, maps=maps))
+      else:
+         self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
+
       stats = self.simulate_unfrozen()
-      self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.send_agent_stats()))
-#     return self.simulate_frozen()
-#     if self.training_iteration % 2 == 0:
-#        return self.simulate_unfrozen()
+      stats_list = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: (env.worldIdx, env.send_agent_stats())))
+      stats = {}
+      for worker_stats in stats_list:
+         if not worker_stats: continue
+         for (envID, env_stats) in worker_stats:
+            if not env_stats: continue
+            if envID not in stats:
+               stats[envID] = env_stats
+            else:
+               for (k, v) in env_stats.items():
+                  if k not in stats[envID]:
+                     stats[envID][k] = v
+                  else:
+                     stats[envID][k] += v
+
+      return stats
 
    def simulate_frozen(self):
 #           update='counts values attention wilderness'.split())

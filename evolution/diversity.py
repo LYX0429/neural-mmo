@@ -17,11 +17,33 @@ def diversity_calc(config):
       calc_diversity = calc_convex_hull
    elif config.FITNESS_METRIC == 'Sum':
       calc_diversity = sum_experience
-   elif config.FITNESS_METRIC == 'Lifespans' or config.FITNESS_METRIC == 'ALP':
+   elif config.FITNESS_METRIC == 'Lifespans':  # or config.FITNESS_METRIC == 'ALP':
       calc_diversity = sum_lifespans
+   elif config.FITNESS_METRIC == 'Lifetimes' or config.FITNESS_METRIC == 'ALP':
+       calc_diversity = calc_mean_lifetime
+   elif config.FITNESS_METRIC == 'Actions':
+       calc_diversity = calc_mean_actions_matched
    else:
        raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))
    return calc_diversity
+
+
+def calc_mean_actions_matched(agent_stats, skill_headers=None, verbose=False):
+    actions_matched = np.hstack(agent_stats['actions_matched'])
+    if verbose:
+        print(actions_matched)
+#       print(agent_stats['lifespans'])
+    return np.mean(actions_matched)
+
+def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False):
+    lifetimes = agent_stats['lifespans']
+    if len(lifetimes) != 0:
+        lifetimes = np.hstack(lifetimes)
+    else:
+        lifetimes = [0]
+    mean_lifetime = lifetimes.mean()
+
+    return mean_lifetime
 
 def sum_lifespans(agent_stats, skill_headers=None, verbose=False):
    lifespans = np.hstack(agent_stats['lifespans'])

@@ -23,6 +23,8 @@ from qdpy.base import ParallelismManager
 # from qdpy.benchmarks import *
 from qdpy.containers import Grid
 from qdpy.plots import *
+from evolution.evo_map import EvolverNMMO
+from evolution.individuals import Individual
 
 # from qdpy.plots import *
 
@@ -47,69 +49,29 @@ mpl.use('Agg')
 
 
 
-class Fitness():
-   def __init__(self):
-      self.values = None
-      self.valid = False
-
-   def dominates(self, fitness):
-      assert len(self.values) == 1 and len(fitness.values) == 1
-      my_fit = self.values[0]
-      their_fit = fitness.values[0]
-
-      return my_fit > their_fit
-
-class Individual():
-   def __init__(self, rank=None, evolver=None, mysterious_class=None):
-      ind_idx, map_arr, atk_mults = evolver.genRandMap(g_hash=rank)
-      assert rank == ind_idx
-      self.fitness = Fitness()
-      self.idx = rank
-      self.chromosome = evolver.chromosomes[ind_idx]
-      self.score_hists = []
-      self.age = 0
-#     self.map_arr = None
-#     self.multi_hot = None
-#     self.atk_mults = None
-
-   def clone(self):
-      child = copy.deepcopy(self)
-      child.features = None
-      child.fitness.values = None
-      child.fitness.valid = False
-      child.score_hists = []
-      child.age = 0
-      child_chrom = self.chromosome.clone()
-      child.idx = None
-      child.chromosome = child_chrom
-
-      return child
-
 
 class NMMOGrid(Grid):
    def __init__(self, evolver, save_path, config, map_generator, *args, **kwargs):
        super().__init__(*args, **kwargs)
        self.evolver = evolver
-       render = config.TERRAIN_RENDER
-       self.border = config.TERRAIN_BORDER
+       self.border = evolver.config.TERRAIN_BORDER
        self.save_path = save_path
-       self.render = render
        self.map_generator = map_generator
 
    def add(self, individual):
       border = self.border
       index = super(NMMOGrid, self).add(individual)
       old_idx = individual.idx
-      if not (old_idx in self.evolver.population and old_idx in self.evolver.maps and old_idx in self.evolver.chromosomes):
-         TT()
+#     if not (old_idx in self.evolver.population and old_idx in self.evolver.maps and old_idx in self.evolver.chromosomes):
+
 
       if index is not None:
          chromosome = individual.chromosome
          idx = self.index_grid(individual.features)
          individual.idx = idx
 #        self.evolver.score_hists[idx] = individual.score_hists
-         self.evolver.score_hists[idx] = self.evolver.score_hists[old_idx]
-         self.evolver.chromosomes[idx] = chromosome
+#        self.evolver.score_hists[idx] = self.evolver.score_hists[old_idx]
+#        self.evolver.chromosomes[idx] = chromosome
          self.evolver.maps[idx] = (chromosome.map_arr, chromosome.multi_hot), chromosome.atk_mults
          self.evolver.population[idx] = self.evolver.population[old_idx]
          if self.evolver.LEARNING_PROGRESS:
@@ -127,14 +89,14 @@ class NMMOGrid(Grid):
          if self.evolver.PATTERN_GEN:
             map_arr = chromosome[0].flat_map
             atk_mults = chromosome[1]
-         elif self.evolver.CPPN:
+         elif self.evolver.CPPN or self.evolver.CA:
             map_arr = chromosome.map_arr
             atk_mults = chromosome.atk_mults
          if map_arr is None:
             #FIXME: why fuxk?
             map_arr, _ = self.evolver.gen_cppn_map(chromosome)
          Save.np(map_arr, map_path)
-         if self.render == True:
+         if self.evolver.config.TERRAIN_RENDER == True:
             Save.render(map_arr[border:-border, border:-border], self.evolver.map_generator.textures, map_path + '.png')
 #        print('add ind with idx {}'.format(tuple(individual.features)))
          json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + index_str + 'json')
@@ -155,7 +117,34 @@ class EvoDEAPQD(DEAPQDAlgorithm):
       super().__init__(*args, **kwargs)
       self.ea_fn = qd_fun
 
-class MapElites():
+
+class meNMMO(EvolverNMMO):
+   def __init__(self, save_path, make_env, trainer, config, n_proc, n_pop, map_policy):
+      super().__init__(save_path, make_env, trainer, config, n_proc, n_pop, map_policy)
+      # Track how many new elites have been added so that we can force population drift if necessary
+      self.archive_update_hist = np.empty((self.config.ARCHIVE_UPDATE_WINDOW))
+      self.archive_update_hist[:] = np.NaN
+      self.n_gen = 0
+      self.save_path = save_path
+      # Create fitness classes (must NOT be initialised in __main__ if you want to use scoop)
+      self.init_toolbox()
+      self.idxs = set()
+      self.mutated_idxs = set()
+      self.g_idxs = list(range(self.config.N_EVO_MAPS))
+      feature_names = self.config.ME_DIMS
+      if self.config.FEATURE_CALC == 'skills':
+          self.feature_idxs = [self.config.SKILLS.index(n) for n in feature_names]
+      else:
+          self.feature_idxs = [i for i in range(len(feature_names))]
+      try:
+         os.mkdir(os.path.join(self.save_path, 'temp_checkpoints'))
+      except FileExistsError:
+         pass
+      # FIXME: we should handle this in the parent
+      self.init_pop()
+
+
+
    def qdSimple(self, init_batch, toolbox, container, batch_size, niter, cxpb = 0.0, mutpb = 1.0, stats = None, halloffame = None, verbose = False, show_warnings = True, start_time = None, iteration_callback = None):
       """The simplest QD algorithm using DEAP.
       :param init_batch: Sequence of individuals used as initial batch.
@@ -186,19 +175,17 @@ class MapElites():
 
       # Evaluate the individuals with an invalid fitness
       invalid_ind = [ind for ind in init_batch if not ind.fitness.valid]
-      maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in invalid_ind])
-      self.evolver.saveMaps(maps)
-      self.evolver.train_and_log(maps)
-      if self.evolver.LEARNING_PROGRESS:
-         self.evolver.train_and_log(maps)
-#     [ind.score_hists.update({ind.idx: self.evolver.score_hists[ind.idx]}) for ind in invalid_ind]
+#     self.saveMaps(maps)
+      self.train_individuals(invalid_ind)
+      if self.LEARNING_PROGRESS:
+         self.train_individuals(invalid_ind)
  
-      fitnesses = [self.evaluate(ind) for ind in invalid_ind]
-#     fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+#     [self.evaluate(ind) for ind in invalid_ind]
+      fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
 
-      for ind, fit in zip(invalid_ind, fitnesses):
-          ind.fitness.values = fit[0]
-          ind.features = fit[1]
+#     for ind, fit in zip(invalid_ind, fitnesses):
+#         ind.fitness.values = fit[0]
+#         ind.features = fit[1]
 
       if len(invalid_ind) == 0:
           raise ValueError("No valid individual found !")
@@ -209,12 +196,14 @@ class MapElites():
           halloffame.update(init_batch)
 
       # Store batch in container
-      nb_updated = container.update(init_batch, issue_warning=show_warnings)
+      nb_updated = container.update(invalid_ind, issue_warning=show_warnings)
+      self.archive_update_hist = np.hstack((self.archive_update_hist[1:], [nb_updated]))
 
       # FIXME: we should warn about this when not reloading!
       if nb_updated == 0:
+         #NOTE: For reloading.
          print('Warning: empty container/grid')
-         pass
+   #     raise 
    #     raise ValueError("No individual could be added to the container !")
 
       else:
@@ -238,26 +227,28 @@ class MapElites():
 
          ## Vary the pool of individuals
 #        offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
-#        if self.evolver.CPPN:
-#           [self.evolver.gen_cppn_map(o.chromosome) for o in offspring]
+#        if self.CPPN:
+#           [self.gen_cppn_map(o.chromosome) for o in offspring]
          offspring = []
          mutated = []
          maps = {}
-         for o in batch:
-            newO = toolbox.clone(o)
-            new_idx = newO.idx
-            new_chrom = newO.chromosome
-            ind, = toolbox.mutate(newO)
-            del ind.fitness.values
-            offspring.append(ind)
-            self.evolver.gen_cppn_map(newO.chromosome)
-            self.evolver.maps[new_idx] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
-            mutated.append(new_idx)
-         maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in offspring])
-         self.evolver.saveMaps(maps, mutated)
-         self.evolver.train_and_log(maps)
-         if self.evolver.LEARNING_PROGRESS:
-            self.evolver.train_and_log(maps)
+         for (i, o) in enumerate(batch):
+#           newO = self.clone(o)
+            if np.random.random() < 0.1:
+                newO = Individual(i, self)
+            else:
+                newO = o.clone()
+                new_chrom = newO.chromosome
+                newO.mutate()
+               #newO, = self.mutate(newO)
+            newO.idx = i
+            offspring.append(newO)
+#           self.gen_cppn_map(newO.chromosome)
+            self.maps[i] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
+            mutated.append(i)
+         self.train_individuals(offspring)
+         if self.LEARNING_PROGRESS:
+            self.train_individuals(offspring)
 
          # Evaluate the individuals with an invalid fitness
          invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -271,6 +262,7 @@ class MapElites():
 
          # Replace the current population by the offspring
          nb_updated = container.update(offspring, issue_warning=show_warnings)
+         self.archive_update_hist = np.hstack((self.archive_update_hist[1:], [nb_updated]))
 
          # Update the hall of fame with the generated individuals
 
@@ -290,6 +282,63 @@ class MapElites():
 
       return batch, logbook
 
+   def iteration_callback(self, i, batch, container, logbook):
+      print('pattern_map_elites iteration {}'.format(self.n_gen))
+#     if not len(self.population) == len(self.maps) == len(self.chromosomes):
+#        raise Exception
+      # FIXME: doesn't work -- sync up these iteration/generation counts
+      self.algo.current_iteration = self.n_gen
+      self.n_epoch = self.n_gen
+      self.idxs = set()
+#     stats = self.tats
+      self.g_idxs = set(range(self.config.N_EVO_MAPS))
+      # update the elites to avoid stagnation (since simulation is stochastic)
+#     if self.n_gen > 0 and (len(container) > 0 and np.random.random() < 0.1):
+      recent_mean_updates = np.nanmean(self.archive_update_hist)
+      if self.n_epoch > 0 and len(container) > 0:
+#     if self.n_epoch > self.config.ARCHIVE_UPDATE_WINDOW and recent_mean_updates < 0.01:
+          disrupted_elites = np.random.choice(container, min(max(1, len(container)-1), self.config.N_EVO_MAPS), replace=False)
+#         disrupted_elites = sorted(container, key=lambda ind: ind.features[0], reverse=True)[:min(len(container), self.config.N_EVO_MAPS)]
+          elite_idxs = [ind.idx for ind in disrupted_elites]
+          for el, el_idx in zip(disrupted_elites, elite_idxs):
+             if el in container:
+                 try:
+                     container.discard(el, also_from_depot=True)
+                 except ValueError as v:
+                     # FIXME: why?
+                     print(v)
+             #FIXME: iterate through diff. features
+          self.train_individuals(disrupted_elites)
+          nb_updated = container.update(disrupted_elites, issue_warning=True)
+          print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(elite_idxs)))
+      #nb_el_updated = container.update()
+
+
+      self.idxs = set()
+      self.g_idxs = set(range(self.config.N_EVO_MAPS))
+      self.log(verbose=False)
+      self.mutated_idxs = set()
+      self.n_gen += 1
+
+      if self.n_gen == 2 or self.n_gen > 0 and self.n_gen % self.config.EVO_SAVE_INTERVAL == 0:
+#     if self.n_gen == 1:
+         self.log_me(container)
+         algo = self.algo
+         self.algo = None
+         toolbox = self.toolbox
+         self.toolbox = None
+#        for k, v in inspect.getmembers(self.algo):
+#           if k.startswith('_') and k != '__class__': #or inspect.ismethod(v):
+#              setattr(self, k, lambda x: None)
+         self.save()
+         algo.container.evolver = None
+         algo.save(os.path.join(self.save_path, 'ME_archive.p'))
+         algo.container.evolver = self
+         self.algo = algo
+         self.toolbox = toolbox
+      # Remove mutants after each iteration, since they have either been added to the container/archive, or deleted.
+      #FIXME: why wouldn't it be?
+
 
    def compile(self):
 
@@ -301,24 +350,23 @@ class MapElites():
 
    def clone(self, individual):
       child = individual.clone()
-      idx = self.g_idxs.pop()
-      child.idx = idx
-      self.evolver.chromosomes[idx] = individual.chromosome
+#     idx = self.g_idxs.pop()
+      child.idx = None
+#     self.chromosomes[idx] = individual.chromosome
 
       return child
 
 
    def mutate(self, individual):
-      evo = self.evolver
       idx = individual.idx
       self.mutated_idxs.add(idx)
 #     print('mutate {}'.format(idx))
       # = self.container.index_grid(np.clip(inddividual.features, 0, 2000))
       #FIXME: big hack
       chrom, atk_mults = individual.chromosome
-      atk_mults = self.evolver.mutate_mults(atk_mults)
+      atk_mults = self.mutate_mults(atk_mults)
       chrom.mutate()
-      self.evolver.validate_spawns(chrom.flat_map, chrom.multi_hot)
+      self.validate_spawns(chrom.flat_map, chrom.multi_hot)
 
       if not hasattr(individual.fitness, 'values'):
          individual.fitness.values = None
@@ -329,7 +377,6 @@ class MapElites():
 
 
    def mate(self, parent_0, parent_1):
-      evo = self.evolver
       idx_0 = parent_0.idx
       idx_1 = parent_1.idx
       self.mutated_idxs.add(idx_0)
@@ -338,7 +385,7 @@ class MapElites():
       chrom_1, atk_mults_1 = parent_1.chromosome
       prims_0 = chrom_0.patterns
       prims_1 = chrom_1.patterns
-#     new_atk_mults_0, new_atk_mults_1 = evo.mate_mults(atk_mults_0, atk_mults_1)
+#     new_atk_mults_0, new_atk_mults_1 = self.mate_mults(atk_mults_0, atk_mults_1)
       len_0, len_1 = len(prims_0), len(prims_1)
 
       if len_0 < len_1:
@@ -349,8 +396,8 @@ class MapElites():
       new_prims_1 = [prims_0[i] if random.random() < 0.5 else prims_1[i] for i in range(len_1)]
       chrom_0.patterns = new_prims_0
       chrom_1.patterns = new_prims_1
-#     evo.chromosomes[idx_0] = chrom_0, new_atk_mults_0
-#     evo.chromosomes[idx_1] = chrom_1, new_atk_mults_1
+#     self.chromosomes[idx_0] = chrom_0, new_atk_mults_0
+#     self.chromosomes[idx_1] = chrom_1, new_atk_mults_1
       chrom_0.update_features()
       chrom_1.update_features()
 
@@ -364,66 +411,36 @@ class MapElites():
 
       return parent_0, parent_1
 
-   def __init__(self, evolver, save_path='./'):
-      self.n_gen = 0
-      self.save_path = save_path
-      self.evolver = evolver
-      # Create fitness classes (must NOT be initialised in __main__ if you want to use scoop)
-      self.init_toolbox()
-      self.idxs = set()
-      self.mutated_idxs = set()
-      self.g_idxs = list(range(self.evolver.config.N_EVO_MAPS))
-      feature_names = self.evolver.config.ME_DIMS
-      self.feature_idxs = [self.evolver.config.SKILLS.index(n) for n in feature_names]
-#     self.feature_idxs = [i for i in range(len(feature_names))]
-      try:
-         os.mkdir(os.path.join(self.save_path, 'temp_checkpoints'))
-      except FileExistsError:
-         pass
-
    def init_toolbox(self):
       fitness_weight = -1.0
       creator.create("FitnessMin", base.Fitness, weights=(fitness_weight, ))
       creator.create("Individual",
                      Individual,
-                     evolver=self.evolver)
+                     evolver=self)
 #                    fitness=creator.FitnessMin,
 #                    features=list)
 
       # Create Toolbox
       toolbox = base.Toolbox()
-      #     toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=2)
       toolbox.register("expr", self.expr)
       toolbox.register("individual", tools.initIterate, creator.Individual,
                        toolbox.expr)
       toolbox.register("clone", self.clone)
-      toolbox.register("population", self.init_pop)
+      toolbox.register("population", self.init_individuals)
       toolbox.register("compile", self.compile)  # gp.compile, pset=pset)
-      # toolbox.register("evaluate", evalSymbReg, points=[x/10. for x in range(-10,10)])
       toolbox.register("evaluate", self.evaluate)  # , points=points)
       # toolbox.register("select", tools.selTournament, tournsize=3)
       toolbox.register("select", tools.selRandom)
-      if self.evolver.CPPN:
-         toolbox.register("mate", self.evolver.mate_cppns)
-         toolbox.register("mutate", self.evolver.mutate_cppn)
-      elif self.evolver.PATTERN_GEN:
+      if self.CPPN:
+         toolbox.register("mate", self.mate_cppns)
+         toolbox.register("mutate", self.mutate_cppn)
+      elif self.PATTERN_GEN:
          toolbox.register("mate", self.mate)
          toolbox.register("mutate", self.mutate)
       else:
-         raise Exception
-      # gp.genFull, min_=0, max_=2)
+         pass
+#        raise Exception
       toolbox.register("expr_mut", self.expr_mutate)
-      # , expr=toolbox.expr_mut, pset=pset)
-#     toolbox.decorate(
-#         "mate",
-#         gp.staticLimit(key=operator.attrgetter("height"),
-#                        max_value=max_size))
-#     toolbox.decorate(
-#         "mutate",
-#         gp.staticLimit(key=operator.attrgetter("height"),
-#                        max_value=max_size))
-      # toolbox.register("mutate", tools.mutPolynomialBounded, low=ind_domain[0], up=ind_domain[1], eta=eta, indpb=mutation_pb)
-      # toolbox.register("select", tools.selRandom) # MAP-Elites = random selection on a grid container
 #     toolbox.register("select", self.select_max_lifetime)
       self.toolbox = toolbox
 #     self.max_skill = 2000
@@ -431,8 +448,8 @@ class MapElites():
    def expr_mutate(self):
       raise NotImplementedError
 
-   def init_pop(self, n):
-      return [Individual(rank=i, evolver=self.evolver) for i in range(n)]
+   def init_individuals(self, n):
+      return [Individual(rank=i, evolver=self) for i in range(n)]
 
    def protectedDiv(left, right):
        try:
@@ -443,148 +460,27 @@ class MapElites():
    def select_max_lifetime(self, container, k):
       return sorted(container, key=lambda ind: ind.features[0], reverse=True)[:k]
 
-   def iteration_callback(self, i, batch, container, logbook):
-      print('pattern_map_elites iteration {}'.format(self.n_gen))
-      if not len(self.evolver.population) == len(self.evolver.maps) == len(self.evolver.chromosomes):
-         TT()
-      # FIXME: doesn't work -- sync up these iteration/generation counts
-      self.algo.current_iteration = self.n_gen
-      evo = self.evolver
-      evo.n_epoch = self.n_gen
-      self.idxs = set()
-      stats = self.evolver.stats
-      self.g_idxs = set(range(self.evolver.config.N_EVO_MAPS))
-      # update the elites to avoid stagnation (since simulation is stochastic)
-      if self.n_gen > 0 and (self.evolver.LEARNING_PROGRESS or len(container) > 0 and np.random.random() < 0.1):
-          disrupted_elites = np.random.choice(container, min(max(1, len(container)-6), self.evolver.config.N_EVO_MAPS), replace=False)
-#         disrupted_elites = sorted(container, key=lambda ind: ind.features[0], reverse=True)[:min(len(container), self.evolver.config.N_EVO_MAPS)]
-          elite_idxs = [ind.idx for ind in disrupted_elites]
-          for el, el_idx in zip(disrupted_elites, elite_idxs):
-             if el in container:
-                 try:
-                     container.discard(el, also_from_depot=True)
-                 except ValueError as v:
-                     # FIXME: why?
-                     print(v)
-             #FIXME: iterate through diff. features
-          maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in disrupted_elites])
-          self.evolver.train_and_log(maps)
-          elite_fitnesses = [self.evaluate(el, elite=True) for el in disrupted_elites]
-#         elite_fitnesses = self.toolbox.map(self.toolbox.evaluate, disrupted_elites)
-          for el, el_fit in zip(disrupted_elites, elite_fitnesses):
-             el.fitness.values = el_fit[0]
-#            el.features = np.clip(el_fit[1], self.features_domain[0][0], self.features_domain[0][1])
-            #el.features = np.clip(el_fit[1], 0, self.max_skill)
-             el.features = el_fit[1]
-          nb_updated = container.update(disrupted_elites, issue_warning=True)
-          print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(elite_idxs)))
-      #nb_el_updated = container.update()
 
-
-      self.idxs = set()
-      evo.global_stats.reset.remote()
-      self.g_idxs = set(range(self.evolver.config.N_EVO_MAPS))
-      if not hasattr(self, 'mutated_idxs'):
-          evo.saveMaps(evo.maps)
-      else:
-          evo.saveMaps(evo.maps, self.mutated_idxs)
-      evo.log(verbose=False)
-      self.mutated_idxs = set()
-      self.n_gen += 1
-
-      if self.n_gen == 1 or self.n_gen > 0 and self.n_gen % self.evolver.config.EVO_SAVE_INTERVAL == 0:
-#     if self.n_gen == 1:
-         self.log_me(container)
-         algo = self.algo
-         self.algo = None
-         toolbox = self.toolbox
-         self.toolbox = None
-#        for k, v in inspect.getmembers(self.algo):
-#           if k.startswith('_') and k != '__class__': #or inspect.ismethod(v):
-#              setattr(self, k, lambda x: None)
-         evo.save()
-         algo.container.evolver = None
-         algo.save(os.path.join(self.save_path, 'ME_archive.p'))
-         algo.container.evolver = self.evolver
-         self.algo = algo
-         self.toolbox = toolbox
-      # Remove mutants after each iteration, since they have either been added to the container/archive, or deleted.
-      #FIXME: why wouldn't it be?
 
    def evaluate(self, individual, elite=False):
       idx = individual.idx
-#     print('evaluating {}'.format(idx))
-      def calc_mean_agent(ind_stats):
-         skill_mat = np.vstack(ind_stats['skills'])
-         mean_agent = skill_mat.mean(axis=0)
 
-         return mean_agent
 
-      def calc_mean_lifetime(ind_stats):
-         mean_lifetime = [np.hstack(ind_stats['lifetimes']).mean()]
 
-         return mean_lifetime
-
-      evo = self.evolver
-
-      if idx not in evo.maps:
+      if idx not in self.maps:
          chromosome = individual.chromosome
-         if evo.CPPN:
-            evo.maps[idx] = (chromosome.map_arr, chromosome.multi_hot), chromosome.atk_mults  
-         elif evo.PATTERN_GEN:
-            evo.maps[idx] = individual.chromosome[0].paint_map(), individual.chromosome[1]
+         if self.CPPN:
+            self.maps[idx] = (chromosome.map_arr, chromosome.multi_hot), chromosome.atk_mults
+         elif self.PATTERN_GEN:
+            self.maps[idx] = individual.chromosome[0].paint_map(), individual.chromosome[1]
          else:
             raise Exception
-         evo.chromosomes[idx] = individual.chromosome
 
       if idx in self.idxs:
          pass
-      # if we have to run any sims, run the parallelized rllib trainer object
-
-      if self.evolver.stats is None or idx not in self.evolver.stats or len(self.evolver.score_hists[idx]) < 1:
-         raise Exception
-      if self.evolver.LEARNING_PROGRESS and len(self.evolver.score_hists[idx]) < 2:
-         raise Exception
-#        print("Training batch 1")
-        #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
-#        if self.evolver.n_epoch == 0:
-#        #  save_dir = self.evolver.trainer.save_checkpoint(os.path.join(self.save_path, 'temp_checkpoints'))
-#           save_dir = self.evolver.trainer.save()
-#        self.evolver.score_hists[idx] = [ atk_mults)
-       #if self.evolver.LEARNING_PROGRESS and not elite and not self.evolver.n_epoch == 0:
-#        if True:
-#           del(self.evolver.trainer)
-#           self.evolver.trainer = None
-#           self.evolver.restore(trash_trainer=True)
-         #  self.evolver.trainer.load_checkpoint(save_dir)
-
-      assert idx in self.evolver.stats
-      ind_stats = self.evolver.stats[idx]
-      score = self.evolver.get_score(idx)
-      if self.evolver.LEARNING_PROGRESS:
-         individual.ALPs = self.evolver.ALPs[idx]
-      features = calc_mean_agent(ind_stats)
-#     features = calc_mean_lifetime(ind_stats)
-
-      if idx in evo.population:
-          (game, old_score, age) = evo.population[idx]
-          evo.population[idx] = (game, score, age)
-      else:
-          evo.population[idx] = (None, score, individual.age)
-         #features = evo.chromosomes[idx][0].features
-      individual.fitness.values = [score]
-      individual.fitness.valid = True
-      features = [features[i] for i in self.feature_idxs]
-      individual.age += 1
-      self.idxs.add(idx)
-      if self.evolver.CPPN:
-         # Taken into account during CPPN reproduction in neat-python
-         #NOTE: Assume single objective
-         individual.chromosome.fitness = score
 
 
-
-      return [[score], features]
+      return [individual.fitness.values, individual.features]
 
    def load(self):
       import pickle
@@ -607,18 +503,18 @@ class MapElites():
                                log_base_path=self.log_base_path,
                                iteration_callback_fn=self.iteration_callback)
          self.algo = algo
-         algo.container.evolver = self.evolver
+         algo.container.evolver = self
 #        algo.current_iteration = archive['current_iteration']
 #        algo.start_time = timer()
 #        algo.run(archive['container'])
-         if not self.evolver.config.RENDER:
+         if not self.config.RENDER:
             algo.run()
 
          return
 
 
    def expr(self):
-      individual = Individual(Individual, evolver=self.evolver)
+      individual = Individual(Individual, evolver=self)
 
 
       return individual
@@ -654,22 +550,22 @@ class MapElites():
 #     max_size = self.max_size
    # The number of features to take into account in the container
       nb_features = len(self.feature_idxs)
-      assert nb_features == len(self.evolver.config.ME_DIMS)
+      assert nb_features == len(self.config.ME_DIMS)
 #     nb_bins = [max_size for _ in range(nb_features)]
-      nb_bins = self.evolver.config.ME_BIN_SIZES
+      nb_bins = self.config.ME_BIN_SIZES
       #    ind_domain = (0., 1.)                     # The domain (min/max values) of the individual genomes
       # The domain (min/max values) of the features
 #     features_domain = [(0, 2000), (0, 2000)]
 #     self.features_domain = features_domain = [(0, self.max_skill) for i in range(nb_features)]
-      self.features_domain = features_domain = self.evolver.config.ME_BOUNDS
+      self.features_domain = features_domain = self.config.ME_BOUNDS
       # The domain (min/max values) of the fitness
       fitness_domain = [(-np.inf, np.inf)]
       # The number of evaluations of the initial batch ('batch' = population)
-      init_batch_size = self.evolver.config.N_EVO_MAPS
+      init_batch_size = self.config.N_EVO_MAPS
       # The number of evaluations in each subsequent batch
-      batch_size = self.evolver.config.N_EVO_MAPS
+      batch_size = self.config.N_EVO_MAPS
       # The number of iterations (i.e. times where a new batch is evaluated)
-      nb_iterations = self.evolver.n_epochs
+      nb_iterations = self.n_epochs
       self.cxpb = cxpb = 0.5
       # The probability of mutating each value of a genome
       self.mutation_pb = mutation_pb = 1.0
@@ -700,10 +596,10 @@ class MapElites():
 
       # Create container
       grid = NMMOGrid(
-                  self.evolver,
+                  self,
                   self.save_path,
-                  self.evolver.config,
-                  self.evolver.map_generator,
+                  self.config,
+                  self.map_generator,
                   shape=nb_bins,
                   max_items_per_bin=max_items_per_bin,
                   fitness_domain=fitness_domain,
@@ -730,78 +626,93 @@ class MapElites():
          self.algo = algo
          # Run the illumination process !
          algo.run()
-      self.log_me(container)
+      self.log_me(grid)
+
+
+   def update_features(self, individual):
+       #     print('evaluating {}'.format(idx))
+
+       features = self.calc_features(individual)
+       #     features = [features[i] for i in self.me.feature_idxs]
+       # FIXME: nip this in the bud
+#      features = [features[i] if i in features else 0 for i in self.feature_idxs]
+       individual.features = features
+
+       [individual.feature_hists[i].append(feat) if i in individual.feature_hists else individual.feature_hists.update(
+           {i: [feat]}) for (i, feat) in enumerate(features)]
+       individual.features = [np.mean(individual.feature_hists[i]) for i in range(len(features))]
+
+       for (i, feat) in enumerate(features):
+           if len(individual.feature_hists[i]) >= self.config.ROLLING_FITNESS:
+               individual.feature_hists[i] = individual.feature_hists[i][-self.config.ROLLING_FITNESS:]
+
 
    def log_me(self, container):
-      grid = container
-      algo = self.algo
-      log_base_path = self.log_base_path
-      # Print results info
-      print(f"Total elapsed: {algo.total_elapsed}\n")
-      print(grid.summary())
-      # print("Best ever fitness: ", container.best_fitness)
-      # print("Best ever ind: ", container.best)
-      # print("%s filled bins in the grid" % (grid.size_str()))
-      # print("Solutions found for bins: ", grid.solutions)
-      # print("Performances grid: ", grid.fitness)
-      # print("Features grid: ", grid.features)
+         grid = container
+         algo = self.algo
+         log_base_path = self.log_base_path
+         # Print results info
+         print(f"Total elapsed: {algo.total_elapsed}\n")
+         print(grid.summary())
+         # print("Best ever fitness: ", container.best_fitness)
+         # print("Best ever ind: ", container.best)
+         # print("%s filled bins in the grid" % (grid.size_str()))
+         # print("Solutions found for bins: ", grid.solutions)
+         # print("Performances grid: ", grid.fitness)
+         # print("Features grid: ", grid.features)
 
-      # Search for the smallest best in the grid:
-      smallest_best = grid.best
-      smallest_best_fitness = grid.best_fitness
-      smallest_best_length = grid.best_features[0]
-      interval_match = 1e-10
+         # Search for the smallest best in the grid:
+         smallest_best = grid.best
+         smallest_best_fitness = grid.best_fitness
+         smallest_best_length = grid.best_features[0]
+         interval_match = 1e-10
 
-      for ind in grid:
-          if abs(ind.fitness.values[0] -
-                 smallest_best_fitness.values[0]) < interval_match:
+         for ind in grid:
+             if abs(ind.fitness.values[0] -
+                    smallest_best_fitness.values[0]) < interval_match:
 
-              if ind.features[0] < smallest_best_length:
-                  smallest_best_length = ind.features[0]
-                  smallest_best = ind
-      print("Smallest best:", smallest_best)
-      print("Smallest best fitness:", smallest_best.fitness)
-      print("Smallest best features:", smallest_best.features)
+                 if ind.features[0] < smallest_best_length:
+                     smallest_best_length = ind.features[0]
+                     smallest_best = ind
+         print("Smallest best:", smallest_best)
+         print("Smallest best fitness:", smallest_best.fitness)
+         print("Smallest best features:", smallest_best.features)
 
-      # It is possible to access the results (including the genomes of the solutions, their performance, etc) stored in the pickle file by using the following code:
-      # ----8<----8<----8<----8<----8<----8<
-      # from deap import base, creator, gp
-      # import pickle
-      # fitness_weight = -1.0
-      # creator.create("FitnessMin", base.Fitness, weights=(fitness_weight,))
-      # creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin, features=list)
-      # pset = gp.PrimitiveSet("MAIN", 1)
-      # pset.addEphemeralConstant("rand101", lambda: random.randint(-4.,4.))
-      # with open("final.p", "rb") as f:
-      #    data = pickle.load(f)
-      # print(data)
-      # ----8<----8<----8<----8<----8<----8<
-      # --> data is a dictionary containing the results.
+         # It is possible to access the results (including the genomes of the solutions, their performance, etc) stored in the pickle file by using the following code:
+         # ----8<----8<----8<----8<----8<----8<
+         # from deap import base, creator, gp
+         # import pickle
+         # fitness_weight = -1.0
+         # creator.create("FitnessMin", base.Fitness, weights=(fitness_weight,))
+         # creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin, features=list)
+         # pset = gp.PrimitiveSet("MAIN", 1)
+         # pset.addEphemeralConstant("rand101", lambda: random.randint(-4.,4.))
+         # with open("final.p", "rb") as f:
+         #    data = pickle.load(f)
+         # print(data)
+         # ----8<----8<----8<----8<----8<----8<
+         # --> data is a dictionary containing the results.
 
-      # Create plots
-      plot_path = os.path.join(log_base_path, "performancesGrid.pdf")
-      plotGridSubplots(grid.quality_array[..., 0],
-                       plot_path,
-                       plt.get_cmap("nipy_spectral"),
-                       grid.features_domain,
-                       grid.fitness_extrema[0],
-                       nbTicks=None)
-      print("\nA plot of the performance grid was saved in '%s'." %
-            os.path.abspath(plot_path))
+         # Create plots
+         plot_path = os.path.join(log_base_path, "performancesGrid.pdf")
+         plotGridSubplots(grid.quality_array[..., 0],
+                          plot_path,
+                          plt.get_cmap("nipy_spectral"),
+                          grid.features_domain,
+                          grid.fitness_extrema[0],
+                          nbTicks=None)
+         print("\nA plot of the performance grid was saved in '%s'." %
+               os.path.abspath(plot_path))
 
-      plot_path = os.path.join(log_base_path, "activityGrid.pdf")
-      plotGridSubplots(grid.activity_per_bin,
-                       plot_path,
-                       plt.get_cmap("nipy_spectral"),
-                       grid.features_domain,
-                       [0, np.max(grid.activity_per_bin)],
-                       nbTicks=None)
-      print("\nA plot of the activity grid was saved in '%s'." %
-            os.path.abspath(plot_path))
+         plot_path = os.path.join(log_base_path, "activityGrid.pdf")
+         plotGridSubplots(grid.activity_per_bin,
+                          plot_path,
+                          plt.get_cmap("nipy_spectral"),
+                          grid.features_domain,
+                          [0, np.max(grid.activity_per_bin)],
+                          nbTicks=None)
+         print("\nA plot of the activity grid was saved in '%s'." %
+               os.path.abspath(plot_path))
 
-      print("All results are available in the '%s' pickle file." %
-            algo.final_filename)
-
-   # MODELINE "{{{1
-   # vim:expandtab:softtabstop=4:shiftwidth=4:fileencoding=utf-8
-   # vim:foldmethod=marker
+         print("All results are available in the '%s' pickle file." %
+               algo.final_filename)

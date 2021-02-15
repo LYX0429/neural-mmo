@@ -213,6 +213,9 @@ class Realm:
    def graphicsData(self):
       return self.env, self.stats
 
+   def set_map(self, idx, map_arr):
+      self.map.set_map(self, idx, map_arr)
+
    def reset(self, idx):
       self.map.reset(self, idx)
       self.tick = 0
@@ -225,6 +228,7 @@ class Realm:
       self.npcs     = NPCManager(self, self.config)
   
    def step(self, decisions):
+#     print('realm tick:', self.tick)
       self.players.spawn()
       while len(self.players.entities) == 0:
          self.players.spawn()

@@ -7,8 +7,11 @@ from forge.blade.lib import enums, utils
 import os
 import time
 
-def loadTiled(tiles, fPath, materials):
-   idxMap = np.load(fPath)
+def loadTiled(tiles, fPath, materials, map_arr=None):
+   if map_arr is not None:
+      idxMap = map_arr
+   else:
+      idxMap = np.load(fPath)
    for r, row in enumerate(idxMap):
       for c, idx in enumerate(row):
          mat  = materials[idx]
@@ -29,17 +32,27 @@ class Map:
       sz              = config.TERRAIN_SIZE
       self.shape      = (sz, sz)
       self.config     = config
+      self.map_arr = None
 
       self.tiles = np.zeros(self.shape, dtype=object)
       for r in range(sz):
          for c in range(sz):
             self.tiles[r, c] = core.Tile(realm, config, enums.Grass, r, c, 'grass')
 
-   def reset(self, realm, idx):
+   def set_map(self, realm, idx, map_arr):
+      self.idx = idx
+      self.reset(self.idx, realm, map_arr=map_arr)
+
+   def reset(self, realm, idx, map_arr=None):
+#     self.idx = idx
       materials = dict((mat.value.index, mat.value) for mat in enums.Material)
       fName     = self.config.ROOT + str(idx) + self.config.SUFFIX
-
-      loadTiled(self.tiles, fName, materials)
+      if map_arr is not None:
+         self.map_arr = map_arr
+      if self.map_arr is not None:
+         loadTiled(self.tiles, fName,  materials, map_arr=self.map_arr)
+      else:
+         loadTiled(self.tiles, fName, materials)
       self.updateList = set()
  
    def harvest(self, r, c):

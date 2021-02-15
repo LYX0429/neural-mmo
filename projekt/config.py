@@ -160,7 +160,7 @@ class EvoNMMO(TreeOrerock):
  # INFER_IDX = 79766
  # INFER_IDX = 80117
    # How to measure diversity of agents on generated map.
-   FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete', 'Hull', 'Sum', 'Lifespans'
+   FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete', 'Hull', 'Sum', 'Lifespans', 'Actions'
    GENOME = 'Random'  # CPPN, Pattern, Random
    THRESHOLD = False
    TERRAIN_MODE = 'contract'
@@ -194,7 +194,9 @@ class EvoNMMO(TreeOrerock):
 #  MAP_DIMS = ['woodcutting', 'mining']
    ME_DIMS = ['mining', 'woodcutting']
    ME_BIN_SIZES = [20, 20]
-   ME_BOUNDS = [(0, 5000), (0, 5000)]
+   ME_BOUNDS = [(0, 10000), (0, 10000)]
+   ARCHIVE_UPDATE_WINDOW = 15  # How long without any updates to ME archive before randomly re-evaluating some elites?
+   FEATURE_CALC = 'map entropy'
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS

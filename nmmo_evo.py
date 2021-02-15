@@ -219,16 +219,29 @@ class NMMO(MultiAgentEnv):
       del(self.env)
       self.env = None
       self.lifetimes = {}
+      self.dones = {'__all__': False}
       self.maps = None
      #del (self.env)
      #self.env = None
 
+   def set_map(self, idx=None, maps=None):
+      if idx is None:
+         global_counter = ray.get_actor("global_counter")
+         self.mapIdx = ray.get(global_counter.get.remote())
+         fPath = os.path.join(self.config['config'].ROOT + str(self.mapIdx), 'map.npy')
+         map_arr = np.load(fPath)
+      else:
+         self.mapIdx = idx
+         map_arr = maps[self.mapIdx]
+         map_arr = maps[idx]
+      self.map_arr = map_arr
+
    def reset(self, config=None, step=None, maps=None):
-      #FIXME: looks like the trainer is resetting of its own accord? Bad.
-      if maps is None:
-         maps = self.maps
-      assert maps is not None      
-      self.maps = maps
+      self.dones = {'__all__': False}
+#     if maps is None:
+#        maps = self.maps
+#     assert maps is not None      
+#     self.maps = maps
       if self.env is None:
          env = gym.make('GDY-nmmo-v0',
                         player_observer_type=gd.ObserverType.VECTOR,
@@ -237,15 +250,11 @@ class NMMO(MultiAgentEnv):
          self.env = env
       self.lifetimes = dict([(i, 0) for i in range(self.env.player_count)])
       self.skills = dict([(skill_name, dict([(i, 0) for i in range(self.env.player_count)])) for skill_name in self.skill_names])
-      global_counter = ray.get_actor("global_counter")
 
       if self.config['config'].TEST:
          map_str_out = self.map_gen.gen_map(self.init_tiles, self.probs)
       else:
-         self.mapIdx = ray.get(global_counter.get.remote())
-#        fPath = os.path.join(self.config['config'].ROOT + str(self.mapIdx), 'map.npy')
-#        map_arr = np.load(fPath)
-         map_arr = maps[self.mapIdx]
+         map_arr = self.map_arr
          map_str = map_arr.astype('U'+str(1 + len(str(self.config['config'].NENT))))
 
          for i, char in enumerate(self.init_tiles):
@@ -280,6 +289,7 @@ class NMMO(MultiAgentEnv):
 
       if self.config['config'].TRAIN_RENDER:
          self.render()
+      dones['__all__'] = self.dones['__all__']
 
       return obs, rew, dones, info
 
@@ -290,13 +300,15 @@ class NMMO(MultiAgentEnv):
       global_vars = self.env.get_state()['GlobalVariables']
       [self.skills[skill_name].update({k: global_vars[skill_name][k]}) if k in global_vars[skill_name] else self.skills[skill_name].update({k: 0}) for k in range(self.env.player_count) for skill_name in self.config['config'].SKILLS]
       global_stats = ray.get_actor('global_stats')
-      global_stats.add.remote(
-             {
-                'skills': [[self.skills[i][j] for i in self.skills] for j in range(self.env.player_count)],
-                'lifespans': [self.lifetimes[i] for i in range(len(self.lifetimes))],
-                'lifetimes': [self.lifetimes[i] for i in range(len(self.lifetimes))],
-                },
-             self.mapIdx)
+      stats ={
+         'skills': [[self.skills[i][j] for i in self.skills] for j in range(self.env.player_count)],
+         'lifespans': [self.lifetimes[i] for i in range(len(self.lifetimes))],
+         'lifetimes': [self.lifetimes[i] for i in range(len(self.lifetimes))],
+         }
+      global_stats.add.remote(stats, self.mapIdx)
+      self.dones['__all__'] = True
+
+      return stats
 
    def __reduce__(self):
       pass

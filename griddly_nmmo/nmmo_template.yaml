@@ -64,10 +64,49 @@ Actions:
           Preconditions:
             - gt: [thirst, 0]
             - gt: [hunger, 0]
+            - lt: [health, 10]
           Commands:
             - incr: health
         Dst:
           Object: gnome
+
+  - Name: increase_hunger
+    InputMapping:
+      Inputs:
+        1:
+          Description: The gnome has eaten.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Preconditions:
+            - lt: [hunger, 10]
+          Commands:
+            # Not ideal
+            - add: [hunger, 10]
+        Dst:
+          Object: _empty
+
+
+  - Name: increase_thirst
+    InputMapping:
+      Inputs:
+        1:
+          Description: The gnome has drunk.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Preconditions:
+            - lt: [thirst, 10]
+          Commands:
+            - add: [thirst, 10]
+        Dst:
+          Object: water
 
   - Name: decrease_health_starvation
     InputMapping:
@@ -123,7 +162,7 @@ Actions:
             # increase health if appropriate
             - exec:
                 Action: increase_health
-                Delay: ${_delay}
+                Delay: 0
             # if hunger > 0, hunger -= 1
             - gt:
                 Arguments: [hunger, 0]
@@ -139,10 +178,10 @@ Actions:
             # This prevents double-decrementing health if both are depleted.
             - exec:
                 Action: decrease_health_starvation
-                Delay: ${_delay}
+                Delay: 0
             - exec:
                 Action: decrease_health_thirst
-                Delay: ${_delay}
+                Delay: 0
             # if health <= 0, die
             - lt:
                 Arguments: [health, 1]
@@ -285,7 +324,9 @@ Actions:
             # leaves give +5 hunger
 #           - add: [hunger, 5]
             - incr: gather_skill
-            - add: [hunger, 10]
+            - exec:
+                Action: increase_hunger
+                Delay: 0
 
         Dst:
           Object: forest
@@ -299,8 +340,10 @@ Actions:
           Object: gnome
           Commands:
             # water gives +5 thirst
-            - add: [thirst, 10]
             - incr: drink_skill
+            - exec:
+                Action: increase_thirst
+                Delay: 0
         Dst:
           Object: water
 

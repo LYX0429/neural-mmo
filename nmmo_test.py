@@ -62,6 +62,6 @@ if __name__ == '__main__':
            #if j != 1 and j % 10 == 0:
            #    T()
 
-            if done['__all__'] or j == 1000:
+            if done['__all__'] or j == 100:
                 break
             j += 1 

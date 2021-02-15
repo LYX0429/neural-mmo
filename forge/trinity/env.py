@@ -133,6 +133,7 @@ class Env:
          infos:
             An empty dictionary provided only for conformity with OpenAI Gym.
       '''
+#     print(self.realm.tick)
       self.env_step = time.time()
 
       ###Preprocess actions
@@ -176,7 +177,7 @@ class Env:
       blob.log(ent.skills.hunting.level,      'Hunting')
       blob.log(ent.skills.woodcutting.level,  'Woodcutting')
       blob.log(ent.skills.mining.level,       'Mining')
-      blob.log(ent.exploration_grid.sum(),    'Exploration')
+      blob.log(len(ent.explored),    'Exploration')
 
       #TODO: swap these entries when equipment is reenabled
       blob = quill.register('Wilderness', self.realm.tick, quill.HISTOGRAM, quill.SCATTER)
@@ -199,7 +200,16 @@ class Env:
 
       return self.quill.packet
 
+   def set_map(self, idx, maps):
+      if idx is None:
+         counter = ray.get_actor("global_counter")
+         idx = ray.get(counter.get.remote())
+      map_arr = maps[idx]
+#     self.realm.set_map(idx, map_arr)
+      self.worldIdx = idx
+
    def reset(self, idx=None, step=True):
+#     print('reset', idx)
       '''Instantiates the environment and returns initial observations
 
       Neural MMO simulates a persistent world. It is best-practice to call
@@ -224,22 +234,25 @@ class Env:
       
      #if idx is None:
       if self.config.EVO_MAP and not self.config.FIXED_MAPS:
-         counter = ray.get_actor("global_counter")
-         idx = ray.get(counter.get.remote())
-         global_stats = ray.get_actor("global_stats")
-         atk_mults = ray.get(global_stats.get_mults.remote(idx))
-         if atk_mults:
-            for k, v in atk_mults.items():
-               setattr(self.config, k, v)
+         idx = self.worldIdx
+#        counter = ray.get_actor("global_counter")
+#        idx = ray.get(counter.get.remote())
+#        self.worldIdx = idx
+#        idx = self.worldIdx
+#        global_stats = ray.get_actor("global_stats")
+#        atk_mults = ray.get(global_stats.get_mults.remote(idx))
+#        if atk_mults:
+#           for k, v in atk_mults.items():
+#              setattr(self.config, k, v)
       elif self.config.EVALUATE and idx is not None and not self.config.MAP == 'PCG':
          json_path = os.path.join(os.curdir, 'evo_experiment', self.config.MAP, 'maps', 'atk_mults{}json'.format(idx))
-         with open(json_path, 'r') as f:
-            atk_mults = json.load(f)
+ #       with open(json_path, 'r') as f:
+ #          atk_mults = json.load(f)
          pass
       elif idx is None:
          idx = np.random.randint(self.config.NMAPS)
 
-      self.worldIdx = idx
+#     self.worldIdx = idx
 #     print('trinity env idx: {}'.format(idx))
       self.dead     = {}
 
@@ -365,6 +378,13 @@ class Env:
          dones[entID]   = False
          self.dummi_ob = ob
 
+      for entID, ent in dead.items():
+         lifetime = ent.history.timeAlive.val
+         self.lifetimes.append(lifetime)
+         if hasattr(self, 'actions_matched'):
+            actions_matched = ent.actions_matched
+            self.actions_matched.append(actions_matched)
+
       if omitDead:
          return obs, rewards, dones
 
@@ -375,8 +395,7 @@ class Env:
          rewards[ent.entID] = self.reward(ent)
          obs[ent.entID]     = self.dummi_ob
 
-         lifetime = ent.history.timeAlive.val
-         self.lifetimes.append(lifetime)
+
 
       return obs, rewards, dones
 
