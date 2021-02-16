@@ -10,6 +10,8 @@ from pathlib import Path
 from pdb import set_trace as T
 from shutil import copyfile
 from typing import Dict
+import skimage
+from skimage.morphology import disk
 
 import numpy as np
 import ray
@@ -26,7 +28,9 @@ import projekt
 from evolution.diversity import diversity_calc
 from evolution.lambda_mu import LambdaMuEvolver
 import neat
-from evolution.individuals import Individual, DefaultGenome
+from evolution.individuals import Individual
+#from evolution.individuals import CPPNGenome as DefaultGenome
+from evolution.individuals import DefaultGenome
 from evolution.individuals import CAGenome
 from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
@@ -176,8 +180,11 @@ def calc_map_entropy(individual):
    ent = scipy.stats.entropy(np.bincount(map_arr.reshape(-1), minlength=individual.n_tiles))
    ent = ent * 100 / np.log(individual.n_tiles)
 
- # ent_2D = skimage.entropy(map_arr, skimage.morphology.disk(10))
+#  local_ent = skimage.filters.rank.entropy(map_arr, disk(10))
+#  lacal_ent = local_ent.mean() * 100
+#  return [ent, local_ent]
    return [ent]
+
 
 def calc_mean_lifetime(individual):
    ind_stats = individual.stats
@@ -233,7 +240,8 @@ class EvolverNMMO(LambdaMuEvolver):
       self.CA = config.GENOME == 'CA'
       self.PATTERN_GEN = config.GENOME == 'Pattern'
       self.RAND_GEN = config.GENOME == 'Random'
-      if not (self.CA or self.CPPN or self.PATTERN_GEN or self.RAND_GEN):
+      self.ALL_GENOMES = config.GENOME == 'All'
+      if not (self.CA or self.CPPN or self.PATTERN_GEN or self.RAND_GEN or self.ALL_GENOMES):
          raise Exception('Invalid genome')
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
@@ -255,7 +263,7 @@ class EvolverNMMO(LambdaMuEvolver):
          # g_idxs we might use
          self.g_idxs_reserve = set([i for i in range(self.n_pop*10)])
 
-      if self.CPPN:
+      if self.CPPN or self.ALL_GENOMES:
          self.neat_to_g = {}
 
          if self.config.GRIDDLY:
@@ -275,11 +283,11 @@ class EvolverNMMO(LambdaMuEvolver):
 #        self.chromosomes = dict([(i-1, genome) for (i, genome) in self.neat_pop.population.items()])
 
 
-      if self.PATTERN_GEN:
+      if self.PATTERN_GEN or self.ALL_GENOMES:
          self.max_primitives = self.map_width**2 / 4
 
-         from evolution.paint_terrain import Chromosome
-         self.Chromosome = Chromosome
+         from evolution.individuals import PatternGenome
+         self.Chromosome = PatternGenome
 #        self.chromosomes = {}
 #        self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
          # TODO: generalize this for tile-flipping, then NEAT
@@ -357,7 +365,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #           T()
          #FIXME: what for?
 #        self.idxs.add(idx)
-         if self.CPPN or self.CA:
+         if self.CPPN or self.CA or self.ALL_GENOMES:
             # Taken into account during CPPN reproduction in neat-python
             #NOTE: Assume single objective
             fitness = ind.fitness.values[0]
@@ -399,43 +407,43 @@ class EvolverNMMO(LambdaMuEvolver):
 #        self.ALPs.pop(gi)
 
 
-   def gen_cppn_map(self, genome):
-      if genome.map_arr is not None and genome.multi_hot is not None:
-         return genome.map_arr, genome.multi_hot
+#  def gen_cppn_map(self, genome):
+#     if genome.map_arr is not None and genome.multi_hot is not None:
+#        return genome.map_arr, genome.multi_hot
 
-      cppn = neat.nn.FeedForwardNetwork.create(genome, self.neat_config)
+#     cppn = neat.nn.FeedForwardNetwork.create(genome, self.neat_config)
 #       if self.config.NET_RENDER:
 #          with open('nmmo_cppn.pkl', 'wb') a
-      multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
-      map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
+#     multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
+#     map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
 
-      for x in range(self.map_width):
-         for y in range(self.map_height):
-            # a decent scale for NMMO
-            x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
-            x_i, y_i = x_i * 2, y_i * 2
-            v = cppn.activate((x_i, y_i))
+#     for x in range(self.map_width):
+#        for y in range(self.map_height):
+#           # a decent scale for NMMO
+#           x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
+#           x_i, y_i = x_i * 2, y_i * 2
+#           v = cppn.activate((x_i, y_i))
 
-            if self.config.THRESHOLD:
-               # use NMMO's threshold logic
-               assert len(v) == 1
-               v = v[0]
-               v = self.map_generator.material_evo(self.config, v)
-            else:
-               # CPPN has output channel for each tile type; take argmax over channels
-               # also a spawn-point tile
-               assert len(v) == self.n_tiles
-               multi_hot[:, x, y] = v
-               # Shuffle before selecting argmax to prevent bias for certain tile types in case of ties
-               v = np.array(v)
-               v = np.random.choice(np.flatnonzero(v == v.max()))
+#           if self.config.THRESHOLD:
+#              # use NMMO's threshold logic
+#              assert len(v) == 1
+#              v = v[0]
+#              v = self.map_generator.material_evo(self.config, v)
+#           else:
+#              # CPPN has output channel for each tile type; take argmax over channels
+#              # also a spawn-point tile
+#              assert len(v) == self.n_tiles
+#              multi_hot[:, x, y] = v
+#              # Shuffle before selecting argmax to prevent bias for certain tile types in case of ties
+#              v = np.array(v)
+#              v = np.random.choice(np.flatnonzero(v == v.max()))
 #              v = np.argmax(v)
-               map_arr[x, y] = v
-      map_arr = self.validate_spawns(map_arr, multi_hot)
-      genome.map_arr = map_arr
-      genome.multi_hot = multi_hot
+#              map_arr[x, y] = v
+#     map_arr = self.validate_spawns(map_arr, multi_hot)
+#     genome.map_arr = map_arr
+#     genome.multi_hot = multi_hot
 
-      return map_arr, multi_hot
+#     return map_arr, multi_hot
 
 
 

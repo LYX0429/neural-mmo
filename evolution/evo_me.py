@@ -89,7 +89,7 @@ class NMMOGrid(Grid):
          if self.evolver.PATTERN_GEN:
             map_arr = chromosome[0].flat_map
             atk_mults = chromosome[1]
-         elif self.evolver.CPPN or self.evolver.CA:
+         elif self.evolver.CPPN or self.evolver.CA or self.evolver.ALL_GENOMES:
             map_arr = chromosome.map_arr
             atk_mults = chromosome.atk_mults
          if map_arr is None:
@@ -234,12 +234,14 @@ class meNMMO(EvolverNMMO):
          maps = {}
          for (i, o) in enumerate(batch):
 #           newO = self.clone(o)
-            if np.random.random() < 0.1:
+            rnd = np.random.random()
+            if rnd < 0.01:
                 newO = Individual(i, self)
             else:
                 newO = o.clone()
                 new_chrom = newO.chromosome
-                newO.mutate()
+                if rnd < 0.67:
+                    newO.mutate()
                #newO, = self.mutate(newO)
             newO.idx = i
             offspring.append(newO)

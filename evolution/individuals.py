@@ -5,6 +5,7 @@ from torch.nn import Conv2d
 import copy
 import numpy as np
 from forge.blade.lib import enums
+from evolution.paint_terrain import Line, Rectangle, RectanglePerimeter, Circle, CirclePerimeter, Gaussian
 from pdb import set_trace as T
 
 # Not using this
@@ -84,6 +85,18 @@ def mate_atk_mults(atk_mults_0, atk_mults_1, single_offspring=False):
             new_atk_mults_1[k] = atk_mults_1[k]
 
     return new_atk_mults_0, new_atk_mults_1
+
+class Genome():
+    def __init__(self):
+        self.atk_mults = gen_atk_mults()
+
+    def clone(self):
+        child = copy.deepcopy(self)
+
+        return child
+
+    def mutate(self):
+        self.atk_mults = mutate_atk_mults(self.atk_mults)
 
 def init_weights(m):
     if type(m) == torch.nn.Linear:
@@ -171,7 +184,7 @@ class CAGenome():
 
     def mutate(self):
         noise = np.random.random(self.nn.weights.shape) * 2 - 1
-        mask = np.random.randint(0, 2, (self.nn.weights.shape))
+        mask = (np.random.random(size=(self.nn.weights.shape)) < 0.1) * 1
         mutation = np.multiply(mask, noise)
         weights = self.nn.weights + mutation
         self.nn.set_weights(weights)
@@ -187,33 +200,74 @@ class CAGenome():
 
 
 class DefaultGenome(neat.genome.DefaultGenome):
-    evolver = None
     ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
     beyond the map.'''
-    def __init__(self, key):
+    def __init__(self, key, neat_config, map_width, n_tiles):
         super().__init__(key)
+        self.configure_new(neat_config.genome_config)
         self.map_arr = None
         self.multi_hot = None
         self.atk_mults = gen_atk_mults()
         self.age = 0
+        self.neat_config = neat_config
+        self.map_width = self.map_height = map_width
+        self.n_tiles = n_tiles
+        self.gen_map()
 
     def configure_crossover(self, parent1, parent2, config):
         super().configure_crossover(parent1, parent2, config)
         mults_1, mults_2 = parent1.atk_mults, parent2.atk_mults
         self.atk_mults, _ = mate_atk_mults(mults_1, mults_2, single_offspring=True)
 
-    def mutate(self, config):
-        super().mutate(config)
+    def mutate(self):
+        super().mutate(self.neat_config.genome_config)
         self.atk_mults = mutate_atk_mults(self.atk_mults)
         self.age = 0
+        self.gen_map()
 
     def clone(self):
         child = copy.deepcopy(self)
         child.age = 0
-        child.map_arr = None
-        child.multi_hot = None
 
         return child
+
+    def gen_map(self):
+        if self.map_arr is not None and self.multi_hot is not None:
+            return self.map_arr, self.multi_hot
+
+        cppn = neat.nn.FeedForwardNetwork.create(self, self.neat_config)
+        #       if self.config.NET_RENDER:
+        #          with open('nmmo_cppn.pkl', 'wb') a
+        multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
+        map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
+
+        for x in range(self.map_width):
+            for y in range(self.map_height):
+                # a decent scale for NMMO
+                x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
+                x_i, y_i = x_i * 2, y_i * 2
+                v = cppn.activate((x_i, y_i))
+
+           #    if self.config.THRESHOLD:
+           #        # use NMMO's threshold logic
+           #        assert len(v) == 1
+           #        v = v[0]
+           #        v = self.map_generator.material_evo(self.config, v)
+           #    else:
+                # CPPN has output channel for each tile type; take argmax over channels
+                # also a spawn-point tile
+                assert len(v) == self.n_tiles
+                multi_hot[:, x, y] = v
+                # Shuffle before selecting argmax to prevent bias for certain tile types in case of ties
+                v = np.array(v)
+                v = np.random.choice(np.flatnonzero(v == v.max()))
+                #              v = np.argmax(v)
+                map_arr[x, y] = v
+#       map_arr = self.validate_spawns(map_arr, multi_hot)
+        self.map_arr = map_arr
+        self.multi_hot = multi_hot
+
+        return map_arr, multi_hot
 
 class Fitness():
     def __init__(self):
@@ -229,6 +283,92 @@ class Fitness():
         return my_fit > their_fit
 
 
+class PatternGenome(Genome):
+    def __init__(self, map_width, n_tiles, max_patterns, default_tile):
+        super().__init__()
+        self.map_width = map_width
+        self.n_tiles = n_tiles
+        self.max_patterns = max_patterns
+        self.default_tile = default_tile
+        self.pattern_templates = [Line, Rectangle, RectanglePerimeter, Gaussian, Circle, CirclePerimeter]
+        #     self.pattern_templates = [Gaussian]
+        self.weights =  [2/3,  1/3]
+        # some MAP-Elites dimensions
+        self.features = None
+        self.flat_map = None
+        self.multi_hot = None
+        self.gen_map()
+
+    #  def init_endpoint_pattern(self, p):
+    #     p = p(
+    #           np.random.randint(0, self.map_width, 2),
+    #           np.random.randint(0, self.map_width, 2),
+    #           np.random.randint(0, self.n_tiles),
+    #           np.random.random(),
+    #           self.map_width,
+    #           )
+
+    #     return p
+
+    def gen_map(self):
+        self.patterns = np.random.choice(self.pattern_templates,
+                                         np.random.randint(self.max_patterns), self.weights).tolist()
+        self.features = [0, 0]  # Number of lines, circle perimeters
+
+        for i, p in enumerate(self.patterns):
+            #if p in [Line, Rectangle]:
+            p = p.generate(p, self.n_tiles, self.map_width)
+            self.patterns[i] = p
+        self.update_features()
+
+        return self.paint_map()
+
+    def update_features(self):
+        self.features = [0, 0]
+        for p in self.patterns:
+            if isinstance(p, (Line, Rectangle, RectanglePerimeter)):
+                self.features[0] += 1
+            elif isinstance(p, (CirclePerimeter, Circle, Gaussian)):
+                self.features[1] += 1
+
+    def mutate(self):
+        super().mutate()
+        n_patterns = len(self.patterns)
+        if n_patterns == 0:
+            add_ptrn = True
+        else:
+            add_ptrn = np.random.randint(0, min(5, self.max_patterns - n_patterns))
+            for p in np.random.choice(self.patterns, np.random.randint(0, max(1, int(n_patterns//5)))):
+                p.mutate()
+
+        for i in range(0, min(5, n_patterns)):
+            self.patterns.pop(np.random.randint(n_patterns-i))
+        if add_ptrn and n_patterns < self.max_patterns:
+            p = np.random.choice(self.pattern_templates)
+            p = p.generate(p, self.n_tiles, self.map_width)
+            self.patterns.append(p)
+        self.flat_map = None
+        self.multi_hot = None
+        self.gen_map()
+        #     self.update_features()
+
+        return self.paint_map()
+
+
+    def paint_map(self):
+        if hasattr(self, 'flat_map') and self.flat_map is not None:
+            return self.flat_map, self.multi_hot
+        multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_width))
+        multi_hot[self.default_tile, :, :] = 1e-10
+
+        for p in self.patterns:
+            p.paint(multi_hot)
+        map_arr = np.argmax(multi_hot, axis=0)
+        self.map_arr, self.multi_hot = map_arr, multi_hot
+
+        return map_arr, multi_hot
+
+
 class Individual():
     def __init__(self, rank, evolver, mysterious_class=None):
         self.fitness = Fitness()
@@ -237,9 +377,20 @@ class Individual():
         self.SPAWN_IDX = evolver.SPAWN_IDX
         self.NENT = evolver.config.NENT
         self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
+        if evolver.ALL_GENOMES:
+            rnd = np.random.random()
+            if rnd < 1/3:
+                self.chromosome = DefaultGenome(self.idx, evolver.neat_config, evolver.map_width, self.n_tiles)
+            elif rnd < 2/3:
+                self.chromosome = PatternGenome(evolver.map_width, self.n_tiles, evolver.max_primitives,
+                                                enums.Material.GRASS.value.index)
+            else:
+                seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
+                self.chromosome = CAGenome(self.n_tiles, seed)
         if evolver.CPPN:
             #FIXME: yeesh
-            self.chromosome = evolver.chromosomes[self.idx]
+            self.chromosome = DefaultGenome(self.idx)
+#           self.chromosome = evolver.chromosomes[self.idx]
         elif evolver.CA:
             seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
             self.chromosome = CAGenome(self.n_tiles, seed)
