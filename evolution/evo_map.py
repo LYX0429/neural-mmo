@@ -32,7 +32,7 @@ from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
 from forge.ethyr.torch import utils
 from forge.trinity.overlay import OverlayRegistry
-from griddly_nmmo.map_gen import GdyMaterial, GriddlyMapGenerator
+
 from pcg import get_tile_data
 from plot_evo import plot_exp
 #from projekt import rlutils
@@ -241,6 +241,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.ALPs = {}
 
       if self.config.GRIDDLY:
+         from griddly_nmmo.map_gen import GdyMaterial, GriddlyMapGenerator
          self.SPAWN_IDX = GdyMaterial.SPAWN.value.index
       else:
          self.SPAWN_IDX = enums.Material.SPAWN.value.index
@@ -269,9 +270,9 @@ class EvolverNMMO(LambdaMuEvolver):
          self.neat_config.elitism = int(self.lam * self.config.N_EVO_MAPS)
          self.neat_config.survival_threshold = self.mu
          self.neat_config.num_outputs = self.n_tiles
-         self.neat_pop = neat.population.Population(self.neat_config)
+#        self.neat_pop = neat.population.Population(self.neat_config)
          #NOTE: NEAT indexing accomodation
-         self.chromosomes = dict([(i-1, genome) for (i, genome) in self.neat_pop.population.items()])
+#        self.chromosomes = dict([(i-1, genome) for (i, genome) in self.neat_pop.population.items()])
 
 
       if self.PATTERN_GEN:
