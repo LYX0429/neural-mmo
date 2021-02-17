@@ -227,12 +227,15 @@ class Env:
          observations, as documented by step()
       '''
       self.quill     = log.Quill(self.realm.iden)
-      self.lifetimes = []
 
       self.env_reset = time.time()
 
-      
-     #if idx is None:
+
+      self.agent_skills = []
+      self.lifetimes = []
+      self.actions_matched = []
+
+#if idx is None:
       if self.config.EVO_MAP and not self.config.FIXED_MAPS:
          idx = self.worldIdx
 #        counter = ray.get_actor("global_counter")
@@ -381,6 +384,7 @@ class Env:
       for entID, ent in dead.items():
          lifetime = ent.history.timeAlive.val
          self.lifetimes.append(lifetime)
+         self.agent_skills.append(self.get_agent_stats(ent))
          if hasattr(self, 'actions_matched'):
             actions_matched = ent.actions_matched
             self.actions_matched.append(actions_matched)

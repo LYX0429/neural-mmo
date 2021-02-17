@@ -51,9 +51,10 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
    def __init__(self, config):
       self.config = config['config']
       self.headers = self.config.SKILLS
+      self.agent_skills = []
+      self.lifetimes = []
       super().__init__(self.config)
       self.evo_dones = None
-      self.agent_skills = []
       if config['config'].FITNESS_METRIC == 'Actions':
          self.ACTION_MATCHING = True
          self.realm.target_action_sequence = [action.static.South] * config['config'].TRAIN_HORIZON
@@ -144,13 +145,15 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
       # Get stats of dead (note the order here)
       l = 0
       for skill_vals in self.agent_skills:
-         skills[l] = self.agent_skills[s]
+         skills[l] = self.agent_skills[l]
          l += 1
 
       # Get stats of living
-      for d, player in self.realm.players.items():
+      d = 0
+      for _, player in self.realm.players.items():
          a_skill_vals = self.get_agent_stats(player)
          skills[d+l] = a_skill_vals
+         d += 1
 
 
 #     if a_skills:
