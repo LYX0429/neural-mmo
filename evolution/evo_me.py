@@ -240,8 +240,7 @@ class meNMMO(EvolverNMMO):
             else:
                 newO = o.clone()
                 new_chrom = newO.chromosome
-                if rnd < 0.67:
-                    newO.mutate()
+                newO.mutate()
                #newO, = self.mutate(newO)
             newO.idx = i
             offspring.append(newO)

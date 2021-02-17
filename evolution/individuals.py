@@ -232,8 +232,8 @@ class DefaultGenome(neat.genome.DefaultGenome):
         return child
 
     def gen_map(self):
-        if self.map_arr is not None and self.multi_hot is not None:
-            return self.map_arr, self.multi_hot
+       #if self.map_arr is not None and self.multi_hot is not None:
+       #    return self.map_arr, self.multi_hot
 
         cppn = neat.nn.FeedForwardNetwork.create(self, self.neat_config)
         #       if self.config.NET_RENDER:
@@ -389,7 +389,7 @@ class Individual():
                 self.chromosome = CAGenome(self.n_tiles, seed)
         if evolver.CPPN:
             #FIXME: yeesh
-            self.chromosome = DefaultGenome(self.idx)
+            self.chromosome = DefaultGenome(self.idx, evolver.neat_config, evolver.map_width, self.n_tiles)
 #           self.chromosome = evolver.chromosomes[self.idx]
         elif evolver.CA:
             seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
