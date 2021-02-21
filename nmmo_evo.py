@@ -1,4 +1,5 @@
 import copy
+from evolution.evolver import init_evolver
 import os
 import pickle
 import sys
@@ -228,12 +229,13 @@ class NMMO(MultiAgentEnv):
       if idx is None:
          global_counter = ray.get_actor("global_counter")
          self.mapIdx = ray.get(global_counter.get.remote())
-         fPath = os.path.join(self.config['config'].ROOT + str(self.mapIdx), 'map.npy')
-         map_arr = np.load(fPath)
+     #   fPath = os.path.join(self.config['config'].ROOT + str(self.mapIdx), 'map.npy')
+     #   map_arr = np.load(fPath)
       else:
          self.mapIdx = idx
-         map_arr = maps[self.mapIdx]
-         map_arr = maps[idx]
+      #FIXME: agree w/ NMMO
+      self.worldIdx = self.mapIdx
+      map_arr = maps[self.mapIdx]
       self.map_arr = map_arr
 
    def reset(self, config=None, step=None, maps=None):
@@ -285,7 +287,7 @@ class NMMO(MultiAgentEnv):
     # if isinstance(a[0], np.ndarray):
       obs, rew, dones, info = self.env.step(a)
       [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
-      [self.lifetimes.update({k: v+1}) if k not in self.env.deads else None for (k, v) in self.lifetimes.items()]
+      [self.lifetimes.update({k: v+1}) if k not in self.env.past_deads else None for (k, v) in self.lifetimes.items()]
 
       if self.config['config'].TRAIN_RENDER:
          self.render()
@@ -373,9 +375,7 @@ if __name__ == '__main__':
         evolver.epoch_reloaded = evolver.n_epoch
         evolver.restore()
         evolver.trainer.reset()
-
-        if evolver.MAP_ELITES:
-            evolver.me.load()
+        evolver.load()
 
     except FileNotFoundError as e:
         print(e)
@@ -383,15 +383,23 @@ if __name__ == '__main__':
             'Cannot load; missing evolver and/or model checkpoint. Evolving from scratch.'
         )
 
-        evolver = EvolverNMMO(
-            save_path,
-            createEnv,
-            None,  # init the trainer in evolution script
-            config,
-            n_proc=config.N_PROC,
-            n_pop=config.N_EVO_MAPS,
-            map_policy=mapPolicy,
-        )
+#       evolver = EvolverNMMO(
+#           save_path,
+#           createEnv,
+#           None,  # init the trainer in evolution script
+#           config,
+#           n_proc=config.N_PROC,
+#           n_pop=config.N_EVO_MAPS,
+#           map_policy=mapPolicy,
+#       )
+
+        evolver = init_evolver(save_path,
+                       createEnv,
+                       None,  # init the trainer in evolution script
+                       config,
+                       n_proc=config.N_PROC,
+                       n_pop=config.N_EVO_MAPS,
+                       )
 #  print(torch.__version__)
 
 #  print(torch.cuda.current_device())

@@ -18,7 +18,7 @@ class LambdaMuEvolver():
            lam=1 / 3,
            mu=1 / 3,
            n_proc=12,
-           n_epochs= 10000
+           n_epochs= 1000000
    ):
        self.maps = {}
        self.save_path = save_path

@@ -194,9 +194,10 @@ class EvoNMMO(TreeOrerock):
 #  MAP_DIMS = ['woodcutting', 'mining']
    ME_DIMS = ['mining', 'woodcutting']
    ME_BIN_SIZES = [20, 20]
-   ME_BOUNDS = [(0, 10000), (0, 10000)]
+   ME_BOUNDS = [(0, 100), (0, 100)]
    ARCHIVE_UPDATE_WINDOW = 15  # How long without any updates to ME archive before randomly re-evaluating some elites?
    FEATURE_CALC = 'map entropy'
+   TEST = False
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS

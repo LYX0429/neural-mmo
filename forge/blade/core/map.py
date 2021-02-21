@@ -41,7 +41,8 @@ class Map:
 
    def set_map(self, realm, idx, map_arr):
       self.idx = idx
-      self.reset(self.idx, realm, map_arr=map_arr)
+      self.map_arr = map_arr
+#     self.reset(self.idx, realm, map_arr=map_arr)
 
    def reset(self, realm, idx, map_arr=None):
 #     self.idx = idx

@@ -53,7 +53,7 @@ class ValidatedMultiDiscreteNMMO(gym.spaces.MultiDiscrete):
 class NMMOWrapper(gym.Wrapper):
     def __init__(self, env, max_steps=100):
         super().__init__(env)
-        self.deads = set()
+        self.past_deads = set()
         self.n_step = 0
         self.max_steps = max_steps
 
@@ -63,18 +63,19 @@ class NMMOWrapper(gym.Wrapper):
         done = {}
         info = {}
         all_done = True
-        [None if (i in self.deads) else action.update({i: list(val)}) for (i, val) in action.items()]
+        [None if (i in self.past_deads) else action.update({i: list(val)}) for (i, val) in action.items()]
         action = [action[i] if i in action else [0,0] for i in range(self.player_count)]
 #       action.reverse()
         obs, rew, done, info = self.env.step(action)
         obs = dict([(i, val) for (i, val) in enumerate(obs)])
         rew = dict([(i, rew[i]) for i in range(self.player_count)])
-        done = dict([(i, self.env.get_state()['GlobalVariables']['player_dead'][i+1] > 0 and i not in self.deads and False) for i in range(self.player_count)])
+        env_deads = self.env.get_state()['GlobalVariables']['player_dead']
+        done = dict([(i, env_deads[i+1] > 0 and i not in self.past_deads and False) for i in range(self.player_count)])
         info = dict([(i, info) for i in range(self.player_count)])
         # Pop anyone who is already dead
-        [(obs.pop(i), rew.pop(i), done.pop(i), info.pop(i)) for i in self.deads]
-        if not len(self.deads) == self.player_count:
-           [self.deads.add(i) if self.env.get_state()['GlobalVariables']['player_dead'][i+1] > 0 else None for i in done] 
+        [(obs.pop(i), rew.pop(i), done.pop(i), info.pop(i)) for i in self.past_deads]
+        if not len(self.past_deads) == self.player_count:
+           [self.past_deads.add(i) if self.env.get_state()['GlobalVariables']['player_dead'][i + 1] > 0 else None for i in done]
        #[self.deads.add(i) if rew[i] < 0 else None for i in rew] 
      #  done = dict([(i, False) for i in range(self.player_count)])
 
@@ -116,7 +117,7 @@ class NMMOWrapper(gym.Wrapper):
         return self.env._player_last_observation[player_id], reward, done, info
 
     def reset(self, level_id=None, level_string=None):
-        self.deads = set()
+        self.past_deads = set()
         reset_result = super().reset(level_id=level_id, level_string=level_string)
 
         # Overwrite the action space

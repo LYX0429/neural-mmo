@@ -2,8 +2,11 @@ from pdb import set_trace as T
 import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
+import skimage
+from skimage.morphology import disk
 
 import skbio
+
 
 
 def diversity_calc(config):
@@ -23,10 +26,51 @@ def diversity_calc(config):
        calc_diversity = calc_mean_lifetime
    elif config.FITNESS_METRIC == 'Actions':
        calc_diversity = calc_mean_actions_matched
+   elif config.FITNESS_METRIC == 'MapTest':
+       calc_diversity = calc_local_map_entropy
+   elif config.FITNESS_METRIC == 'MapTestText':
+       calc_diversity = ham_text
    else:
        raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))
    return calc_diversity
 
+from PIL import Image, ImageDraw, ImageFont
+fnt = ImageFont.truetype('arial.ttf', 15)
+trg_image = Image.new(mode = "RGB", size=(50, 50))
+draw = ImageDraw.Draw(trg_image)
+draw.text((1,1), "Evo", font=fnt, fill=(255,0,0))
+draw.text((1,15), "NMMO", font=fnt, fill=(255,0,0))
+draw.text((1,32), "¯\_(ツ)_/¯", font=fnt, fill=(255,0,0))
+trg_image.save("trg_img.png")
+trg_image = (np.array(trg_image)[:, :, 0] / 255 * 8).astype(np.uint8)
+
+def ham_text(individual):
+    map_arr = individual.chromosome.map_arr[10:-10, 10:-10]
+    return -(trg_image != map_arr).sum()
+
+def calc_map_entropies(individual, config):
+    glob_ent = calc_global_map_entropy(individual, config)
+    loc_ent = calc_local_map_entropy(individual, config)
+
+    return [glob_ent[0], loc_ent]
+
+def calc_global_map_entropy(individual, config):
+    # FIXME: hack to ignore lava borders
+    b = config.TERRAIN_BORDER
+    map_arr = individual.chromosome.map_arr[b:-b, b:-b]
+    ent = scipy.stats.entropy(np.bincount(map_arr.reshape(-1), minlength=individual.n_tiles))
+    ent = ent * 100 / np.log(individual.n_tiles)
+
+    return [ent]
+
+def calc_local_map_entropy(individual, config):
+    # FIXME: hack to ignore lava borders
+    b = config.TERRAIN_BORDER
+    map_arr = individual.chromosome.map_arr[b:-b, b:-b]
+    local_ent = skimage.filters.rank.entropy(map_arr, disk(3))
+    local_ent = local_ent.mean() * 100 / np.log2(individual.n_tiles)
+
+    return local_ent.item()
 
 def calc_mean_actions_matched(agent_stats, skill_headers=None, verbose=False):
     actions_matched = np.hstack(agent_stats['actions_matched'])

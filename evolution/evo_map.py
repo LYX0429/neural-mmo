@@ -1,4 +1,5 @@
 import copy
+from qdpy.phenotype import Features
 import csv
 import json
 import os
@@ -26,9 +27,10 @@ from ray.rllib.policy.sample_batch import SampleBatch
 
 import projekt
 from evolution.diversity import diversity_calc
+from evolution.diversity import calc_map_entropies, calc_global_map_entropy
 from evolution.lambda_mu import LambdaMuEvolver
 import neat
-from evolution.individuals import Individual
+from evolution.individuals import EvoIndividual
 #from evolution.individuals import CPPNGenome as DefaultGenome
 from evolution.individuals import DefaultGenome
 from evolution.individuals import CAGenome
@@ -164,7 +166,7 @@ def createPolicies(config):
 
 def calc_mean_agent(individual):
    skill_arrays = []
-   ind_stats = individusl.stats
+   ind_stats = individual.stats
 
    for skill_arr in ind_stats['skills']:
       if len(skill_arr) > 0:
@@ -174,16 +176,7 @@ def calc_mean_agent(individual):
 
    return mean_agent
 
-def calc_map_entropy(individual):
-   # FIXME: hack to ignore lava borders
-   map_arr = individual.chromosome.map_arr[10:-10,10:-10]
-   ent = scipy.stats.entropy(np.bincount(map_arr.reshape(-1), minlength=individual.n_tiles))
-   ent = ent * 100 / np.log(individual.n_tiles)
 
-#  local_ent = skimage.filters.rank.entropy(map_arr, disk(10))
-#  lacal_ent = local_ent.mean() * 100
-#  return [ent, local_ent]
-   return [ent]
 
 
 def calc_mean_lifetime(individual):
@@ -202,7 +195,8 @@ class EvolverNMMO(LambdaMuEvolver):
       assert self.mapPolicy is not None
       if config.FEATURE_CALC == "map entropy":
          config.ME_DIMS = 'map entropy'
-         self.calc_features = calc_map_entropy
+         self.calc_features = calc_map_entropies
+#        self.calc_features = calc_global_map_entropy
       elif config.FEATURE_CALC == 'skill':
          self.calc_features = calc_mean_agent
       elif config.FEATURE_CALC == 'agent lifetime':
@@ -225,7 +219,11 @@ class EvolverNMMO(LambdaMuEvolver):
       self.state = {}
       self.done = {}
       self.chromosomes = {}
-
+      if self.config.GRIDDLY:
+         from griddly_nmmo.map_gen import GdyMaterial, GriddlyMapGenerator
+         self.SPAWN_IDX = GdyMaterial.SPAWN.value.index
+      else:
+         self.SPAWN_IDX = enums.Material.SPAWN.value.index
       if self.config.GRIDDLY:
          self.map_generator = GriddlyMapGenerator(self.config)
       else:
@@ -238,24 +236,21 @@ class EvolverNMMO(LambdaMuEvolver):
       self.global_counter = ray.get_actor("global_counter")
       self.CPPN = config.GENOME == 'CPPN'
       self.CA = config.GENOME == 'CA'
-      self.PATTERN_GEN = config.GENOME == 'Pattern'
-      self.RAND_GEN = config.GENOME == 'Random'
+      self.PRIMITIVES = config.GENOME == 'Pattern'
+      self.TILE_FLIP = config.GENOME == 'Random'
+      self.LSYSTEM = config.GENOME == 'LSystem'
       self.ALL_GENOMES = config.GENOME == 'All'
-      if not (self.CA or self.CPPN or self.PATTERN_GEN or self.RAND_GEN or self.ALL_GENOMES):
+      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.ALL_GENOMES):
          raise Exception('Invalid genome')
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
+      self.MAP_TEST = 'MapTest' in config.FITNESS_METRIC
       self.calc_fitness = diversity_calc(config)
       self.ALPs = {}
-
-      if self.config.GRIDDLY:
-         from griddly_nmmo.map_gen import GdyMaterial, GriddlyMapGenerator
-         self.SPAWN_IDX = GdyMaterial.SPAWN.value.index
-      else:
-         self.SPAWN_IDX = enums.Material.SPAWN.value.index
-
       self.LAMBDA_MU = config.EVO_ALGO == 'Simple'
       self.MAP_ELITES = config.EVO_ALGO == 'MAP-Elites'
+      self.CMAES = config.EVO_ALGO == 'CMAES'
+      self.CMAME = config.EVO_ALGO == 'CMAME'
 
       # because population will exceeded given limit
 
@@ -283,11 +278,12 @@ class EvolverNMMO(LambdaMuEvolver):
 #        self.chromosomes = dict([(i-1, genome) for (i, genome) in self.neat_pop.population.items()])
 
 
-      if self.PATTERN_GEN or self.ALL_GENOMES:
-         self.max_primitives = self.map_width**2 / 4
+      if self.PRIMITIVES or self.ALL_GENOMES:
+        #self.max_primitives = self.map_width**2 / 4
+         self.max_primitives = 20
 
-         from evolution.individuals import PatternGenome
-         self.Chromosome = PatternGenome
+#        from evolution.individuals import PatternGenome
+#        self.Chromosome = PatternGenome
 #        self.chromosomes = {}
 #        self.global_counter.set_idxs.remote(range(self.config.N_EVO_MAPS))
          # TODO: generalize this for tile-flipping, then NEAT
@@ -312,7 +308,10 @@ class EvolverNMMO(LambdaMuEvolver):
 
 
    def update_fitness(self, individual, ALP=False):
-      individual.score_hists.append(self.calc_fitness(individual.stats))
+      if not self.MAP_TEST:
+         individual.score_hists.append(self.calc_fitness(individual.stats))
+      else:
+         individual.score_hists.append(self.calc_fitness(individual))
 
       if ALP:
          score = individual.score_hists[-2] - individual.score_hists[-1]
@@ -323,25 +322,53 @@ class EvolverNMMO(LambdaMuEvolver):
          individual.ALPs.append(score)
          score = abs(np.mean(individual.ALPs))
       else:
-          score = np.mean(individual.score_hists)
+         score = np.mean(individual.score_hists)
 
-      if len(individual.score_hists) >= self.config.ROLLING_FITNESS:
-         individual.score_hists = individual.score_hists[-self.config.ROLLING_FITNESS:]
+         if len(individual.score_hists) >= self.config.ROLLING_FITNESS:
+            individual.score_hists = individual.score_hists[-self.config.ROLLING_FITNESS:]
 
-      if ALP:
-         if len(self.ALPs) >= self.config.ROLLING_FITNESS:
-            individual.ALPs = individual.ALPs[-self.config.ROLLING_FITNESS:]
+         if ALP:
+            if len(self.ALPs) >= self.config.ROLLING_FITNESS:
+               individual.ALPs = individual.ALPs[-self.config.ROLLING_FITNESS:]
 
-      individual.fitness.values = [score]
+#        individual.fitness.values = [score]
+         individual.fitness.setValues([-score])
 
+   def update_features(self, individual):
+      #     print('evaluating {}'.format(idx))
+
+      if self.config.FEATURE_CALC == 'map entropy':
+         features = self.calc_features(individual, self.config)
+      else:
+         features = self.calc_features(individual)
+
+      individual.features = features
+      #     features = [features[i] for i in self.me.feature_idxs]
+      # FIXME: nip this in the bud
+      #      features = [features[i] if i in features else 0 for i in self.feature_idxs]
+#     individual.features = features
+#     individual.features.setValues(features)
+#     individual.features = Features(features)
+
+     ##FIXME: would need to make sure this is resetting on clone
+     #[individual.feature_hists[i].append(
+     #   feat) if i in individual.feature_hists else individual.feature_hists.update(
+     #   {i: [feat]}) for (i, feat) in enumerate(features)]
+#    #individual.features = [np.mean(individual.feature_hists[i]) for i in range(len(features))]
+     #individual.features.setValues([np.mean(individual.feature_hists[i]) for i in range(len(features))])
+
+     #for (i, feat) in enumerate(features):
+     #   if len(individual.feature_hists[i]) >= self.config.ROLLING_FITNESS:
+     #      individual.feature_hists[i] = individual.feature_hists[i][-self.config.ROLLING_FITNESS:]
 
    def train_individuals(self, individuals):
-      self.saveMaps(individuals)
+      if self.n_epoch % self.config.EVO_SAVE_INTERVAL == 0:
+         self.saveMaps(self.container)
       maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in individuals])
       stats = self.train_and_log(maps)
 
       for ind in individuals:
-         if not ind.idx in stats:
+         if not self.MAP_TEST and not ind.idx in stats:
             print('missing individual {} from training stats!'.format(ind.idx))
 #           print(maps.keys())
 #           print(stats.keys())
@@ -359,17 +386,17 @@ class EvolverNMMO(LambdaMuEvolver):
          ind.stats = stats[ind.idx]
          self.update_fitness(ind, ALP=self.LEARNING_PROGRESS)
          self.update_features(ind)
-         ind.fitness.valid = True
+#        ind.fitness.valid = True
          ind.age += 1
 #        if not len(ind.score_hists) == ind.age:
 #           T()
          #FIXME: what for?
 #        self.idxs.add(idx)
-         if self.CPPN or self.CA or self.ALL_GENOMES:
+#        if self.CPPN or self.CA or self.ALL_GENOMES:
             # Taken into account during CPPN reproduction in neat-python
             #NOTE: Assume single objective
-            fitness = ind.fitness.values[0]
-            ind.chromosome.fitness = fitness
+         fitness = ind.fitness.getValues()
+#        ind.chromosome.fitness = fitness
 
          if ind.idx in self.population:
              (game, old_score, age) = self.population[ind.idx]
@@ -382,7 +409,10 @@ class EvolverNMMO(LambdaMuEvolver):
 
    def train_and_log(self, maps):
       self.global_counter.set_idxs.remote([i for i in maps.keys()])
-      stats = self.trainer.train(maps)
+      if not self.MAP_TEST:
+         stats = self.trainer.train(maps)
+      else:
+         stats = dict([(k, None) for k in maps.keys()])
 
       return stats
 
@@ -519,7 +549,8 @@ class EvolverNMMO(LambdaMuEvolver):
       g_idxs_envs = list(g_idxs_out)
       np.random.shuffle(g_idxs_envs)
 #     global_counter.set_idxs.remote(g_idxs_envs)
-      self.saveMaps(maps, new_g_idxs)
+      if self.n_epoch % self.config.EVO_SAVE_INTERVAL == 0:
+         self.saveMaps(maps, new_g_idxs)
 #     global_stats = self.global_stats
 #     self.send_genes(global_stats)
       _ = self.train_and_log(maps)
@@ -595,6 +626,9 @@ class EvolverNMMO(LambdaMuEvolver):
 #           filename=os.path.join(self.save_path, 'genome_fitness.csv'))
       self.n_epoch += 1
 
+   def log(self, verbose=False):
+      super().log([(ind.idx, None, ind.fitness.values[0], ind.age) for ind in self.container], verbose=verbose)
+
 
    def evolve(self):
      #if self.MAP_ELITES:
@@ -607,16 +641,14 @@ class EvolverNMMO(LambdaMuEvolver):
      #      self.map_generator = MapGenerator(self.config)
      #   winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
      #else:
+      T()
       return super().evolve()
 
 
    def saveMaps(self, individuals, mutated=None):
-      if self.n_epoch % 100 == 0:
-         checkpoint_maps = True
-         #TODO: imitate this by calling savemaps on container
-#        mutated = self.maps.keys()
-      else:
-         checkpoint_maps = False
+#     if self.n_epoch % 100 == 0:
+#     checkpoint_maps = True
+ #    else:
 
 
       # can't have neat with non-cppn representation
@@ -631,12 +663,12 @@ class EvolverNMMO(LambdaMuEvolver):
 
 #           return
 
-      if self.n_epoch % 100 == 0:
-         checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
-         checkpoint_dir_created = False
-         checkpointing = True
-      else:
-         checkpointing = False
+#     if self.n_epoch % 100 == 0:
+      checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
+      checkpoint_dir_created = False
+      checkpointing = True
+#     else:
+#        checkpointing = False
 
 
       for ind in individuals:
@@ -664,7 +696,7 @@ class EvolverNMMO(LambdaMuEvolver):
                os.mkdir(checkpoint_dir_path)
                checkpoint_dir_created = True
             png_path = os.path.join(checkpoint_dir_path, 'map' + str(i) + '.png')
-            Save.render(map_arr, self.map_generator.textures, png_path)
+            Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
             Save.np(map_arr, os.path.join(checkpoint_dir_path, 'map' + str(i) + '.np'))
             json_path = os.path.join(checkpoint_dir_path, 'atk_mults' + str(i) + 'json')
             with open(json_path, 'w') as json_file:
@@ -675,9 +707,9 @@ class EvolverNMMO(LambdaMuEvolver):
          with open(json_path, 'w') as json_file:
             json.dump(atk_mults, json_file)
 
-      if self.n_epoch % 100 == 0:
-         if self.n_epoch != 0:
-             plot_exp(self.config.EVO_DIR)
+#     if self.n_epoch % 100 == 0:
+#        if self.n_epoch != 0:
+      plot_exp(self.config.EVO_DIR)
 
 
    def make_game(self, child_map):
@@ -690,6 +722,8 @@ class EvolverNMMO(LambdaMuEvolver):
    def restore(self, trash_trainer=False, inference=False):
       '''
       '''
+      if self.MAP_TEST:
+         return
       self.calc_fitness = diversity_calc(self.config)
       self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.EVO_DIR, 'maps', 'map')
 
@@ -841,20 +875,20 @@ class EvolverNMMO(LambdaMuEvolver):
 
       return ind_1, ind_2
 
-   def mutate_cppn(self, ind_1):
-      g1 = ind_1.chromosome
-      g1.mutate(self.neat_config.genome_config)
-      ind_1.chromosome = g1
-      self.gen_cppn_map(g1)
+#  def mutate_cppn(self, ind_1):
+#     g1 = ind_1.chromosome
+#     g1.mutate(self.neat_config.genome_config)
+#     ind_1.chromosome = g1
+#     self.gen_cppn_map(g1)
 
-      if not hasattr(ind_1.fitness, 'values'):
-         ind_1.fitness.values = None
-      ind_1.fitness.valid = False
+#     if not hasattr(ind_1.fitness, 'values'):
+#        ind_1.fitness.values = None
+#     ind_1.fitness.valid = False
 
-      return (ind_1, )
+#     return (ind_1, )
 
    def genRandMap(self, g_hash):
-      ind = Individual(g_hash, self)
+      ind = EvoIndividual(iterable=[], rank=g_hash, evolver=self)
       chrom = ind.chromosome
 
       return chrom.map_arr, chrom.atk_mults
@@ -1135,7 +1169,8 @@ class EvolverNMMO(LambdaMuEvolver):
            # so for now, trash score history and re-calculate after reload
            self.population[g_hash]= None, score, age
           #self.population[g_hash]= None, score, age
-       self.trainer.save()
+       if not self.MAP_TEST:
+          self.trainer.save()
        global TRAINER
        TRAINER = self.trainer
        self.trainer= None

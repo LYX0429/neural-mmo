@@ -150,6 +150,7 @@ if __name__ == '__main__':
    global config
 
    config = projekt.config.EvoNMMO()
+#  config = projekt.config.Griddly()
 
    # Built config with CLI overrides
    if len(sys.argv) > 1:

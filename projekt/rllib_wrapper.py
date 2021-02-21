@@ -685,7 +685,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #        self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
       #NOTE: you can't iteratively send indexes to environment with 'foreach_worker', multiprocessing will thwart you
       i = 0
-      print(self.config['env_config'].keys())
       if self.config['env_config']['config'].N_PROC == self.config['env_config']['config'].N_EVO_MAPS:
          for worker in self.workers.remote_workers():
             fuck_id = idxs[i % len(idxs)]

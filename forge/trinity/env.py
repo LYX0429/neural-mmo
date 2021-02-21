@@ -205,7 +205,7 @@ class Env:
          counter = ray.get_actor("global_counter")
          idx = ray.get(counter.get.remote())
       map_arr = maps[idx]
-#     self.realm.set_map(idx, map_arr)
+      self.realm.set_map(idx, map_arr)
       self.worldIdx = idx
 
    def reset(self, idx=None, step=True):
