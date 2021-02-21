@@ -37,6 +37,7 @@ from forge.trinity.overlay import OverlayRegistry
 from forge.blade.io import action
 
 from evolution.diversity import DIV_CALCS, diversity_calc
+from griddly_nmmo.env import NMMO
 
 from ray.rllib.execution.metric_ops import StandardMetricsReporting
 
@@ -296,7 +297,7 @@ def plot_diversity(x, y, div_names, exp_name, render=False):
 class RLLibEvaluator(evaluator.Base):
    '''Test-time evaluation with communication to
    the Unity3D client. Makes use of batched GPU inference'''
-   def __init__(self, config, trainer):
+   def __init__(self, config, trainer, archive=None):
       super().__init__(config)
       self.trainer  = trainer
 
@@ -304,11 +305,18 @@ class RLLibEvaluator(evaluator.Base):
       if self.config.MAP != 'PCG':
 #        self.config.ROOT = self.config.MAP
          self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
-      self.env      = projekt.rllib_wrapper.RLLibEnv({'config': config})
+      if self.config.GRIDDLY:
+         self.env = NMMO({'config': config})
+      else:
+         self.env      = projekt.rllib_wrapper.RLLibEnv({'config': config})
 
-      self.env.reset(idx=self.config.INFER_IDX, step=False)
+      self.maps = maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in archive])
+      idx = list(maps.keys())[np.random.choice(len(maps))]
+      self.env.set_map(idx=idx, maps=maps)
+      self.env.reset(step=False)
 #     self.env.reset(idx=0, step=False)
-      self.registry = OverlayRegistry(self.env, self.model, trainer, config)
+      if not config.GRIDDLY:
+         self.registry = OverlayRegistry(self.env, self.model, trainer, config)
       self.obs      = self.env.step({})[0]
 
       self.state    = {}
@@ -485,19 +493,31 @@ class RLLibEvaluator(evaluator.Base):
           pos: Camera position (r, c) from the server)
           cmd: Consol command from the server
       '''
-      stats = self.env.get_all_agent_stats()
-      score = self.calc_diversity(stats, verbose=True)
+#     stats = self.env.get_all_agent_stats()
+#     score = self.calc_diversity(stats, verbose=True)
 #     score = DIV_CALCS[1][0](stats, verbose=True)
-      print(score)
+#     print(score)
 
       #Compute batch of actions
       actions, self.state, _ = self.trainer.compute_actions(
             self.obs, state=self.state, policy_id='policy_0')
-      self.registry.step(self.obs, pos, cmd,
+#     actions = dict([(i, (0,0)) for (i, val) in self.env.env.action_space.sample().items()])
+      if not self.config.GRIDDLY:
+         self.registry.step(self.obs, pos, cmd,
             update='counts values attention wilderness'.split())
 
       #Step environment
-      super().tick(actions)
+      ret = super().tick(actions)
+
+      if self.env.dones['__all__'] == True:
+         if self.config.GRIDDLY:
+            self.reset_env()
+
+   def reset_env(self):
+      maps = self.maps
+      idx = list(maps.keys())[np.random.choice(len(maps))]
+      self.env.set_map(idx=idx, maps=maps)
+      self.env.reset()
 
 class Policy(RecurrentNetwork, nn.Module):
    '''Wrapper class for using our baseline models with RLlib'''

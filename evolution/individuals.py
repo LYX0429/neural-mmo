@@ -290,7 +290,6 @@ class DefaultGenome(neat.genome.DefaultGenome, Genome):
                #v = np.random.choice(np.flatnonzero(v == v.max()))
                 v = np.argmax(v)
                 map_arr[x, y] = v
-#       map_arr = self.validate_spawns(map_arr, multi_hot)
         self.map_arr = map_arr
         self.multi_hot = multi_hot
 
@@ -508,6 +507,8 @@ class EvoIndividual(Individual):
         self.idx = rank
         self.n_tiles = len(evolver.TILE_PROBS)
         self.SPAWN_IDX = evolver.SPAWN_IDX
+        self.FOOD_IDX = evolver.mats.FOREST.value.index
+        self.WATER_IDX = evolver.mats.WATER.value.index
         self.NENT = evolver.config.NENT
         self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
         if evolver.ALL_GENOMES:
@@ -516,7 +517,7 @@ class EvoIndividual(Individual):
                 self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
             elif rnd < 2/5:
                 self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
-                                                enums.Material.GRASS.value.index)
+                                                evolver.enums.Material.GRASS.value.index)
             elif rnd < 3/5:
                 self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
             elif rnd < 4/5:
@@ -538,7 +539,7 @@ class EvoIndividual(Individual):
         elif evolver.PRIMITIVES:
             self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
                                             enums.Material.GRASS.value.index)
-        self.validate_spawns()
+        self.validate_map()
         self.score_hists = []
 #       self.feature_hists = {}
         self.age = -1
@@ -570,39 +571,47 @@ class EvoIndividual(Individual):
     def mutate(self):
         self.chromosome.mutate()
         self.iterable = self.chromosome.get_iterable()
-        self.validate_spawns()
+        self.validate_map()
 
-    def validate_spawns(self):
-        if not hasattr(self.chromosome, 'multi_hot'):
-            multi_hot = None
-        else:
-            multi_hot = self.chromosome.multi_hot
+    def validate_map(self):
+ #      if not hasattr(self.chromosome, 'multi_hot'):
+ #          multi_hot = None
+ #      else:
+ #          multi_hot = self.chromosome.multi_hot
         map_arr = self.chromosome.map_arr
-        self.add_border(map_arr, multi_hot)
-        idxs = map_arr == self.SPAWN_IDX
-        spawn_points = np.vstack(np.where(idxs)).transpose()
+        self.add_border(map_arr, None)
+        spawn_idxs = map_arr == self.SPAWN_IDX
+        food_idxs = map_arr == self.FOOD_IDX
+        water_idxs = map_arr == self.WATER_IDX
+        spawn_points = np.vstack(np.where(spawn_idxs)).transpose()
         n_spawns = len(spawn_points)
+        n_food = (1 * food_idxs).sum()
+        n_water = (1 * water_idxs).sum()
+        if n_spawns < self.NENT or n_food < self.NENT or n_water < self.NENT:
+            self.valid_map = False
+        else:
+            self.valid_map = True
 
-        if n_spawns >= self.NENT:
-            return map_arr
-        n_new_spawns = self.NENT - n_spawns
+#       if n_spawns >= self.NENT:
+#           return map_arr
+#       n_new_spawns = self.NENT - n_spawns
 
-        #     if multi_hot is not None:
-        #        spawn_idxs = k_largest_index_argsort(
-        #              multi_hot[enums.Material.SPAWN.value.index, :, :],
-        #              n_new_spawns)
-        #    #   map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
-        #     else:
-        border = self.TERRAIN_BORDER
-        #     spawn_idxs = np.random.randint(border, self.map_width - border, (2, n_new_spawns))
-        #     map_arr[spawn_idxs[0], spawn_idxs[1]] = self.SPAWN_IDX
-        b = self.TERRAIN_BORDER
-        all_idxs = np.vstack(np.where(map_arr[b:-b,b:-b]!=-1)).T
-        spawn_idxs = all_idxs[np.random.choice(all_idxs.shape[0], n_new_spawns + 1, replace=False)] + b
-        map_arr[spawn_idxs[:,0], spawn_idxs[:,1]] = self.SPAWN_IDX
-        while not (map_arr == self.SPAWN_IDX).sum() >= self.NENT:
-            print('Insufficient spawn points')
-            map_arr[np.random.choice(all_idxs[all_idxs.shape[0]], 1)] = self.SPAWN_IDX
+#       #     if multi_hot is not None:
+#       #        spawn_idxs = k_largest_index_argsort(
+#       #              multi_hot[enums.Material.SPAWN.value.index, :, :],
+#       #              n_new_spawns)
+#       #    #   map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
+#       #     else:
+#       border = self.TERRAIN_BORDER
+#       #     spawn_idxs = np.random.randint(border, self.map_width - border, (2, n_new_spawns))
+#       #     map_arr[spawn_idxs[0], spawn_idxs[1]] = self.SPAWN_IDX
+#       b = self.TERRAIN_BORDER
+#       all_idxs = np.vstack(np.where(map_arr[b:-b,b:-b]!=-1)).T
+#       spawn_idxs = all_idxs[np.random.choice(all_idxs.shape[0], n_new_spawns + 1, replace=False)] + b
+#       map_arr[spawn_idxs[:,0], spawn_idxs[:,1]] = self.SPAWN_IDX
+#       while not (map_arr == self.SPAWN_IDX).sum() >= self.NENT:
+#           print('Insufficient spawn points')
+#           map_arr[np.random.choice(all_idxs[all_idxs.shape[0]], 1)] = self.SPAWN_IDX
 
 
     def add_border(self, map_arr, multi_hot=None):

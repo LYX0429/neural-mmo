@@ -29,6 +29,9 @@ class Base:
       '''Rendering launches a Twisted WebSocket server with a fixed
       tick rate. This is a blocking call; the server will handle 
       environment execution using the provided tick function.'''
+      if self.config.GRIDDLY:
+         while True:
+            self.tick(None, None)
       from forge.trinity.twistedserver import Application
       Application(self.env, self.tick)
 
@@ -73,6 +76,7 @@ class Base:
       #Step the environment
       self.obs, rewards, self.done, _ = self.env.step(
             actions, omitDead=True, preprocessActions=preprocessActions)
+
 
 class Evaluator(Base):
    def __init__(self, config, policy):

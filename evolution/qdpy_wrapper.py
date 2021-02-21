@@ -59,19 +59,23 @@ class NMMOGrid(Grid):
        self.border = evolver.config.TERRAIN_BORDER
        self.save_path = save_path
        self.map_generator = map_generator
+       self._nb_items_per_bin = self._nb_items_per_bin.astype(np.uint8)
 
    def add(self, individual):
       border = self.border
+      idx = self.index_grid(individual.features)
       index = super(NMMOGrid, self).add(individual)
       old_idx = individual.idx
 #     if not (old_idx in self.evolver.population and old_idx in self.evolver.maps and old_idx in self.evolver.chromosomes):
-      if not index == self.index_grid(individual.features):
-          pass
       if index is not None:
          # if it has been added
          chromosome = individual.chromosome
-         idx = self.index_grid(individual.features)
-         individual.idx = idx
+         bin_idxs = set(range(12))
+         for s in self.solutions[idx]:
+             if s is not individual:
+                 bin_idxs.remove(s.bin_idx)
+         individual.bin_idx = bin_idxs.pop()
+         individual.idx = idx  + (individual.bin_idx,)
 #        self.evolver.score_hists[idx] = individual.score_hists
 #        self.evolver.score_hists[idx] = self.evolver.score_hists[old_idx]
 #        self.evolver.chromosomes[idx] = chromosome
@@ -80,27 +84,26 @@ class NMMOGrid(Grid):
          if self.evolver.LEARNING_PROGRESS:
             self.evolver.ALPs[idx] = individual.ALPs
 
-         if len(idx) == 1:
-            index_str = '(' + str(idx[0]) + ',)'
-         else:
-            index_str = '('+ ', '.join([str(f) for f in idx]) + ')'
-         map_path = os.path.join(self.save_path, 'maps', 'map' + index_str)
-         try:
-             os.makedirs(map_path)
-         except FileExistsError:
-             pass
-         map_arr = chromosome.map_arr
-         atk_mults = chromosome.atk_mults
+ #       if len(idx) == 1:
+ #          index_str = '(' + str(idx[0]) + ',)'
+ #       else:
+ #          index_str = '('+ ', '.join([str(f) for f in idx]) + ')'
+ #       map_path = os.path.join(self.save_path, 'maps', 'map' + index_str)
+ #       try:
+ #           os.makedirs(map_path)
+ #       except FileExistsError:
+ #           pass
+ #       map_arr = chromosome.map_arr
+ #       atk_mults = chromosome.atk_mults
 #        if map_arr is None:
-#           #FIXME: why fuxk?
 #           map_arr, _ = self.evolver.gen_cppn_map(chromosome)
 #        Save.np(map_arr, map_path)
-         if self.evolver.config.TERRAIN_RENDER == True:
-            Save.render(map_arr[border:-border, border:-border], self.evolver.map_generator.textures, map_path + '.png')
+ #       if self.evolver.config.TERRAIN_RENDER == True:
+ #          Save.render(map_arr[border:-border, border:-border], self.evolver.map_generator.textures, map_path + '.png')
 #        print('add ind with idx {}'.format(tuple(individual.features)))
-         json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + index_str + 'json')
-         with open(json_path, 'w') as json_file:
-            json.dump(atk_mults, json_file)
+ #       json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + index_str + 'json')
+ #       with open(json_path, 'w') as json_file:
+ #          json.dump(atk_mults, json_file)
 
       # individual is removed from population, whether or not it has been added to the container
       self.evolver.flush_individual(old_idx)
@@ -130,7 +133,7 @@ class meNMMO(EvolverNMMO):
       self.init_toolbox()
       self.idxs = set()
       self.mutated_idxs = set()
-      self.g_idxs = list(range(self.config.N_EVO_MAPS))
+      self.reset_g_idxs()
       feature_names = self.config.ME_DIMS
       if self.config.FEATURE_CALC == 'skills':
           self.feature_idxs = [self.config.SKILLS.index(n) for n in feature_names]
@@ -164,6 +167,13 @@ class meNMMO(EvolverNMMO):
 
       TODO
       """
+
+      def cull_invalid(offspring):
+          # Remove invalid mutants
+          valid_ind = []
+          [valid_ind.append(o) if o.valid_map else None for o in offspring]
+          return valid_ind
+
       if start_time == None:
           start_time = timer()
       logbook = deap.tools.Logbook()
@@ -174,6 +184,7 @@ class meNMMO(EvolverNMMO):
 
       # Evaluate the individuals with an invalid fitness
       invalid_ind = [ind for ind in init_batch if not ind.fitness.valid]
+      invalid_ind = cull_invalid(invalid_ind)
       self.train_individuals(invalid_ind)
       if self.LEARNING_PROGRESS:
          self.train_individuals(invalid_ind)
@@ -231,7 +242,6 @@ class meNMMO(EvolverNMMO):
      #   offspring = []
      #   mutated = []
      #   maps = {}
-     #   TT()
      #   for (i, o) in enumerate(batch):
 #    #      newO = self.clone(o)
      #      rnd = np.random.random()
@@ -247,18 +257,28 @@ class meNMMO(EvolverNMMO):
 #    #      self.gen_cppn_map(newO.chromosome)
      #      self.maps[i] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
      #      mutated.append(i)
-         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-         self.train_individuals(offspring)
+#        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+
+
+         valid_ind = cull_invalid(offspring)
+
+         while len(valid_ind) == 0:
+             # FIXME: put this inside our own varAnd function
+             self.reset_g_idxs()  # since cloned individuals need new indices
+             offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
+             valid_ind = cull_invalid(offspring)
+         self.train_individuals(valid_ind)
          if self.LEARNING_PROGRESS:
-            self.train_individuals(offspring)
+             self.train_individuals(valid_ind)
+
 
          # Evaluate the individuals with an invalid fitness
 #        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
 #        print('{} invalid individuals'.format(len(invalid_ind)))
-         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+         fitnesses = toolbox.map(toolbox.evaluate, valid_ind)
 #        fitnesses = [self.evaluate(ind) for ind in invalid_ind]
 
-         for ind, fit in zip(invalid_ind, fitnesses):
+         for ind, fit in zip(valid_ind, fitnesses):
 #            ind.fitness.setValues(fit[0])
 #            ind.features.setValues(fit[1])
              ind.fitness.values = fit[0]
@@ -288,6 +308,9 @@ class meNMMO(EvolverNMMO):
 
       return batch, logbook
 
+   def reset_g_idxs(self):
+      self.g_idxs = set(range(self.config.N_EVO_MAPS))
+
    def iteration_callback(self, i, batch, container, logbook):
       print('pattern_map_elites iteration {}'.format(self.n_gen))
 #     if not len(self.population) == len(self.maps) == len(self.chromosomes):
@@ -297,7 +320,7 @@ class meNMMO(EvolverNMMO):
       self.n_epoch = self.n_gen
       self.idxs = set()
 #     stats = self.tats
-      self.g_idxs = set(range(self.config.N_EVO_MAPS))
+      self.reset_g_idxs()
       # update the elites to avoid stagnation (since simulation is stochastic)
 #     if self.n_gen > 0 and (len(container) > 0 and np.random.random() < 0.1):
       recent_mean_updates = np.nanmean(self.archive_update_hist)
@@ -327,7 +350,7 @@ class meNMMO(EvolverNMMO):
 
 
       self.idxs = set()
-      self.g_idxs = set(range(self.config.N_EVO_MAPS))
+      self.reset_g_idxs()
       self.log(verbose=False)
       self.mutated_idxs = set()
       self.n_gen += 1
@@ -385,7 +408,7 @@ class meNMMO(EvolverNMMO):
   #   chrom, atk_mults = individual.chromosome
   #   atk_mults = self.mutate_mults(atk_mults)
   #   chrom.mutate()
-  #   self.validate_spawns(chrom.flat_map, chrom.multi_hot)
+  #   self.validate_map(chrom.flat_map, chrom.multi_hot)
 
   #   individual.fitness.delValues()
 # #   if not hasattr(individual.fitness, 'values'):
@@ -630,7 +653,7 @@ class meNMMO(EvolverNMMO):
       # The probability of mutating each value of a genome
       self.mutation_pb = mutation_pb = 1.0
       # The number of items in each bin of the grid
-      max_items_per_bin = 1
+      max_items_per_bin = int(self.config.ITEMS_PER_BIN)
       self.verbose = verbose = True
       # Display warning and error messages. Set to True if you want to check if some individuals were out-of-bounds
       self.show_warnings = show_warnings = True

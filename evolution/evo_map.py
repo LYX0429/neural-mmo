@@ -221,12 +221,12 @@ class EvolverNMMO(LambdaMuEvolver):
       self.chromosomes = {}
       if self.config.GRIDDLY:
          from griddly_nmmo.map_gen import GdyMaterial, GriddlyMapGenerator
+         self.mats = GdyMaterial
          self.SPAWN_IDX = GdyMaterial.SPAWN.value.index
-      else:
-         self.SPAWN_IDX = enums.Material.SPAWN.value.index
-      if self.config.GRIDDLY:
          self.map_generator = GriddlyMapGenerator(self.config)
       else:
+         self.mats = enums.Material
+         self.SPAWN_IDX = self.mats.SPAWN.value.index
          self.map_generator = MapGenerator(config)
       self.skill_idxs = {}
       self.idx_skills = {}
@@ -364,6 +364,8 @@ class EvolverNMMO(LambdaMuEvolver):
    def train_individuals(self, individuals):
       if self.n_epoch % self.config.EVO_SAVE_INTERVAL == 0:
          self.saveMaps(self.container)
+         if self.n_epoch > 0:
+            plot_exp(self.config.EVO_DIR)
       maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in individuals])
       stats = self.train_and_log(maps)
 
@@ -469,7 +471,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #              v = np.random.choice(np.flatnonzero(v == v.max()))
 #              v = np.argmax(v)
 #              map_arr[x, y] = v
-#     map_arr = self.validate_spawns(map_arr, multi_hot)
+#     map_arr = self.validate_map(map_arr, multi_hot)
 #     genome.map_arr = map_arr
 #     genome.multi_hot = multi_hot
 
@@ -697,19 +699,15 @@ class EvolverNMMO(LambdaMuEvolver):
                checkpoint_dir_created = True
             png_path = os.path.join(checkpoint_dir_path, 'map' + str(i) + '.png')
             Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
-            Save.np(map_arr, os.path.join(checkpoint_dir_path, 'map' + str(i) + '.np'))
-            json_path = os.path.join(checkpoint_dir_path, 'atk_mults' + str(i) + 'json')
-            with open(json_path, 'w') as json_file:
-               json.dump(atk_mults, json_file)
+#           Save.np(map_arr, os.path.join(checkpoint_dir_path, 'map' + str(i) + '.np'))
+#           json_path = os.path.join(checkpoint_dir_path, 'atk_mults' + str(i) + 'json')
+#           with open(json_path, 'w') as json_file:
+#              json.dump(atk_mults, json_file)
 
         #if self.RAND_GEN or self.PATTERN_GEN:
          json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
          with open(json_path, 'w') as json_file:
             json.dump(atk_mults, json_file)
-
-#     if self.n_epoch % 100 == 0:
-#        if self.n_epoch != 0:
-      plot_exp(self.config.EVO_DIR)
 
 
    def make_game(self, child_map):
@@ -777,6 +775,10 @@ class EvolverNMMO(LambdaMuEvolver):
        #    #get_policy_class=get_policy_class,
        #     execution_plan=frozen_execution_plan,
        # )
+         if self.config.RENDER:
+            evaluation_interval = 1
+         else:
+            evaluation_interval = None
          trainer = EvoPPOTrainer(
             execution_plan=frozen_execution_plan,
             env="custom",
@@ -801,6 +803,7 @@ class EvolverNMMO(LambdaMuEvolver):
             '_use_trajectory_view_api': False,
             'no_done_at_end': False,
             'callbacks': LogCallbacks,
+            'evaluation_interval': evaluation_interval,
             'env_config': {
                 'config':
                 self.config,
@@ -849,7 +852,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
       if not self.trainer:
          self.restore()
-      evaluator = RLLibEvaluator(self.config, self.trainer)
+      evaluator = RLLibEvaluator(self.config, self.trainer, archive=self.container)
       evaluator.render()
 
 
@@ -912,7 +915,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #              self.max_primitives,
 #              enums.Material.GRASS.value.index)
 #        map_arr, multi_hot = chromosome.generate()
-#        map_arr = self.validate_spawns(map_arr, multi_hot)
+#        map_arr = self.validate_map(map_arr, multi_hot)
 #        chromosome.flat_map = map_arr
 #        atk_mults = self.gen_mults()
 #        self.chromosomes[g_hash] = chromosome, atk_mults
@@ -932,7 +935,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #        # FIXME: hack: ignore lava
 #        map_arr = np.random.choice(np.arange(0, self.n_tiles), (self.map_width, self.map_height),
 #              p=self.TILE_PROBS[:])
-#        map_arr = self.validate_spawns(map_arr)
+#        map_arr = self.validate_map(map_arr)
 #        atk_mults = self.gen_mults()
 
 #        self.add_border(map_arr)
@@ -951,7 +954,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #     elif self.PATTERN_GEN:
 #        chromosome, atk_mults = copy.deepcopy(self.chromosomes[par_hash])
 #        map_arr, multi_hot = chromosome.mutate()
-#        self.validate_spawns(map_arr, multi_hot)
+#        self.validate_map(map_arr, multi_hot)
 #        chromosome.flat_map = map_arr
 #        self.chromosomes[g_hash] = chromosome, atk_mults
 #     else:
@@ -965,7 +968,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #           t= np.random.randint(1, self.n_tiles)
 #           map_arr[x, y]= t
 #  #     map_arr = self.add_border(map_arr)
-#        self.validate_spawns(map_arr)
+#        self.validate_map(map_arr)
 #     atk_mults = self.mutate_mults(atk_mults)
 
 #     return map_arr, atk_mults

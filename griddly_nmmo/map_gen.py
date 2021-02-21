@@ -128,9 +128,9 @@ def replace_vars(yaml_contents, var_dict):
 
 class MapGen():
     INIT_DELAY = 0 # how long to wait before decrementing hunger & thirst
-    INIT_HEALTH = 10
-    INIT_THIRST = 10
-    INIT_HUNGER = 10
+    INIT_HEALTH = -1
+    INIT_THIRST = 0
+    INIT_HUNGER = 0
     SHRUB_RESPAWN = 30
 
 
@@ -143,7 +143,7 @@ class MapGen():
             self.MAP_WIDTH = 20
         self.VAR_DICT = {
                 '${_init_delay}':    self.INIT_DELAY * self.N_PLAYERS,
-                '${_delay}':         1 * self.N_PLAYERS,
+                '${_delay}':         1,# * self.N_PLAYERS,
                 '${_init_health}':   self.INIT_HEALTH,
                 '${_init_hunger}':   self.INIT_HUNGER,
                 '${_init_thirst}':   self.INIT_THIRST,

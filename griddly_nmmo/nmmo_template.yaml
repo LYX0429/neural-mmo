@@ -193,7 +193,7 @@ Actions:
             # keep ticking
             - exec:
                 Action: tick_state
-                Delay: ${_delay}
+                Delay: 1
 
         Dst:
             Object: gnome
@@ -332,9 +332,9 @@ Actions:
           Object: forest
           Commands:
 #           - decr: leaves
-            - exec:
-                Action: spawn_forest
-                Delay: ${_forest_respawn}
+#           - exec:
+#               Action: spawn_forest
+#               Delay: ${_forest_respawn}
             - remove: true
       - Src:
           Object: gnome
@@ -494,16 +494,16 @@ Objects:
     InitialActions:
       # Start ticking hunger after an initial grace period.
       - Action: tick_state
-        Delay: ${_init_delay}
+        Delay: 1
  #      Delay: 0
     MapCharacter: H
     Variables:
       - Name: health
         InitialValue: 10
       - Name: hunger
-        InitialValue: 0
+        InitialValue: 10
       - Name: thirst
-        InitialValue: 0
+        InitialValue: 10
       - Name: wood
         InitialValue: 0
       - Name: ore

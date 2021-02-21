@@ -198,6 +198,7 @@ class EvoNMMO(TreeOrerock):
    ARCHIVE_UPDATE_WINDOW = 15  # How long without any updates to ME archive before randomly re-evaluating some elites?
    FEATURE_CALC = 'map entropy'
    TEST = False
+   ITEMS_PER_BIN = 1
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS
