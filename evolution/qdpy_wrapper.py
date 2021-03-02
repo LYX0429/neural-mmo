@@ -169,6 +169,8 @@ class meNMMO(EvolverNMMO):
       """
 
       def cull_invalid(offspring):
+          if self.MAP_TEST:
+              return offspring
           # Remove invalid mutants
           valid_ind = []
           [valid_ind.append(o) if o.valid_map else None for o in offspring]
@@ -287,7 +289,7 @@ class meNMMO(EvolverNMMO):
          # Replace the current population by the offspring
          if self.MAP_TEST:
              show_warnings = True
-         nb_updated = container.update(offspring, issue_warning=show_warnings)
+         nb_updated = container.update(valid_ind, issue_warning=show_warnings)
          self.archive_update_hist = np.hstack((self.archive_update_hist[1:], [nb_updated]))
 
          # Update the hall of fame with the generated individuals
@@ -297,7 +299,7 @@ class meNMMO(EvolverNMMO):
 
          # Append the current generation statistics to the logbook
          record = stats.compile(container) if stats else {}
-         logbook.record(iteration=i, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+         logbook.record(iteration=i, containersize=container.size_str(), evals=len(invalid_ind), nbupdated=nb_updated, elapsed=timer()-start_time, **record)
 
          if verbose:
              print(logbook.stream)
@@ -323,7 +325,10 @@ class meNMMO(EvolverNMMO):
       self.reset_g_idxs()
       # update the elites to avoid stagnation (since simulation is stochastic)
 #     if self.n_gen > 0 and (len(container) > 0 and np.random.random() < 0.1):
-      recent_mean_updates = np.nanmean(self.archive_update_hist)
+      if self.config.ARCHIVE_UPDATE_WINDOW == 0:
+          recent_mean_updates = 0
+      else:
+          recent_mean_updates = np.nanmean(self.archive_update_hist)
 #     if self.n_epoch > 0 and len(container) > 0 and not self.MAP_TEST:
       if self.n_epoch > self.config.ARCHIVE_UPDATE_WINDOW and recent_mean_updates < 0.01 and not self.MAP_TEST:
      #    try:

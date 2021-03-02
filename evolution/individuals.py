@@ -9,6 +9,7 @@ from forge.blade.lib import enums
 from evolution.paint_terrain import Line, Rectangle, RectanglePerimeter, Circle, CirclePerimeter, Gaussian
 from pdb import set_trace as T
 from qdpy.phenotype import Individual, Fitness, Features
+from evolution.paint_terrain import PRIMITIVE_TYPES
 
 # Not using this
 class SpawnPoints():
@@ -117,8 +118,9 @@ def init_weights(m):
         torch.nn.init.orthogonal_(m.weight)
 
 class NeuralCA(torch.nn.Module):
+
     N_HIDDEN = 10
-    N_CHAN = 8
+    N_CHAN = 9
     N_WEIGHTS = 2 * N_HIDDEN * N_CHAN * 3 * 3 + N_HIDDEN + 2 * N_HIDDEN + N_HIDDEN + N_HIDDEN * N_CHAN + N_CHAN + 1
     def __init__(self, n_chan):
         #FIXME
@@ -131,7 +133,7 @@ class NeuralCA(torch.nn.Module):
         self.l2 = Conv2d(m, n_chan, 1, 1, 0, bias=True)
         self.layers = [self.l0, self.l2, self.l2]
         self.apply(init_weights)
-        self.n_passes = 1
+        self.n_passes = np.random.randint(1, 5)
         self.weights = self.get_init_weights()
 
     def forward(self, x):
@@ -179,15 +181,21 @@ class NeuralCA(torch.nn.Module):
         return init_weights
 
 class CAGenome():
-    def __init__(self, n_tiles, seed):
+    def __init__(self, n_tiles, map_width, seed):
         self.nn = NeuralCA(n_tiles)
 #       self.seed = seed.reshape(1, *seed.shape)
-#       self.seed = np.random.randint(0, n_tiles, (n_tiles, map_width, map_width))
+        if seed is None:
+            seed = np.zeros((n_tiles, map_width, map_width))
+            x = map_width // 2
+            y = map_width // 2
+            seed[1, x - 5: x + 5, y - 5:y + 5] = 1
+           #seed = np.random.randint(0, 1, (n_tiles, map_width, map_width))
+           #seed = np.random.randint(0, 1, (n_tiles, map_width, map_width))
         self.seed = seed
-        self.gen_map()
         self.atk_mults = gen_atk_mults()
         self.age = -1
         self.epsilon = 0.05
+        self.rng = default_rng()
 
     def gen_map(self):
         self.multi_hot = self.nn(self.seed).squeeze(0).detach().numpy()
@@ -201,7 +209,7 @@ class CAGenome():
     def mutate(self):
 
         noise = np.random.random(self.nn.weights.shape) * self.epsilon - (self.epsilon / 2)
-        n_mut = max(1, int(np.random.normal(noise.size/5, noise.size/10)))
+        n_mut = max(1, int(self.rng.exponential(scale=1.0, size=1)))
         x = np.argwhere(noise)
         idxs = np.random.choice(x.shape[0], n_mut, replace=False)
         x = x[idxs]
@@ -212,7 +220,6 @@ class CAGenome():
 #       weights = self.nn.weights + mutation
         self.nn.n_passes += int(np.random.uniform(0, 2.5))
         self.nn.set_weights(weights)
-        self.gen_map()
         self.atk_mults = mutate_atk_mults(self.atk_mults)
         self.age = -1
 
@@ -239,7 +246,6 @@ class DefaultGenome(neat.genome.DefaultGenome, Genome):
         self.neat_config = neat_config
         self.map_width = self.map_height = map_width
         self.n_tiles = n_tiles
-        self.gen_map()
 
     def configure_crossover(self, parent1, parent2, config):
         super().configure_crossover(parent1, parent2, config)
@@ -250,7 +256,6 @@ class DefaultGenome(neat.genome.DefaultGenome, Genome):
         super().mutate(self.neat_config.genome_config)
         self.atk_mults = mutate_atk_mults(self.atk_mults)
         self.age = 0
-        self.gen_map()
 
     def clone(self):
         child = copy.deepcopy(self)
@@ -301,16 +306,30 @@ class PatternGenome(Genome):
         super().__init__(n_tiles, map_width)
         self.map_width = map_width
         self.n_tiles = n_tiles
-        self.max_patterns = map_width ** 2 / 20
+       #self.max_patterns = map_width ** 2 / 20
+        self.max_patterns = 100
         self.default_tile = default_tile
-        self.pattern_templates = [Line, Rectangle, RectanglePerimeter, Gaussian, Circle, CirclePerimeter]
+#       self.pattern_templates = [Line, Rectangle, RectanglePerimeter, Gaussian, Circle, CirclePerimeter]
         #     self.pattern_templates = [Gaussian]
         self.weights =  [2/3,  1/3]
         # some MAP-Elites dimensions
 #       self.features = None
 #       self. = None
 #       self.multi_hot = None
-        self.gen_map()
+        self.rng = default_rng()
+
+        n_patterns = 25
+        self.patterns = np.random.choice(PRIMITIVE_TYPES,
+                                         n_patterns).tolist()
+        #       self.features = [0, 0]  # Number of lines, circle perimeters
+
+        for i, p in enumerate(self.patterns):
+            # if p in [Line, Rectangle]:
+            intensity = np.random.random()
+            tile_i = np.random.randint(0, self.n_tiles)
+            p = p.generate(p, tile_i=tile_i, intensity=intensity,
+                           n_tiles=self.n_tiles, map_width=self.map_width)
+            self.patterns[i] = p
 
     #  def init_endpoint_pattern(self, p):
     #     p = p(
@@ -324,14 +343,7 @@ class PatternGenome(Genome):
     #     return p
 
     def gen_map(self):
-        self.patterns = np.random.choice(self.pattern_templates,
-                                         np.random.randint(self.max_patterns), self.weights).tolist()
-#       self.features = [0, 0]  # Number of lines, circle perimeters
 
-        for i, p in enumerate(self.patterns):
-            #if p in [Line, Rectangle]:
-            p = p.generate(p, self.n_tiles, self.map_width)
-            self.patterns[i] = p
 #       self.update_features()
 
         return self.paint_map()
@@ -345,6 +357,9 @@ class PatternGenome(Genome):
 #               self.features[1] += 1
 
     def get_iterable(self):
+        # each pattern has: type, intensity, p1, p2, p3, p4
+        it = np.zeros(shape=())
+
         return []
 
 #       #FIXME: hack
@@ -353,32 +368,32 @@ class PatternGenome(Genome):
     def mutate(self):
         super().mutate()
         n_patterns = len(self.patterns)
-        if n_patterns == 0:
-            add_ptrn = True
-        else:
-            add_ptrn = max(0, int(np.random.normal(1, 2)))
-#           add_ptrn = np.random.randint(0, min(5, self.max_patterns - n_patterns))
-            for p in np.random.choice(self.patterns, max(0, int(np.random.normal(1, 2)))):
-                p.mutate()
-
-        n_del = max(0, min(n_patterns, int(np.random.normal(1, 2))))
+        n_add = max(0, int(self.rng.exponential(scale=1.0, size=1)))
+        n_add = min(self.max_patterns - n_patterns, n_add)
+        n_del = max(0, int(self.rng.exponential(scale=1.0, size=1)))
+        n_del = min(n_patterns - 1, int(self.rng.exponential(scale=1.0, size=1)))
+        n_mut = max(1, int(self.rng.exponential(scale=1.0, size=1)))
+#       print('n_add: {}, n_mut: {}, n_del: {}'.format(n_add, n_mut, n_del))
+        mutees = np.random.choice(self.patterns, n_mut)
+        for m in mutees:
+            m.mutate()
         for i in range(n_del):
             self.patterns.pop(np.random.randint(n_patterns-i))
-        if add_ptrn and n_patterns < self.max_patterns:
-            p = np.random.choice(self.pattern_templates)
-            p = p.generate(p, self.n_tiles, self.map_width)
-            self.patterns.append(p)
-        self.flat_map = None
+        new_types = np.random.choice(PRIMITIVE_TYPES, n_add)
+        [self.patterns.append(n.generate(n,
+                                         tile_i=np.random.randint(0, self.n_tiles-1),
+                                         intensity=np.random.random(),
+                                         n_tiles=self.n_tiles,
+                                         map_width=self.map_width)) for n in new_types]
         self.multi_hot = None
-        self.gen_map()
-        #     self.update_features()
-
-        return self.paint_map()
+#       self.flat_map = None
+#       self.update_features()
+#       print('added {} patterns, mutated {}, deleted {}'.format(n_add, n_mut, n_del))
 
 
     def paint_map(self):
-        if hasattr(self, 'flat_map') and self.flat_map is not None:
-            return self.flat_map, self.multi_hot
+#       if hasattr(self, 'flat_map') and self.flat_map is not None:
+#           return self.flat_map, self.multi_hot
         multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_width))
         multi_hot[self.default_tile, :, :] = 1e-10
 
@@ -387,7 +402,7 @@ class PatternGenome(Genome):
         map_arr = np.argmax(multi_hot, axis=0)
         self.map_arr, self.multi_hot = map_arr, multi_hot
 
-        return map_arr, multi_hot
+#       return map_arr, multi_hot
 
 class TileFlipGenome(Genome):
     def __init__(self, n_tiles, map_width):
@@ -403,6 +418,9 @@ class TileFlipGenome(Genome):
         pos_idxs = np.random.choice(idxs.shape[0], n_muts, replace=False)
         mut_idxs = idxs[pos_idxs]
         self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = new
+
+    def gen_map(self):
+        pass
 
     def clone(self):
         child = TileFlipGenome(self.n_tiles, self.map_width)
@@ -427,7 +445,6 @@ class LSystemGenome(Genome):
         self.expansions = dict([
             (i, np.repeat(np.random.randint(0, n_tiles, (1, 2, 2)), self.n_expansions, axis=0)) for i in range(n_tiles)
         ])
-        self.gen_map()
 
     def mutate(self):
         super().mutate()
@@ -454,7 +471,6 @@ class LSystemGenome(Genome):
 #       self.axiom = np.where(np.random.random(self.axiom.shape) < 1/8, np.random.randint(0, self.n_tiles, (self.axiom_width, self.axiom_width)), self.axiom)
 #       [self.expansions.update({k: np.where(np.random.random(expansion.shape) < 1.5/n_rule_cells, np.random.randint(0, self.n_tiles, (2, 2)), expansion)})
 #        for (k, expansion) in self.expansions.items()]
-        self.gen_map()
 
     def gen_map(self):
         np.random.seed(420)
@@ -517,21 +533,23 @@ class EvoIndividual(Individual):
                 self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
             elif rnd < 2/5:
                 self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
-                                                evolver.enums.Material.GRASS.value.index)
+                                                evolver.mats.Material.GRASS.value.index)
             elif rnd < 3/5:
                 self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
             elif rnd < 4/5:
                 self.chromosome = TileFlipGenome(self.n_tiles, evolver.map_width)
             else:
-                seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
-                self.chromosome = CAGenome(self.n_tiles, seed)
+#               seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
+                seed = None
+                self.chromosome = CAGenome(self.n_tiles, evolver.map_width)
         if evolver.CPPN:
             #FIXME: yeesh
             self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
 #           self.chromosome = evolver.chromosomes[self.idx]
         elif evolver.CA:
-            seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
-            self.chromosome = CAGenome(self.n_tiles, seed)
+#           seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
+            seed = None
+            self.chromosome = CAGenome(self.n_tiles, evolver.map_width, seed)
         elif evolver.LSYSTEM:
             self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
         elif evolver.TILE_FLIP:
@@ -539,6 +557,7 @@ class EvoIndividual(Individual):
         elif evolver.PRIMITIVES:
             self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
                                             enums.Material.GRASS.value.index)
+        self.chromosome.gen_map()
         self.validate_map()
         self.score_hists = []
 #       self.feature_hists = {}
@@ -570,8 +589,10 @@ class EvoIndividual(Individual):
 
     def mutate(self):
         self.chromosome.mutate()
-        self.iterable = self.chromosome.get_iterable()
+        self.chromosome.gen_map()
         self.validate_map()
+        self.iterable = self.chromosome.get_iterable()
+        self.features = []
 
     def validate_map(self):
  #      if not hasattr(self.chromosome, 'multi_hot'):

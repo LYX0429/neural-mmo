@@ -10,6 +10,7 @@ import gym
 import numpy as np
 import ray
 import ray.rllib.agents.ppo as ppo
+from gym.utils.play import play
 import torch
 import griddly_nmmo
 from fire import Fire
@@ -19,7 +20,7 @@ from ray.rllib.env import MultiAgentEnv
 import evolution
 import griddly
 import projekt
-import python_griddly
+#import python_griddly
 from evolution.evo_map import EvolverNMMO
 from forge.ethyr.torch import utils
 from griddly import GymWrapperFactory, gd
@@ -28,6 +29,7 @@ from griddly_nmmo.wrappers import NMMOWrapper
 from projekt import rllib_wrapper
 sep = os.pathsep
 os.environ['PYTHONPATH'] = sep.join(sys.path)
+from griddly.util.rllib.wrappers import RLlibMultiAgentWrapper
 from griddly_nmmo.env import NMMO
 
 
@@ -68,11 +70,32 @@ def createEnv(config):
     wrapper.build_gym_from_yaml(
         'nmmo',
         yaml_path,
-        level=0,
+        level=None,
         player_observer_type=gd.ObserverType.VECTOR,
         global_observer_type=gd.ObserverType.ISOMETRIC,
     )
 
+    test_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'griddly_nmmo/nmmo.yaml')
+
+    env_name = 'nmmo.yaml'
+    config.update({
+        'env': env_name,
+        'env_config': {
+            # in the griddly environment we set a variable to let the training environment
+            # know if that player is no longer active
+#           'player_done_variable': 'player_done',
+
+#           'record_video_config': {
+#               'frequency': 10000  # number of rollouts
+#           },
+
+            'yaml_file': test_path,
+            'global_observer_type': gd.ObserverType.ISOMETRIC,
+            'level': None,
+            'max_steps': config['config'].MAX_STEPS,
+        },
+    })
+#   return RLlibMultiAgentWrapper(env_config)
     return NMMO(config)
 
 
@@ -80,8 +103,8 @@ def createEnv(config):
 
 
 def mapPolicy(agentID):
-#  return 'default_policy'
-   return 'policy_{}'.format(agentID % config.NPOLICIES)
+   return 'default_policy'
+#  return 'policy_{}'.format(agentID % config.NPOLICIES)
 
 
 # Generate RLlib policies
@@ -106,8 +129,7 @@ def createPolicies(config):
 #   responsible for providing unique indexes to parallel environments.'''
 #   def __init__(self, config):
 #      self.count = 0
-#   def get(self):
-#      self.count += 1
+#   def get(self)      self.count += 1
 #
 #      if self.count == config.N_EVO_MAPS:
 #          self.count = 0
@@ -244,6 +266,7 @@ if __name__ == '__main__':
         evolver.config.TRAIN_RENDER = config.TRAIN_RENDER
         evolver.config.INFER_IDX = config.INFER_IDX
         evolver.config.RENDER = config.RENDER
+        evolver.config.ARCHIVE_UPDATE_WINDOW = config.ARCHIVE_UPDATE_WINDOW
         #     evolver.config.SKILLS = config.SKILLS
         #     evolver.config.MODEL = config.MODEL
         #     evolver.config['config'].MAX_STEPS = 200
@@ -267,7 +290,6 @@ if __name__ == '__main__':
 #           config,
 #           n_proc=config.N_PROC,
 #           n_pop=config.N_EVO_MAPS,
-#           map_policy=mapPolicy,
 #       )
 
         evolver = init_evolver(save_path,
@@ -276,7 +298,8 @@ if __name__ == '__main__':
                        config,
                        n_proc=config.N_PROC,
                        n_pop=config.N_EVO_MAPS,
-                       )
+                       map_policy=mapPolicy,
+                               )
 #  print(torch.__version__)
 
 #  print(torch.cuda.current_device())
@@ -290,6 +313,7 @@ if __name__ == '__main__':
     wrapper.build_gym_from_yaml(
         'nmmo',
         yaml_path,
+#       image_path='~/Griddly/resources/images',
         level=0,
         player_observer_type=gd.ObserverType.VECTOR,
         global_observer_type=gd.ObserverType.ISOMETRIC,
@@ -317,6 +341,7 @@ if __name__ == '__main__':
 
     if config.TEST:
        env = NMMO(rllib_config['env_config'])
+#      play(env)
 
        for i in range(20):
           env.reset()

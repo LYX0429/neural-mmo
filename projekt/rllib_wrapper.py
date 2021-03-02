@@ -35,9 +35,9 @@ from forge.trinity import Env, evaluator
 from forge.trinity.dataframe import DataType
 from forge.trinity.overlay import OverlayRegistry
 from forge.blade.io import action
+from griddly_nmmo.env import NMMO
 
 from evolution.diversity import DIV_CALCS, diversity_calc
-from griddly_nmmo.env import NMMO
 
 from ray.rllib.execution.metric_ops import StandardMetricsReporting
 
@@ -45,12 +45,15 @@ from ray.rllib.evaluation.worker_set import WorkerSet
 from ray.rllib.execution.rollout_ops import ParallelRollouts, ConcatBatches
 from ray.rllib.execution.train_ops import TrainOneStep
 
+from griddly import GymWrapperFactory, gd
 from ray.rllib.utils.typing import EnvConfigDict, EnvType, ResultDict, TrainerConfigDict
 
 #Moved log to forge/trinity/env
 class RLLibEnv(Env, rllib.MultiAgentEnv):
    def __init__(self, config):
       self.config = config['config']
+      if self.config.GRIDDLY:
+         from griddly_nmmo.env import NMMO
       self.headers = self.config.SKILLS
       self.agent_skills = []
       self.lifetimes = []
@@ -242,8 +245,6 @@ def actionSpace(config, n_act_i=3, n_act_j=5):
          n              = arg.N(config)
          atns[atn][arg] = gym.spaces.Discrete(n)
 
-   if config.GRIDDLY:
-      pass
    return atns
 
 def plot_diversity(x, y, div_names, exp_name, render=False):
@@ -292,21 +293,64 @@ def plot_diversity(x, y, div_names, exp_name, render=False):
       plt.show()
 
 
+import copy
+def unregister():
+   for env in copy.deepcopy(gym.envs.registry.env_specs):
+      if 'GDY' in env:
+         print("Remove {} from registry".format(env))
+         del gym.envs.registry.env_specs[env]
 
 
 class RLLibEvaluator(evaluator.Base):
    '''Test-time evaluation with communication to
    the Unity3D client. Makes use of batched GPU inference'''
-   def __init__(self, config, trainer, archive=None):
+   def __init__(self, config, trainer, archive=None, createEnv=None):
       super().__init__(config)
       self.trainer  = trainer
 
-      self.model    = self.trainer.get_policy('policy_0').model
+      if config.GRIDDLY:
+         self.policy_id = 'default_policy'
+#        self.policy_id = 'policy_0'
+      else:
+         self.policy_id = 'policy_0'
+      self.model    = self.trainer.get_policy(self.policy_id).model
       if self.config.MAP != 'PCG':
 #        self.config.ROOT = self.config.MAP
          self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
       if self.config.GRIDDLY:
-         self.env = NMMO({'config': config})
+
+#        unregister()
+#        wrapper = GymWrapperFactory()
+#        yaml_path = 'nmmo.yaml'
+#        wrapper.build_gym_from_yaml(
+#           'nmmo',
+#           yaml_path,
+#           level=None,
+#           player_observer_type=gd.ObserverType.VECTOR,
+#           global_observer_type=gd.ObserverType.ISOMETRIC,
+#        )
+#        test_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'griddly_nmmo/nmmo.yaml')
+
+#        env_name = 'nmmo.yaml'
+#        config = {'config': self.config}
+#        config.update({
+#           'env': env_name,
+#           'env_config': {
+#              # in the griddly environment we set a variable to let the training environment
+#              # know if that player is no longer active
+#              #           'player_done_variable': 'player_done',
+
+#              #           'record_video_config': {
+#              #               'frequency': 10000  # number of rollouts
+#              #           },
+
+#              'yaml_file': test_path,
+#              'global_observer_type': gd.ObserverType.ISOMETRIC,
+#              'level': None,
+#              'max_steps': 500,
+#           },
+#        })
+         self.env = createEnv({'config': config})
       else:
          self.env      = projekt.rllib_wrapper.RLLibEnv({'config': config})
 
@@ -500,8 +544,9 @@ class RLLibEvaluator(evaluator.Base):
 
       #Compute batch of actions
       actions, self.state, _ = self.trainer.compute_actions(
-            self.obs, state=self.state, policy_id='policy_0')
-#     actions = dict([(i, (0,0)) for (i, val) in self.env.env.action_space.sample().items()])
+            self.obs, state=self.state, policy_id=self.policy_id)
+#     actions = dict([(i, (2, np.random.randint(5))) for (i, val) in self.env.env.action_space.sample().items()])
+#     actions = dict([(i, val) for (i, val) in self.env.env.action_space.sample().items()])
       if not self.config.GRIDDLY:
          self.registry.step(self.obs, pos, cmd,
             update='counts values attention wilderness'.split())
@@ -635,6 +680,15 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #     self.train_exec_impl = execution_plan(self.workers, config)
       self.saveDir = path
       self.pathDir = '/'.join(path.split(os.sep)[:-1])
+      self.init_epoch = True
+
+   def log_result(self, stuff):
+      return
+#     if self.init_epoch:
+#        self.init_epoch = False
+#        return
+#     else:
+#        super().log_return(stuff)
 
    def reset(self):
       #TODO: is this doing anythiing??
@@ -707,7 +761,10 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       i = 0
       if self.config['env_config']['config'].N_PROC == self.config['env_config']['config'].N_EVO_MAPS:
          for worker in self.workers.remote_workers():
-            fuck_id = idxs[i % len(idxs)]
+            if len(idxs) > 0:
+               fuck_id = idxs[i % len(idxs)]
+            else:
+               fuck_id = idxs[i]
             i += 1
             # FIXME: fucking FUCK this GARBAGE BULLSHIT
             # FIXME: must have N_PROC = N_EVO_MAPS. Utter fucking trash garbage.

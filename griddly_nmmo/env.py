@@ -1,5 +1,6 @@
+from pdb import set_trace as T
 import gym
-from griddly import gd
+#from griddly import gd
 import ray
 from ray.rllib import MultiAgentEnv
 import numpy as np
@@ -7,10 +8,13 @@ import numpy as np
 import griddly_nmmo
 from griddly_nmmo.map_gen import MapGen
 from griddly_nmmo.wrappers import NMMOWrapper
+from griddly.util.rllib import RLlibMultiAgentWrapper
 
 reshp = (1, 2, 0)
+#reshp = (0, 1, 2)
+import os
 
-class NMMO(MultiAgentEnv):
+class NMMO(NMMOWrapper):
    def __init__(self, config):
       self.config = config
       self.map_gen = MapGen(config['config'])
@@ -19,19 +23,20 @@ class NMMO(MultiAgentEnv):
       self.chars_to_terrain = dict([(v, k) for (k, v) in self.map_gen.chars.items()])
       level_string = self.map_gen.gen_map(self.init_tiles, self.probs)
       self.env = None
-      env = gym.make('GDY-nmmo-v0',
-                     player_observer_type=gd.ObserverType.VECTOR,
-                     global_observer_type=gd.ObserverType.ISOMETRIC)
-      env = NMMOWrapper(env)
-      self.env = env
+#     env = gym.make('GDY-nmmo-v0',
+#                    player_observer_type=gd.ObserverType.VECTOR,
+#                    global_observer_type=gd.ObserverType.ISOMETRIC)
+      self.env = NMMOWrapper(config['env_config'])
+#     self.env_config = env_config
+#     env = RLlibMultiAgentWrapper(config['env_config'])
       self.env.reset(level_id=None, level_string=level_string)
      #self.env.reset(level_id=0)
       if isinstance(self.env.observation_space, list):
          self.observation_space = self.env.observation_space[0]
       else:
          self.observation_space = self.env.observation_space
-      self.observation_space = gym.spaces.Box(self.observation_space.low.transpose(reshp),
-            self.observation_space.high.transpose(reshp))
+#     self.observation_space = gym.spaces.Box(self.observation_space.low.transpose(reshp),
+#           self.observation_space.high.transpose(reshp))
       #     self.observation_space.shape = self.env.observation_space[0].shape
       self.action_space = self.env.action_space
       self.action_space = gym.spaces.MultiDiscrete(self.env.action_space.nvec)
@@ -41,7 +46,9 @@ class NMMO(MultiAgentEnv):
       self.lifetimes = {}
       self.dones = {'__all__': False}
       self.maps = None
-     #del (self.env)
+      self.past_deads = set()
+
+   #del (self.env)
      #self.env = None
 
    def set_map(self, idx=None, maps=None):
@@ -59,19 +66,22 @@ class NMMO(MultiAgentEnv):
       assert map_arr is not None
 
    def reset(self, config=None, step=None, maps=None):
+      self.past_deads = set()
       self.dones = {'__all__': False}
 #     if maps is None:
 #        maps = self.maps
 #     assert maps is not None
 #     self.maps = maps
       if self.env is None:
-         env = gym.make('GDY-nmmo-v0',
-                        player_observer_type=gd.ObserverType.VECTOR,
-                        global_observer_type=gd.ObserverType.ISOMETRIC)
-         env = NMMOWrapper(env)
+#        env = gym.make('GDY-nmmo-v0',
+#                       player_observer_type=gd.ObserverType.VECTOR,
+#                       global_observer_type=gd.ObserverType.ISOMETRIC)
+         env = NMMOWrapper(self.config['env_config'])
+#        env = RLlibMultiAgentWrapper(self.config['env_config'])
          self.env = env
       self.lifetimes = dict([(i, 0) for i in range(self.env.player_count)])
       self.skills = dict([(skill_name, dict([(i, 0) for i in range(self.env.player_count)])) for skill_name in self.skill_names])
+#     self.init_pos = {}
 
       if self.config['config'].TEST:
          map_str_out = self.map_gen.gen_map(self.init_tiles, self.probs)
@@ -91,6 +101,7 @@ class NMMO(MultiAgentEnv):
          for i, (x, y) in enumerate(idxs):
             if i < self.config['config'].NENT:
                map_str[x, y] = self.map_gen.player_char + str(i+1)
+#              self.init_pos[i] = (x, y)
             else:
                map_str[x, y] = '.'
 
@@ -98,7 +109,8 @@ class NMMO(MultiAgentEnv):
          map_str_out[:, -1] = '\n'
          map_str_out = ' '.join(s for s in map_str_out.reshape(-1))
       obs = self.env.reset(level_id=None, level_string=map_str_out)
-      [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
+#     [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
+      self.get_init_stats()
 
       return obs
 
@@ -106,12 +118,13 @@ class NMMO(MultiAgentEnv):
    def step(self, a, omitDead=False, preprocessActions=False):
     # if isinstance(a[0], np.ndarray):
       obs, rew, dones, info = self.env.step(a)
-      [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
+
+   #     [obs.update({k: v.transpose(reshp)}) for (k, v) in obs.items()]
       [self.lifetimes.update({k: v+1}) if k not in self.env.past_deads else None for (k, v) in self.lifetimes.items()]
 
       if self.config['config'].TRAIN_RENDER or self.config['config'].RENDER:
          self.render()
-      dones['__all__'] = self.dones['__all__']
+#     dones['__all__'] = self.dones['__all__']
 
 
       if self.config['config'].RENDER:
@@ -122,21 +135,51 @@ class NMMO(MultiAgentEnv):
             print('Mean lifetime: {}'.format(np.mean(lifetimes)))
             self.dones['__all__'] = True
 
+
+      self.dones = dones
       return obs, rew, dones, info
 
-   def render(self, observer='global'):
-       return self.env.render(observer=observer)
+   def render(self, observer='global', mode='rgb'):
+       if self.config['config'].RENDER or self.worldIdx == 0:
+          return self.env.render(observer=observer)
+
+   def unwrapped(self):
+      return self
+
+   def get_init_stats(self):
+      self.init_stats = {}
+      self.init_stats['init_pos'] = np.empty((self.env.player_count, 2))
+      env_state = self.env.get_state()
+      objects = env_state['Objects']
+      for o in objects:
+         if o['Name'] == 'gnome':
+            self.init_stats['init_pos'][o['PlayerId'] - 1] = o['Location']
+
 
    def send_agent_stats(self):
-      global_vars = self.env.get_state()['GlobalVariables']
+      env_state = self.env.get_state()
+      global_vars = env_state['GlobalVariables']
       [self.skills[skill_name].update({k: global_vars[skill_name][k]}) if k in global_vars[skill_name] else self.skills[skill_name].update({k: 0}) for k in range(self.env.player_count) for skill_name in self.config['config'].SKILLS]
-      global_stats = ray.get_actor('global_stats')
-      stats ={
+      scores = [global_vars['score'][i] for i in range(self.env.player_count)]
+#     global_stats = ray.get_actor('global_stats')
+
+      objects = env_state['Objects']
+      end_pos = np.empty((self.env.player_count, 2))
+      for o in objects:
+         if o['Name'] == 'gnome':
+            end_pos[o['PlayerId'] - 1] = o['Location']
+      # reward agent for being on ``opposite corner'' of map
+      y_deltas = [(end_pos[i][1] - self.init_stats['init_pos'][i][1]) + (end_pos[i][0] - self.init_stats['init_pos'][i][0]) for i in range(self.env.player_count)]
+
+
+      stats = {
          'skills': [[self.skills[i][j] for i in self.skills] for j in range(self.env.player_count)],
          'lifespans': [self.lifetimes[i] for i in range(len(self.lifetimes))],
-         'lifetimes': [self.lifetimes[i] for i in range(len(self.lifetimes))],
-         }
-#     global_stats.add.remote(stats, self.mapIdx)
+         #        'lifetimes': [self.lifetimes[i] for i in range(len(self.lifetimes))],
+         'y_deltas': y_deltas,
+         'scores': scores,
+      }
+      #     global_stats.add.remote(stats, self.mapIdx)
       self.dones['__all__'] = True
 
       return stats

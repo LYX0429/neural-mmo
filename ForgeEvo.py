@@ -4,20 +4,15 @@ import sys
 # My favorite debugging macro
 from pdb import set_trace as T
 
-import numpy as np
 import ray
 import torch
 from fire import Fire
 from ray import rllib
 
 import projekt
-import evolution
 from evolution.evolver import init_evolver
-from evolution.diversity import calc_differential_entropy
-from forge.ethyr.torch import utils
 from pcg import get_tile_data
 TILE_TYPES, TILE_PROBS = get_tile_data(griddly=False)
-#from projekt import env, rlutils
 from projekt import rllib_wrapper
 
 '''Main file for the neural-mmo/projekt demo

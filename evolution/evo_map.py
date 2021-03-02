@@ -143,8 +143,8 @@ def mapPolicy(agentID,
 
 # Generate RLlib policies
 def createPolicies(config):
-   #if config.GRIDDLY:
-   #   return
+#   if config.GRIDDLY:
+#      return
     obs =  observationSpace(config)
     atns = actionSpace(config)
     policies = {}
@@ -152,12 +152,13 @@ def createPolicies(config):
     for i in range(config.NPOLICIES):
         params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
 
-#       if config.GRIDDLY:
-#          key = mapPolicy('default_policy')
-#       else:
-        key = mapPolicy(i
-                #, config
-                )
+        if config.GRIDDLY:
+          #key = mapPolicy('default_policy')
+           key = 'default_policy'
+        else:
+           key = mapPolicy(i
+                   #, config
+                   )
         policies[key] = (None, obs, atns, params)
 
     return policies
@@ -185,6 +186,9 @@ def calc_mean_lifetime(individual):
 
    return mean_lifetime
 
+def dummi_features(individual):
+    return (50, 50)
+
 
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None):
@@ -201,6 +205,8 @@ class EvolverNMMO(LambdaMuEvolver):
          self.calc_features = calc_mean_agent
       elif config.FEATURE_CALC == 'agent lifetime':
          self.calc_features = calc_mean_lifetime
+      elif config.FEATURE_CALC is None:
+          self.calc_features = dummi_features
       self.config = config
 #     self.gen_mults = gen_atk_mults
 #     self.mutate_mults = mutate_atk_mults
@@ -307,7 +313,7 @@ class EvolverNMMO(LambdaMuEvolver):
          pass
 
 
-   def update_fitness(self, individual, ALP=False):
+   def update_fitness(self, individual, ALP):
       if not self.MAP_TEST:
          individual.score_hists.append(self.calc_fitness(individual.stats))
       else:
@@ -321,6 +327,7 @@ class EvolverNMMO(LambdaMuEvolver):
             individual.ALPs = []
          individual.ALPs.append(score)
          score = abs(np.mean(individual.ALPs))
+         individual.fitness.setValues([-score])
       else:
          score = np.mean(individual.score_hists)
 
@@ -332,10 +339,13 @@ class EvolverNMMO(LambdaMuEvolver):
                individual.ALPs = individual.ALPs[-self.config.ROLLING_FITNESS:]
 
 #        individual.fitness.values = [score]
-         individual.fitness.setValues([-score])
+      individual.fitness.setValues([-score])
 
    def update_features(self, individual):
       #     print('evaluating {}'.format(idx))
+#     if not len(individual.features) == 0:
+#        # assume features are fixed w.r.t. map: no need to recalculate except after mutation/mating
+#        return
 
       if self.config.FEATURE_CALC == 'map entropy':
          features = self.calc_features(individual, self.config)
@@ -361,11 +371,14 @@ class EvolverNMMO(LambdaMuEvolver):
      #   if len(individual.feature_hists[i]) >= self.config.ROLLING_FITNESS:
      #      individual.feature_hists[i] = individual.feature_hists[i][-self.config.ROLLING_FITNESS:]
 
+   def plot(self):
+      plot_exp(self.config.EVO_DIR)
+
    def train_individuals(self, individuals):
       if self.n_epoch % self.config.EVO_SAVE_INTERVAL == 0:
          self.saveMaps(self.container)
          if self.n_epoch > 0:
-            plot_exp(self.config.EVO_DIR)
+             self.plot()
       maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in individuals])
       stats = self.train_and_log(maps)
 
@@ -375,7 +388,6 @@ class EvolverNMMO(LambdaMuEvolver):
 #           print(maps.keys())
 #           print(stats.keys())
 #           #FIXME: We'll try again for now.
-#           T()
             stats = self.train_and_log(maps)
 #           stats = ray.get(self.global_stats.get.remote())
 
@@ -383,7 +395,7 @@ class EvolverNMMO(LambdaMuEvolver):
             stats = self.train_and_log(maps)
            #stats = ray.get(self.global_stats.get.remote())
             [setattr(i, 'stats', stats[i.idx]) for i in individuals]
-            [self.update_fitness(i) for i in individuals]
+            [self.update_fitness(i, ALP=False) for i in individuals]
             [self.update_features(i) for i in individuals]
          ind.stats = stats[ind.idx]
          self.update_fitness(ind, ALP=self.LEARNING_PROGRESS)
@@ -643,7 +655,6 @@ class EvolverNMMO(LambdaMuEvolver):
      #      self.map_generator = MapGenerator(self.config)
      #   winner = self.neat_pop.run(self.neat_eval_fitness, self.n_epochs)
      #else:
-      T()
       return super().evolve()
 
 
@@ -675,20 +686,20 @@ class EvolverNMMO(LambdaMuEvolver):
 
       for ind in individuals:
          i = ind.idx
-         path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
-         try:
-            os.mkdir(path)
-         except FileExistsError:
-            pass
+#        path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
+#        try:
+#           os.mkdir(path)
+#        except FileExistsError:
+#           pass
 
          map_arr = ind.chromosome.map_arr
-         atk_mults = ind.chromosome.atk_mults
+#        atk_mults = ind.chromosome.atk_mults
 
-         if map_arr is None:
-            raise Exception
-         Save.np(map_arr, path)
+#        if map_arr is None:
+#           raise Exception
+#        Save.np(map_arr, path)
 
-         if self.config.TERRAIN_RENDER:
+         if self.config.TERRAIN_RENDER or checkpointing:
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
             Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
 
@@ -705,9 +716,9 @@ class EvolverNMMO(LambdaMuEvolver):
 #              json.dump(atk_mults, json_file)
 
         #if self.RAND_GEN or self.PATTERN_GEN:
-         json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
-         with open(json_path, 'w') as json_file:
-            json.dump(atk_mults, json_file)
+ #       json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
+ #       with open(json_path, 'w') as json_file:
+ #          json.dump(atk_mults, json_file)
 
 
    def make_game(self, child_map):
@@ -743,6 +754,7 @@ class EvolverNMMO(LambdaMuEvolver):
                }
          griddly_config = {
                }
+         multiagent_config = {}
       else:
          model_config = {
                 'custom_model': 'test_model',
@@ -751,12 +763,18 @@ class EvolverNMMO(LambdaMuEvolver):
                     self.config
                 }}
          griddly_config = {}
+         multiagent_config = {
+               "policy_mapping_fn":
+                  self.mapPolicy
+         }
 
       if self.trainer is None or trash_trainer:
          del(self.trainer)
 
          # Create policies
-         policies = createPolicies(self.config)
+         if self.config.GRIDDLY:
+            policies = createPolicies(self.config)
+            multiagent_config['policies'] = policies
 
          conf = self.config
          model_path = os.path.join(self.save_path, 'models')
@@ -765,8 +783,17 @@ class EvolverNMMO(LambdaMuEvolver):
          except FileExistsError:
             print('Model directory already exists.',model_path)
          # Instantiate monolithic RLlib Trainer object.
-         num_workers = self.config.N_PROC
-       # EvoPPOTrainer = build_trainer(
+         if self.config.RENDER:
+            num_workers = 0
+            self.config.N_EVO_MAPS = 0
+            sgd_minibatch_size = 0
+         elif self.config.N_EVO_MAPS == 1:
+            num_workers = self.config.N_PROC
+            sgd_minibatch_size = 100
+         else:
+            num_workers = self.config.N_PROC
+            sgd_minibatch_size = 128
+      # EvoPPOTrainer = build_trainer(
        #     name="EvoPPO",
        #    #name="PPO",
        #    #default_config=DEFAULT_CONFIG,
@@ -795,25 +822,23 @@ class EvolverNMMO(LambdaMuEvolver):
             'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
            #'train_batch_size': 5000,
             'rollout_fragment_length': 100,
-            'sgd_minibatch_size': 128,  # normally: 128
+            'sgd_minibatch_size': sgd_minibatch_size,  # normally: 128
             'num_sgd_iter': 1,
+            'monitor': False,
             'framework': 'torch',
             'horizon': np.inf,
             'soft_horizon': False,
             '_use_trajectory_view_api': False,
             'no_done_at_end': False,
             'callbacks': LogCallbacks,
-            'evaluation_interval': evaluation_interval,
+#           'evaluation_interval': evaluation_interval,
             'env_config': {
                 'config':
                 self.config,
             },
-            'multiagent': {
-                "policies": policies,
-                "policy_mapping_fn":
-                self.mapPolicy
-            },
+
             'model': model_config,
+            'multiagent': multiagent_config,
             **griddly_config
             }
 
@@ -827,7 +852,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
          # Print model size
 
-         utils.modelSize(trainer.defaultModel())
+#        utils.modelSize(trainer.defaultModel())
          trainer.restore(self.config.MODEL)
          TRAINER = trainer
          self.trainer = trainer
@@ -852,7 +877,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
       if not self.trainer:
          self.restore()
-      evaluator = RLLibEvaluator(self.config, self.trainer, archive=self.container)
+      evaluator = RLLibEvaluator(self.config, self.trainer, archive=self.container, createEnv=self.make_env)
       evaluator.render()
 
 
@@ -1118,7 +1143,7 @@ class EvolverNMMO(LambdaMuEvolver):
        if FROZEN:
            if game is None:
                game = self.game
-               update_entropy_skills(game.desciples.values())
+#              update_entropy_skills(game.desciples.values())
 
           #if self.n_tick > 15:
           #    self.obs = game.reset()
@@ -1138,12 +1163,12 @@ class EvolverNMMO(LambdaMuEvolver):
                   #    self.update_max_skills(ent)
                    reward -= 1
            # Compute batch of actions
-#              if self.config.GRIDDLY:
-#                 actions, self.state, _= self.trainer.compute_actions(
-#                     self.obs, state=self.state, policy_id='default_policy')
-#              else:
-               actions, self.state, _= self.trainer.compute_actions(
-                   self.obs, state=self.state, policy_id='policy_0')
+               if self.config.GRIDDLY:
+                  actions, self.state, _= self.trainer.compute_actions(
+                      self.obs, state=self.state, policy_id='default_policy')
+               else:
+                  actions, self.state, _= self.trainer.compute_actions(
+                      self.obs, state=self.state, policy_id='policy_0')
 
                # Compute overlay maps
                self.overlays.register(self.obs)

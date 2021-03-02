@@ -1,11 +1,11 @@
 from pdb import set_trace as TT
-import abc
-import math
 import time
 from timeit import default_timer as timer
 from inspect import signature
 from typing import Optional, Tuple, List, Iterable, Iterator, Any, TypeVar, Generic, Union, Sequence, MutableSet, \
     MutableSequence, Type, Callable, Generator, Mapping, MutableMapping, overload
+
+from qdpy.algorithms import deap
 from typing_extensions import runtime, Protocol
 import warnings
 import numpy as np
@@ -177,6 +177,8 @@ class EvoCMAES(CMAES):
     def run(self):
 #       self.optimise(EvoCMAES._eval)
         pop_size = self.evo.config.N_EVO_MAPS
+
+        start_time = time.time()
         for i in range(self.evo.n_epochs):
             models = [np.array(self.ask()) for _ in range(pop_size)]
             individuals = [EvoIndividual(iterable=models[j], rank=j, evolver=self.evo) for j in range(pop_size)]
@@ -193,12 +195,18 @@ class EvoCMAES(CMAES):
             #   self.tell(np.hstack((ind.chromosome.nn.weights, [ind.chromosome.nn.n_passes])).tolist(), fitness=ind.fitness.values, features=ind.features)
                 self.tell(ind)
             print('CMAES epoch {}'.format(i))
-            if i % self.evo.config.EVO_SAVE_INTERVAL == 0:
+            self.evo.n_epoch += 1
+            self.evo.log()
+
+            if i == 1 or i > 0 and i % self.evo.config.EVO_SAVE_INTERVAL == 0:
+                self.evo.plot()
 #               self.evo.log_me()
-                self.evo.log()
                 self.evo.saveMaps(individuals)
                 container = self.evo.container
                 self.evo.container = None
+                evolver = self.evo
+                self.evolver = None
 #               self.evo.save()
+                self.evo = evolver
                 self.evo.container = container
 #       for _ in range

@@ -1,7 +1,9 @@
 from pdb import set_trace as T
+from griddly.util.rllib import RLlibMultiAgentWrapper
 
 import gym
 import numpy as np
+from griddly import gd
 
 
 class ValidatedMultiDiscreteNMMO(gym.spaces.MultiDiscrete):
@@ -49,11 +51,13 @@ class ValidatedMultiDiscreteNMMO(gym.spaces.MultiDiscrete):
 
         return [action_name_idx, action_id]
 
+import os
 
-class NMMOWrapper(gym.Wrapper):
-    def __init__(self, env, max_steps=100):
-        super().__init__(env)
-        self.past_deads = set()
+class NMMOWrapper(RLlibMultiAgentWrapper):
+    def __init__(self, config):
+        max_steps = 100
+
+        super().__init__(config)
         self.n_step = 0
         self.max_steps = max_steps
 
@@ -63,21 +67,31 @@ class NMMOWrapper(gym.Wrapper):
         done = {}
         info = {}
         all_done = True
-        [None if (i in self.past_deads) else action.update({i: list(val)}) for (i, val) in action.items()]
-        action = [action[i] if i in action else [0,0] for i in range(self.player_count)]
+      # [None if (i in self.past_deads) else action.update({i: list(val)}) for (i, val) in action.items()]
+#       action = dict([(i, action[i]) if i in action else (i, [0,0]) for i in range(self.player_count)])
 #       action.reverse()
-        obs, rew, done, info = self.env.step(action)
-        obs = dict([(i, val) for (i, val) in enumerate(obs)])
-        rew = dict([(i, rew[i]) for i in range(self.player_count)])
-        env_deads = self.env.get_state()['GlobalVariables']['player_dead']
-        done = dict([(i, env_deads[i+1] > 0 and i not in self.past_deads and False) for i in range(self.player_count)])
-        info = dict([(i, info) for i in range(self.player_count)])
-        # Pop anyone who is already dead
-        [(obs.pop(i), rew.pop(i), done.pop(i), info.pop(i)) for i in self.past_deads]
-        if not len(self.past_deads) == self.player_count:
-           [self.past_deads.add(i) if self.env.get_state()['GlobalVariables']['player_dead'][i + 1] > 0 else None for i in done]
-       #[self.deads.add(i) if rew[i] < 0 else None for i in rew] 
+#       action = [action[i] for i in range(self.player_count)]
+        obs, rew, done, info = super().step(action)
+#       obs, rew, done, info = super().step(self.action_space.sample())
+       #print(obs.shape)
+#       obs = dict([(i, val) for (i, val) in enumerate(obs)])
+       #rew = dict([(i, rew[i]) for i in range(self.player_count)])
+        def cull_gnomes():
+            env_state = self.get_state()
+            env_deads = env_state['GlobalVariables']['player_done']
+       #    done = dict([(i, env_deads[i+1] > 0 and i not in self.past_deads) for i in range(self.player_count)])
+       #    info = dict([(i, info) for i in range(self.player_count)])
+       #    # Pop anyone who is already dead
+       #    [(obs.pop(i), rew.pop(i), done.pop(i), info.pop(i)) for i in self.past_deads]
+            [self.past_deads.add(i) if isinstance(i, int) and env_deads[i + 1] > 0 else None for i in done]
+       #    #FIXME: Trippy griddly bug fucks negative reward due to player starvation/thirst death
+       #    [rew.update({i: 1}) if i not in self.past_deads else None for i in rew]
+            # Reward gnomes for potentiall undying after death
+           #[rew.update({i: 1}) if env_deads[i + 1] else None for i in rew]
+        #[self.deads.add(i) if rew[i] < 0 else None for i in rew]
      #  done = dict([(i, False) for i in range(self.player_count)])
+#       if not len(self.past_deads) == self.player_count:
+#          cull_gnomes()
 
     #   for player_id, player_action in action.items():
     #       p_obs, p_rew, p_done, p_info = self.step_player(player_id, player_action)
@@ -91,77 +105,81 @@ class NMMOWrapper(gym.Wrapper):
 
        #done['__all__'] = len(self.deads) == self.player_count
 #       done['__all__'] = self.n_step >= self.max_steps
-        done['__all__'] = False
+#       done['__all__'] = False
         self.n_step += 1
 
+#       print('past deads:', self.past_deads)
+#       print('done:', done)
+#       print('rew:', rew)
         return obs, rew, done, info
 
-    def step_player(self, player_id, action):
-        if action is None:
-            reward = 0
-            done = True
-            info = {}
-            # Just a no-op.
-            _ = self.env._players[player_id].step('move', [0, 0], True)
-        else:
-           #x = action[0]
-           #y = action[1]
-            action_name = self.action_names[action[0]]
-            action_id = action[1]
-           #action_data = [x, y, action_id]
-           #reward, done, info = self.env._players[player_id].step(action_name, action_data)
-            print(player_id, action_name, action_id)
-            reward, done, info = self.env._players[player_id].step(action_name, [action_id], True)
-            self.env._player_last_observation[player_id] = np.array(self.env._players[player_id].observe(), copy=False)
+#   def step_player(self, player_id, action):
+#       if action is None:
+#           reward = 0
+#           done = True
+#           info = {}
+#           # Just a no-op.
+#           _ = self._players[player_id].step('move', [0, 0], True)
+#       else:
+#          #x = action[0]
+#          #y = action[1]
+#           action_name = self.action_names[action[0]]
+#           action_id = action[1]
+#          #action_data = [x, y, action_id]
+#          #reward, done, info = self.env._players[player_id].step(action_name, action_data)
+#           print(player_id, action_name, action_id)
 
-        return self.env._player_last_observation[player_id], reward, done, info
+#           reward, done, info = self.env._players[player_id].step(action_name, [action_id], True)
+#           self.env._player_last_observation[player_id] = np.array(self.env._players[player_id].observe(), copy=False)
+
+#       return self.env._player_last_observation[player_id], reward, done, info
 
     def reset(self, level_id=None, level_string=None):
         self.past_deads = set()
-        reset_result = super().reset(level_id=level_id, level_string=level_string)
+        obs = super().reset(level_id=level_id, level_string=level_string)
 
         # Overwrite the action space
-        self.env.action_space = self._create_action_space()
-        self.action_space = self.env.action_space
-        self.observation_space = self.env.observation_space
+#       self.env.action_space = self._create_action_space()
+#       self.action_space = self.env.action_space
+#       self.observation_space = self.env.observation_space
 
-        obs = dict([(i, val) for i, val in enumerate(reset_result)])
+#       obs = dict([(i, val) for i, val in enumerate(obs)])
 
         self.n_step = 0
 
         return obs
 
-    def _create_action_space(self):
+   #def _create_action_space(self):
 
-        # Convert action to GriddlyActionASpace
-        self.player_count = self.env.player_count
-        self.action_input_mappings = self.env.action_input_mappings
+   #    # Convert action to GriddlyActionASpace
+#  #    self.player_count = self.player_count
+#  #    self.action_input_mappings = self.action_input_mappings
 
-        self._grid_width = self.env.game.get_width()
-        self._grid_height = self.env.game.get_height()
+   #    self._grid_width = self.game.get_width()
+   #    self._grid_height = self.game.get_height()
 
-        self.avatar_object = self.env.gdy.get_avatar_object()
+   #    self.avatar_object = self.gdy.get_avatar_object()
 
-        has_avatar = self.avatar_object is not None and len(self.avatar_object) > 0
+   #    has_avatar = self.avatar_object is not None and len(self.avatar_object) > 0
 
-       #if has_avatar:
-       #    raise RuntimeError("Cannot use MultiDiscreteRTSWrapper with environments that control single avatars")
+   #   #if has_avatar:
+   #   #    raise RuntimeError("Cannot use MultiDiscreteRTSWrapper with environments that control single avatars")
 
-        self.valid_action_mappings = {}
-        self.action_names = []
-        self.max_action_ids = 0
+   #    self.valid_action_mappings = {}
+   #    self.action_names = []
+   #    self.max_action_ids = 0
 
-        for action_name, mapping in sorted(self.action_input_mappings.items()):
-            if not mapping['Internal']:
-                self.action_names.append(action_name)
-                num_action_ids = len(mapping['InputMappings']) + 1
+   #    for action_name, mapping in sorted(self.action_input_mappings.items()):
+   #        if not mapping['Internal']:
+   #            self.action_names.append(action_name)
+   #            num_action_ids = len(mapping['InputMappings']) + 1
 
-                if self.max_action_ids < num_action_ids:
-                    self.max_action_ids = num_action_ids
-                self.valid_action_mappings[action_name] = num_action_ids
+   #            if self.max_action_ids < num_action_ids:
+   #                self.max_action_ids = num_action_ids
+   #            self.valid_action_mappings[action_name] = num_action_ids
 
-       #multi_discrete_space = [1, self._grid_width, self._grid_height, len(self.valid_action_mappings),
-       #                        self.max_action_ids]
-        multi_discrete_space = [len(self.valid_action_mappings), self.max_action_ids]
+   #   #multi_discrete_space = [1, self._grid_width, self._grid_height, len(self.valid_action_mappings),
+   #   #                        self.max_action_ids]
+   #    multi_discrete_space = [len(self.valid_action_mappings), self.max_action_ids]
 
-        return ValidatedMultiDiscreteNMMO(multi_discrete_space, self)
+   #    return ValidatedMultiDiscreteNMMO(multi_discrete_space, self)

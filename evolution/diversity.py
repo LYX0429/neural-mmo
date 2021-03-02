@@ -30,6 +30,10 @@ def diversity_calc(config):
        calc_diversity = calc_local_map_entropy
    elif config.FITNESS_METRIC == 'MapTestText':
        calc_diversity = ham_text
+   elif config.FITNESS_METRIC == 'y_deltas':
+       calc_diversity = calc_y_deltas
+   elif config.FITNESS_METRIC == 'Scores':
+       calc_diversity = calc_scores
    else:
        raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))
    return calc_diversity
@@ -72,12 +76,24 @@ def calc_local_map_entropy(individual, config):
 
     return local_ent.item()
 
+def calc_scores(agent_stats, skill_headers=None, verbose=False):
+    scores = np.hstack(agent_stats['scores'])
+    if verbose:
+        print('scores: {}'.format(scores))
+    return np.mean(scores)
+
 def calc_mean_actions_matched(agent_stats, skill_headers=None, verbose=False):
     actions_matched = np.hstack(agent_stats['actions_matched'])
     if verbose:
         print(actions_matched)
 #       print(agent_stats['lifespans'])
     return np.mean(actions_matched)
+
+def calc_y_deltas(agent_stats, skill_headers=None, verbose=False):
+    y_deltas = np.hstack(agent_stats['y_deltas'])
+    if verbose:
+        print('y_deltas: {}'.format(y_deltas))
+    return np.mean(y_deltas)
 
 def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False):
     lifetimes = agent_stats['lifespans']
