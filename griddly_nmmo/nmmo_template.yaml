@@ -37,7 +37,7 @@ Environment:
       InitialValue: 0
       PerPlayer: true
   Player:
-    Count: 1
+    Count: 5
     Observer:
       RotateWithAvatar: true
       TrackAvatar: true
@@ -88,9 +88,10 @@ Actions:
           Preconditions:
             - gt: [thirst, 0]
             - gt: [hunger, 0]
-            - lt: [health, 15]
+            - lt: [health, 10]
           Commands:
             - incr: health
+            - set_tile: 0
         Dst:
           Object: gnome
 
@@ -106,10 +107,10 @@ Actions:
       - Src:
           Object: gnome
           Preconditions:
-            - lt: [hunger, 15]
+            - lt: [hunger, 10]
           Commands:
             # Not ideal
-            - add: [hunger, 15]
+            - add: [hunger, 10]
         Dst:
           Object: _empty
 
@@ -128,7 +129,7 @@ Actions:
           Preconditions:
             - lt: [thirst, 10]
           Commands:
-            - add: [thirst, 15]
+            - add: [thirst, 10]
         Dst:
           Object: water
 
@@ -146,6 +147,7 @@ Actions:
           Preconditions:
             - lt: [hunger, 1]
             - lt: [hunger, thirst]
+            - gt: [health, 0]
           Commands:
             - decr: health
         Dst:
@@ -166,6 +168,7 @@ Actions:
           Preconditions:
             - lt: [thirst, 1]
             - lt: [thirst, hunger]
+            - gt: [health, 0] # no negative health
           Commands:
             - decr: health
         Dst:
@@ -187,6 +190,7 @@ Actions:
           Preconditions:
             - lt: [thirst, 1]
             - eq: [thirst, hunger]
+            - gt: [health, 0]
           Commands:
             - decr: health
         Dst:
@@ -235,7 +239,7 @@ Actions:
             - lt:
                 Arguments: [health, 1]
                 Commands:
-                  - set: [player_done, 1]
+#                 - set: [player_done, 1]
                   - set_tile: 1
                   - reward: -1
 #                 - remove: true
@@ -393,7 +397,7 @@ Actions:
 #         Preconditions:
 #           - lt: [player_dead, 1]
           Commands:
-            - set: [ player_done, 1 ]
+#           - set: [ player_done, 1 ]
             - set_tile: 1
             - reward: -1
 #           - remove: true
@@ -422,6 +426,7 @@ Actions:
             # leaves give +5 hunger
             - incr: gather_skill
             - incr: score
+#           - reward: 1
             - exec:
                 Action: increase_hunger
                 Delay: 0
@@ -578,9 +583,9 @@ Objects:
       - Name: health
         InitialValue: 10
       - Name: hunger
-        InitialValue: 10
+        InitialValue: 20
       - Name: thirst
-        InitialValue: 10
+        InitialValue: 20
       - Name: wood
         InitialValue: 0
       - Name: ore

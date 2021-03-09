@@ -2,6 +2,8 @@ import csv
 import argparse
 
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 
 def plot_exp(exp_name, render=False):

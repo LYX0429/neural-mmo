@@ -7,6 +7,8 @@ import json
 
 import gym
 from matplotlib import pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 import ray
 import ray.rllib.agents.ppo.ppo as ppo
@@ -309,8 +311,8 @@ class RLLibEvaluator(evaluator.Base):
       self.trainer  = trainer
 
       if config.GRIDDLY:
-         self.policy_id = 'default_policy'
-#        self.policy_id = 'policy_0'
+#        self.policy_id = 'default_policy'
+         self.policy_id = 'policy_0'
       else:
          self.policy_id = 'policy_0'
       self.model    = self.trainer.get_policy(self.policy_id).model
@@ -571,7 +573,11 @@ class Policy(RecurrentNetwork, nn.Module):
       super().__init__(*args, **kwargs)
       nn.Module.__init__(self)
 
-      self.space  = actionSpace(self.config).spaces
+      action_space = actionSpace(self.config)
+      if hasattr(action_space, 'spaces'):
+         self.space  = actionSpace(self.config).spaces
+      else:
+         self.space = action_space
 
       #Select appropriate baseline model
 
@@ -688,7 +694,7 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #        self.init_epoch = False
 #        return
 #     else:
-#        super().log_return(stuff)
+#        super().log_result(stuff)
 
    def reset(self):
       #TODO: is this doing anythiing??
@@ -769,11 +775,17 @@ class EvoPPOTrainer(ppo.PPOTrainer):
             # FIXME: fucking FUCK this GARBAGE BULLSHIT
             # FIXME: must have N_PROC = N_EVO_MAPS. Utter fucking trash garbage.
          #  worker.foreach_env.remote(lambda env: env.set_map(idx=next(idxs), maps=maps))
-            worker.foreach_env.remote(lambda env: env.set_map(idx=fuck_id, maps=maps))
+            worker.foreach_env(lambda env: env.set_map(idx=fuck_id, maps=maps))
       else:
+         # Ha ha what the fuck
+         if 'maps' in maps:
+            maps = maps['maps']
          self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
 
-      stats = self.simulate_unfrozen()
+      if self.config['env_config']['config'].FROZEN:
+         stats = self.simulate_frozen()
+      else:
+         stats = self.simulate_unfrozen()
       stats_list = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: (env.worldIdx, env.send_agent_stats())))
       stats = {}
       for worker_stats in stats_list:
@@ -792,17 +804,37 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       return stats
 
    def simulate_frozen(self):
-#           update='counts values attention wilderness'.split())
-      obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset({})))
+      #self._evaluate()
+      pass
+
+   ##          update='counts values attention wilderness'.split())
+      obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(
+         lambda env: (env.worldIdx, env.reset({}))))
+      obs_dict = {}
+      for ob_w in obs:
+         if len(ob_w) > 0:
+            for ob_e in ob_w:
+               obs_dict[ob_e[0]] = ob_e[1]
 #     actions = self.workers.foreach_policy(lambda pol, str: pol.compute_actions(obs))
 
       for _ in range(100):
-         actions = [self.compute_actions(ob, policy_id='policy_0', state={}) for w_ob in obs for ob in w_ob]
+         actions = {}
+         T()
+         [actions.update({worldIdx: self.compute_actions(ob, policy_id='policy_0', state={})}) for (worldIdx, ob) in obs_dict.items()]
         #actions, self.state, _ = self.compute_actions(
         #      self.obs, state=self.state, policy_id='policy_0')
 #     self.registry.step(self.obs, pos, cmd,
 
-         self.workers.foreach_env(lambda env: env.step(actions, env.id))
+         obs = self.workers.foreach_worker(lambda worker:
+                                     worker.foreach_env(lambda env:
+                                                        (env.worldIdx, env.step(actions[env.worldIdx]))
+                                                        )
+                                     )
+         obs_dict = {}
+         for ob_w in obs:
+            if len(ob_w) > 0:
+               for ob_e in ob_w:
+                  obs_dict[ob_e[0]] = ob_e[1]
 
    def reset_envs(self):
       obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset({}, step=True)))

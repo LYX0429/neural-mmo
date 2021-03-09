@@ -214,6 +214,9 @@ class Griddly(EvoNMMO):
    GRIDDLY = True
    REGISTERED = False  #FIXME: hack. Do not set this.
    TEST = False
+   NENT=5
+   FROZEN = False
+   PRETRAIN = False
    EVO_DIR = 'griddly_scratch_0'
    TERRAIN_BORDER = 1
    ME_DIMS = ['mine_skill', 'woodcut_skill']

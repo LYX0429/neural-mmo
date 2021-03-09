@@ -152,9 +152,9 @@ def createPolicies(config):
     for i in range(config.NPOLICIES):
         params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
 
-        if config.GRIDDLY:
-          #key = mapPolicy('default_policy')
-           key = 'default_policy'
+        if config.GRIDDLY and False:
+           key = mapPolicy('default_policy')
+          #key = 'default_policy'
         else:
            key = mapPolicy(i
                    #, config
@@ -380,7 +380,10 @@ class EvolverNMMO(LambdaMuEvolver):
          if self.n_epoch > 0:
              self.plot()
       maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in individuals])
-      stats = self.train_and_log(maps)
+      if self.config.FROZEN:
+         stats = self.train_and_log_frozen(maps)
+      else:
+         stats = self.train_and_log(maps)
 
       for ind in individuals:
          if not self.MAP_TEST and not ind.idx in stats:
@@ -420,6 +423,68 @@ class EvolverNMMO(LambdaMuEvolver):
 
 #     self.global_stats.reset.remote()
 
+   def train_and_log_frozen(self, maps):
+      from multiprocessing import Pipe, Process
+      processes = {}
+      n_proc = 0
+      if not hasattr(self, 'frozen_workers'):
+         self.frozen_workers = [self.make_env({'config':self.config}) for _ in range(self.config.N_EVO_MAPS)]
+         [self.frozen_workers[i].set_map(i, maps) for i in range(self.config.N_EVO_MAPS)]
+      for (g_hash, map_arr) in maps.items():
+         parent_conn, child_conn = Pipe()
+         game = self.frozen_workers[g_hash]
+         p = Process(target=self.simulate_game,
+                     args=(
+                        game,
+                        maps,
+                        self.n_sim_ticks,
+                        child_conn,
+                     ))
+         p.start()
+         processes[g_hash] = p, parent_conn, child_conn
+         #              # NB: specific to NMMO!!
+         #              # we simulate a bunch of envs simultaneously through the rllib trainer
+         #              self.simulate_game(game, map_arr, self.n_sim_ticks, g_hash=g_hash)
+         #              parent_conn, child_conn = None, None
+         #              processes[g_hash] = score, parent_conn, child_conn
+         #              for g_hash, (game, score, age) in population.items():
+         #                  try:
+         #                      with open(os.path.join('./evo_experiment', '{}'.format(self.config['config'].EVO_DIR), 'env_{}_skills.json'.format(g_hash))) as f:
+         #                          agent_skills = json.load(f)
+         #                          score = self.update_entropy_skills(agent_skills)
+         #                  except FileNotFoundError:
+         #                      raise Exception
+         #                      # hack
+         #                      score = None
+         #                      processes[g_hash] = score, parent_conn, child_conn
+         #                  self.population[g_hash] = (game, score, age)
+
+         #              n_proc += 1
+         #              break
+
+         if n_proc > 1 and n_proc % self.n_proc == 0:
+            self.join_procs(processes)
+
+      if len(processes) > 0:
+         self.join_procs(processes)
+
+      T()
+      stats_list = [w.send_agent_stats() for w in self.frozen_workers]
+      stats = {}
+      for worker_stats in stats_list:
+         if not worker_stats: continue
+         for (envID, env_stats) in worker_stats:
+            if not env_stats: continue
+            if envID not in stats:
+               stats[envID] = env_stats
+            else:
+               for (k, v) in env_stats.items():
+                  if k not in stats[envID]:
+                     stats[envID][k] = v
+                  else:
+                     stats[envID][k] += v
+
+      return stats
 
    def train_and_log(self, maps):
       self.global_counter.set_idxs.remote([i for i in maps.keys()])
@@ -744,12 +809,12 @@ class EvolverNMMO(LambdaMuEvolver):
       global TRAINER
       self.trainer = TRAINER
 
-      if self.config.GRIDDLY:
+      if self.config.GRIDDLY and False:
          model_config = {
                'conv_filters': [
                   [64, (7, 7), 1],
-#                 [3, (3, 3), 1],
-#                 [3, (3, 3), 1],
+#      #          [3, (3, 3), 1],
+#      #          [3, (3, 3), 1],
                   ],
                }
          griddly_config = {
@@ -1056,14 +1121,24 @@ class EvolverNMMO(LambdaMuEvolver):
            if xp > self.max_skills[skill]:
                self.max_skills[skill] = max_xp
 
-   def simulate_game(self, game, map_arr, n_ticks, conn=None, g_hash=None):
-       score = 0
-       score += self.tick_game(game, g_hash=g_hash)
+   def simulate_game(self, game, maps, conn=None, g_hash=None):
+      game.set_map(game.worldIdx, maps)
+      ob = game.reset()
+      for t in range(self.config.MAX_STEPS):
 
-       if conn:
-           conn.send(score)
+          actions, self.state, _ = self.trainer.compute_actions(
+             ob)
+          ob, _, _, _ = game.step(actions)
 
-       return score
+
+
+#      score = 0
+#      score += self.tick_game(game, g_hash=g_hash)
+
+#      if conn:
+#          conn.send(score)
+
+#      return score
 
    def run(self, game, map_arr):
        self.obs= game.reset(#map_arr=map_arr,
@@ -1084,8 +1159,8 @@ class EvolverNMMO(LambdaMuEvolver):
    def evolve_generation(self):
 #     global_stats = self.global_stats
 #     self.send_genes(global_stats)
-      train_stats = self.trainer.train()
-      stats = self.stats
+      stats = self.trainer.train(maps=dict([(i, None) for i in range(self.config.N_EVO_MAPS)]))
+#     stats = self.stats
      #headers = ray.get(global_stats.get_headers.remote())
 #     n_epis = train_stats['episodes_this_iter']
 
@@ -1099,8 +1174,8 @@ class EvolverNMMO(LambdaMuEvolver):
       for g_hash in self.population.keys():
          if g_hash not in stats:
             print('Missing simulation stats for map {}. I assume this is the 0th generation, or re-load? Re-running the training step.'.format(g_hash))
-            self.trainer.train()
-            stats = self.stats
+            stats = self.trainer.train()
+#           stats = self.stats
 
             break
 
@@ -1163,7 +1238,7 @@ class EvolverNMMO(LambdaMuEvolver):
                   #    self.update_max_skills(ent)
                    reward -= 1
            # Compute batch of actions
-               if self.config.GRIDDLY:
+               if self.config.GRIDDLY and False:
                   actions, self.state, _= self.trainer.compute_actions(
                       self.obs, state=self.state, policy_id='default_policy')
                else:

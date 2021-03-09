@@ -1,5 +1,5 @@
 from pdb import set_trace as T
-from griddly.util.rllib import RLlibMultiAgentWrapper
+from griddly.util.rllib.wrappers.core import RLlibMultiAgentWrapper, RLlibEnv
 
 import gym
 import numpy as np
@@ -55,11 +55,11 @@ import os
 
 class NMMOWrapper(RLlibMultiAgentWrapper):
     def __init__(self, config):
-        max_steps = 100
-
-        super().__init__(config)
+#       max_steps = 100
+        env = RLlibEnv(config)
+        super().__init__(env, config)
         self.n_step = 0
-        self.max_steps = max_steps
+#       self.max_steps = max_steps
 
     def step(self, action):
         rew = {}

@@ -345,7 +345,6 @@ class PatternGenome(Genome):
     def gen_map(self):
 
 #       self.update_features()
-
         return self.paint_map()
 
 #   def update_features(self):

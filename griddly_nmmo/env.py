@@ -8,7 +8,6 @@ import numpy as np
 import griddly_nmmo
 from griddly_nmmo.map_gen import MapGen
 from griddly_nmmo.wrappers import NMMOWrapper
-from griddly.util.rllib import RLlibMultiAgentWrapper
 
 reshp = (1, 2, 0)
 #reshp = (0, 1, 2)
@@ -18,7 +17,8 @@ class NMMO(NMMOWrapper):
    def __init__(self, config):
       self.config = config
       self.map_gen = MapGen(config['config'])
-      yaml_path = 'nmmo.yaml'
+      yaml_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'nmmo.yaml')
+#     yaml_path = 'griddly_nmmo/nmmo.yaml'
       self.init_tiles, self.probs, self.skill_names = self.map_gen.get_init_tiles(yaml_path, write_game_file=False)
       self.chars_to_terrain = dict([(v, k) for (k, v) in self.map_gen.chars.items()])
       level_string = self.map_gen.gen_map(self.init_tiles, self.probs)
@@ -26,7 +26,10 @@ class NMMO(NMMOWrapper):
 #     env = gym.make('GDY-nmmo-v0',
 #                    player_observer_type=gd.ObserverType.VECTOR,
 #                    global_observer_type=gd.ObserverType.ISOMETRIC)
+     #if 'env_config' in config:
       self.env = NMMOWrapper(config['env_config'])
+   #else:
+     #   self.env = NMMOWrapper(config)
 #     self.env_config = env_config
 #     env = RLlibMultiAgentWrapper(config['env_config'])
       self.env.reset(level_id=None, level_string=level_string)
@@ -63,7 +66,7 @@ class NMMO(NMMOWrapper):
       self.worldIdx = self.mapIdx
       map_arr = maps[self.mapIdx]
       self.map_arr = map_arr
-      assert map_arr is not None
+#     assert map_arr is not None
 
    def reset(self, config=None, step=None, maps=None):
       self.past_deads = set()
@@ -83,7 +86,7 @@ class NMMO(NMMOWrapper):
       self.skills = dict([(skill_name, dict([(i, 0) for i in range(self.env.player_count)])) for skill_name in self.skill_names])
 #     self.init_pos = {}
 
-      if self.config['config'].TEST:
+      if self.config['config'].TEST or self.config['config'].PRETRAIN:
          map_str_out = self.map_gen.gen_map(self.init_tiles, self.probs)
       else:
          map_arr = self.map_arr
@@ -127,7 +130,7 @@ class NMMO(NMMOWrapper):
 #     dones['__all__'] = self.dones['__all__']
 
 
-      if self.config['config'].RENDER:
+      if self.config['config'].RENDER or (self.config['config'].GRIDDLY and self.config['config'].TEST):
          if len(self.env.past_deads) == self.config['config'].NENT:
             print('Evaluated map {}'.format(self.worldIdx))
             lifetimes = list(self.lifetimes.values())
@@ -168,7 +171,7 @@ class NMMO(NMMOWrapper):
       for o in objects:
          if o['Name'] == 'gnome':
             end_pos[o['PlayerId'] - 1] = o['Location']
-      # reward agent for being on ``opposite corner'' of map
+      # assign map fitness when agent ends up in ``opposite corner'' of map
       y_deltas = [(end_pos[i][1] - self.init_stats['init_pos'][i][1]) + (end_pos[i][0] - self.init_stats['init_pos'][i][0]) for i in range(self.env.player_count)]
 
 

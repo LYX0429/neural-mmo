@@ -10,13 +10,13 @@ from collections import OrderedDict
 np.set_printoptions(threshold=5000, linewidth=200)
 
 TILE_PROB_DICT = OrderedDict({
-               'lava':     0.10,
-               'grass':    0.385,
-               'water':    0.10,
-               'forest':   0.10,
-               'stone':    0.10,
-               'iron_ore': 0.10,
-               'tree':     0.10,
+               'lava':     1,
+               'grass':    3,
+               'water':    2,
+               'forest':   5.,
+               'stone':    1,
+               'iron_ore': 1,
+               'tree':     1,
                'gnome_spawn': 0.025,
               #'chicken_spawn': 0.005
             })
@@ -165,9 +165,10 @@ class MapGen():
 
     def get_init_tiles(self, yaml_path, write_game_file=False):
         # Using a template to generate the runtime file allows for preservation of comments and structure. And possibly other tricks... (evolution of game entities and mechanics)
-        yaml_path_og = os.path.join(griddly.__path__[0], 'resources', 'games',  yaml_path)
-        yaml_path = os.path.join('griddly_nmmo',  yaml_path)
+        yaml_path_og = os.path.join(griddly.__path__[0], 'resources', 'games',  'nmmo.yaml')
+       #yaml_path = os.path.join('griddly_nmmo',  yaml_path)
         yaml_template_path = yaml_path.strip('.yaml') + '_template.yaml'
+        yaml_template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), yaml_template_path)
         init_tiles = [self.chars['grass']]
         probs = [self.probs['grass']]
         self.tile_types = tile_types = list(self.probs.keys())
@@ -189,6 +190,7 @@ class MapGen():
         probs.append(self.probs['gnome_spawn'])
         # Add a placeholder level so that we can make the env from yaml (this will be overwritten during reset)
         level_string = self.gen_map(init_tiles, probs)
+        print(level_string)
         contents['Environment']['Levels'] = [level_string] # placeholder map
         contents['Environment']['Player']['Count'] = self.N_PLAYERS # set num players
         contents['Environment']['Name'] = 'nmmo'
@@ -212,8 +214,16 @@ class MapGen():
     def gen_map(self, init_tiles, probs):
         # max 3 character string in each tile
         # need to take into account column of newlines
+        # we'll add spawns later
+        if self.player_char in init_tiles:
+            spawn_idx = init_tiles.index(self.player_char)
+            # NB: We're actually popping from object attributes here
+            init_tiles.pop(spawn_idx)
+            probs.pop(spawn_idx)
+        probs = np.array(probs) / np.sum(probs)
         level_string = np.random.choice(init_tiles, size=(self.MAP_WIDTH, self.MAP_WIDTH+1), p=probs).astype(self.utf_enc)
-        idxs = np.where(level_string[1:-1, 1:-2] == self.player_char)
+#       idxs = np.where(level_string[1:-1, 1:-2] == self.player_char)
+        idxs = np.where(level_string[1:-1, 1:-2] == ".")
         idxs = np.array(list(zip(idxs[0], idxs[1]))) + 1
         ixs = np.random.choice(len(idxs), min(self.N_PLAYERS, len(idxs)), replace=False)
         coords = idxs[ixs]
@@ -222,7 +232,7 @@ class MapGen():
         level_string[-1, :] = self.chars[border_tile]
         level_string[:, 0] = self.chars[border_tile]
         level_string[:, -2] = self.chars[border_tile]
-        for j, coord in enumerate(coords):
+        for j, coord in enumerate(coords[:self.N_PLAYERS]):
             level_string[coord[0], coord[1]] = self.player_char + str(j+1)
 #       level_string[coords[:, 0], coords[:, 1]] = self.player_char
 
