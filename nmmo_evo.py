@@ -195,9 +195,13 @@ class Stats:
             self.stats[mapIdx] = {}
             self.stats[mapIdx]['skills'] = [stats['skills']]
             self.stats[mapIdx]['lifespans'] = [stats['lifespans']]
+            self.stats[mapIdx]['scores'] = [stats['scores']]
+            self.stats[mapIdx]['y_deltas'] = [stats['y_deltas']]
         else:
             self.stats[mapIdx]['skills'].append(stats['skills'])
             self.stats[mapIdx]['lifespans'].append(stats['lifespans'])
+            self.stats[mapIdx]['scores'].append(stats['scores'])
+            self.stats[mapIdx]['y_deltas'].append(stats['y_deltas'])
 
     def get(self):
         return self.stats

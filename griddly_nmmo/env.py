@@ -49,12 +49,15 @@ class NMMO(NMMOWrapper):
       self.lifetimes = {}
       self.dones = {'__all__': False}
       self.maps = None
+      self.map_arr = None
       self.past_deads = set()
+      self.must_send_stats = False
 
    #del (self.env)
      #self.env = None
 
    def set_map(self, idx=None, maps=None):
+#     print('setting map', self.worldIdx)
       if idx is None:
          global_counter = ray.get_actor("global_counter")
          self.mapIdx = ray.get(global_counter.get.remote())
@@ -66,9 +69,19 @@ class NMMO(NMMOWrapper):
       self.worldIdx = self.mapIdx
       map_arr = maps[self.mapIdx]
       self.map_arr = map_arr
-#     assert map_arr is not None
+#     print(maps.keys())
+#     assert map_arr is not Nonem
+
+      # If we have se the map, we need to load it immediately
+      self.dones['__all__'] = True
+
 
    def reset(self, config=None, step=None, maps=None):
+#     print('resetting {}'.format(self.worldIdx))
+#     if self.must_send_stats:
+#        self.send_agent_stats()
+      # If we are about to simulate, we will need to send stats afterward
+      self.must_send_stats = True
       self.past_deads = set()
       self.dones = {'__all__': False}
 #     if maps is None:
@@ -119,6 +132,7 @@ class NMMO(NMMOWrapper):
 
 
    def step(self, a, omitDead=False, preprocessActions=False):
+#     print('step env ',self.worldIdx)
     # if isinstance(a[0], np.ndarray):
       obs, rew, dones, info = self.env.step(a)
 
@@ -138,8 +152,13 @@ class NMMO(NMMOWrapper):
             print('Mean lifetime: {}'.format(np.mean(lifetimes)))
             self.dones['__all__'] = True
 
-
+      # In case we need to load a map assigned to this env at the previous step
+      # More generally: we can mark the environment as done from outside or as a result of processes other than usual
+      # simulation.
+      if self.dones['__all__'] == True:
+         dones['__all__'] = True
       self.dones = dones
+      self.last_obs = obs
       return obs, rew, dones, info
 
    def render(self, observer='global', mode='rgb'):
@@ -160,11 +179,13 @@ class NMMO(NMMOWrapper):
 
 
    def send_agent_stats(self):
+#     print('sending stats', self.worldIdx)
       env_state = self.env.get_state()
       global_vars = env_state['GlobalVariables']
       [self.skills[skill_name].update({k: global_vars[skill_name][k]}) if k in global_vars[skill_name] else self.skills[skill_name].update({k: 0}) for k in range(self.env.player_count) for skill_name in self.config['config'].SKILLS]
       scores = [global_vars['score'][i] for i in range(self.env.player_count)]
-#     global_stats = ray.get_actor('global_stats')
+      # FIXME: only necessary when frozen due to evaluator resets
+      global_stats = ray.get_actor('global_stats')
 
       objects = env_state['Objects']
       end_pos = np.empty((self.env.player_count, 2))
@@ -182,8 +203,12 @@ class NMMO(NMMOWrapper):
          'y_deltas': y_deltas,
          'scores': scores,
       }
-      #     global_stats.add.remote(stats, self.mapIdx)
+      # FIXME: only necessary when frozen due to evaluator resets
+      global_stats.add.remote(stats, self.mapIdx)
+
+      # If we are sending stats, we must reset immediately, without again sending stats
       self.dones['__all__'] = True
+      self.must_send_stats = False
 
       return stats
 

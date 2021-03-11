@@ -236,12 +236,13 @@ Actions:
                 Action: decrease_health_hungerThirst
                 Delay: 0
             # if health <= 0, die
-            - lt:
-                Arguments: [health, 1]
-                Commands:
+#           - lt:
+#               Arguments: [health, 1]
+#               Commands:
 #                 - set: [player_done, 1]
-                  - set_tile: 1
-                  - reward: -1
+#                 - set_tile: 1
+#                 - reward: -1
+#                 - decr: score
 #                 - remove: true
             # keep ticking
             - exec:
@@ -398,8 +399,9 @@ Actions:
 #           - lt: [player_dead, 1]
           Commands:
 #           - set: [ player_done, 1 ]
-            - set_tile: 1
-            - reward: -1
+#           - set_tile: 1
+#           - reward: -1
+#           - decr: score
 #           - remove: true
         Dst:
           Object: lava
@@ -426,7 +428,7 @@ Actions:
             # leaves give +5 hunger
             - incr: gather_skill
             - incr: score
-#           - reward: 1
+            - reward: 1
             - exec:
                 Action: increase_hunger
                 Delay: 0

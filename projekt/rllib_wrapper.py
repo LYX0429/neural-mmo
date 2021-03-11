@@ -8,6 +8,14 @@ import json
 import gym
 from matplotlib import pyplot as plt
 import matplotlib
+from ray.rllib.agents import Trainer
+from ray.rllib.env.normalize_actions import NormalizeActionWrapper
+from ray.rllib.utils import override
+from ray.rllib.utils.from_config import from_config
+from ray.tune import Trainable
+from ray.tune.registry import ENV_CREATOR, _global_registry
+from ray.tune.utils import merge_dicts
+
 matplotlib.use('Agg')
 import numpy as np
 import ray
@@ -48,7 +56,8 @@ from ray.rllib.execution.rollout_ops import ParallelRollouts, ConcatBatches
 from ray.rllib.execution.train_ops import TrainOneStep
 
 from griddly import GymWrapperFactory, gd
-from ray.rllib.utils.typing import EnvConfigDict, EnvType, ResultDict, TrainerConfigDict
+from ray.rllib.utils.typing import EnvConfigDict, EnvType, ResultDict, TrainerConfigDict, PartialTrainerConfigDict
+
 
 #Moved log to forge/trinity/env
 class RLLibEnv(Env, rllib.MultiAgentEnv):
@@ -86,8 +95,10 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
       t, mmean = len(self.lifetimes), np.mean(self.lifetimes)
 
-      if not self.config.EVALUATE and self.realm.tick > self.config.TRAIN_HORIZON:
-         dones['__all__'] = True
+      # We don't need this, set_map does it for us?
+
+#     if not self.config.EVALUATE and self.realm.tick > self.config.TRAIN_HORIZON:
+#        dones['__all__'] = True
 
       # are we doing evolution?
 
@@ -107,9 +118,9 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
 
    def send_agent_stats(self):
-#     global_stats = ray.get_actor('global_stats')
+      global_stats = ray.get_actor('global_stats')
       stats = self.get_all_agent_stats()
-#     global_stats.add.remote(stats, self.worldIdx)
+      global_stats.add.remote(stats, self.worldIdx)
       self.evo_dones = {}
       self.evo_dones['__all__'] = True
 
@@ -539,10 +550,10 @@ class RLLibEvaluator(evaluator.Base):
           pos: Camera position (r, c) from the server)
           cmd: Consol command from the server
       '''
-#     stats = self.env.get_all_agent_stats()
-#     score = self.calc_diversity(stats, verbose=True)
+      stats = self.env.send_agent_stats()
+      score = self.calc_diversity(stats, verbose=True)
 #     score = DIV_CALCS[1][0](stats, verbose=True)
-#     print(score)
+      print(score)
 
       #Compute batch of actions
       actions, self.state, _ = self.trainer.compute_actions(
@@ -677,16 +688,136 @@ def frozen_execution_plan(workers: WorkerSet, config: TrainerConfigDict):
     return EXEC_RETURN
 
 
+import logging
+logger = logging.getLogger(__name__)
 
 class EvoPPOTrainer(ppo.PPOTrainer):
    '''Small utility class on top of RLlib's base trainer. Evolution edition.'''
    def __init__(self, env, path, config, execution_plan):
+      self.nmmo_config = config['env_config']['config']
       super().__init__(env=env, config=config)
 #     self.execution_plan = execution_plan
 #     self.train_exec_impl = execution_plan(self.workers, config)
       self.saveDir = path
       self.pathDir = '/'.join(path.split(os.sep)[:-1])
       self.init_epoch = True
+
+
+   # FIXME: AWFUL hack, purely to override overriding of batch mode when
+   # initializing eval workers.
+   @override(Trainable)
+   def setup(self, config: PartialTrainerConfigDict):
+      env = self._env_id
+      if env:
+         config["env"] = env
+         # An already registered env.
+         if _global_registry.contains(ENV_CREATOR, env):
+            self.env_creator = _global_registry.get(ENV_CREATOR, env)
+         # A class specifier.
+         elif "." in env:
+            self.env_creator = \
+               lambda env_context: from_config(env, env_context)
+         # Try gym/PyBullet.
+         else:
+
+            def _creator(env_context):
+               import gym
+               # Allow for PyBullet envs to be used as well (via string).
+               # This allows for doing things like
+               # `env=CartPoleContinuousBulletEnv-v0`.
+               try:
+                  import pybullet_envs
+                  pybullet_envs.getList()
+               except (ModuleNotFoundError, ImportError):
+                  pass
+               return gym.make(env, **env_context)
+
+            self.env_creator = _creator
+      else:
+         self.env_creator = lambda env_config: None
+
+      # Merge the supplied config with the class default, but store the
+      # user-provided one.
+      self.raw_user_config = config
+      self.config = Trainer.merge_trainer_configs(self._default_config,
+                                                  config)
+# NMMO won't use tf1 :D
+
+#     # Check and resolve DL framework settings.
+#     # Enable eager/tracing support.
+#     if tf1 and self.config["framework"] in ["tf2", "tfe"]:
+#        if self.config["framework"] == "tf2" and tfv < 2:
+#           raise ValueError("`framework`=tf2, but tf-version is < 2.0!")
+#        if not tf1.executing_eagerly():
+#           tf1.enable_eager_execution()
+#        logger.info("Executing eagerly, with eager_tracing={}".format(
+#           self.config["eager_tracing"]))
+#     if tf1 and not tf1.executing_eagerly() and \
+#             self.config["framework"] != "torch":
+#        logger.info("Tip: set framework=tfe or the --eager flag to enable "
+#                    "TensorFlow eager execution")
+
+      if self.config["normalize_actions"]:
+         inner = self.env_creator
+
+         def normalize(env):
+            import gym  # soft dependency
+            if not isinstance(env, gym.Env):
+               raise ValueError(
+                  "Cannot apply NormalizeActionActionWrapper to env of "
+                  "type {}, which does not subclass gym.Env.", type(env))
+            return NormalizeActionWrapper(env)
+
+         self.env_creator = lambda env_config: normalize(inner(env_config))
+
+      Trainer._validate_config(self.config)
+      if not callable(self.config["callbacks"]):
+         raise ValueError(
+            "`callbacks` must be a callable method that "
+            "returns a subclass of DefaultCallbacks, got {}".format(
+               self.config["callbacks"]))
+      self.callbacks = self.config["callbacks"]()
+      log_level = self.config.get("log_level")
+      if log_level in ["WARN", "ERROR"]:
+         logger.info("Current log_level is {}. For more information, "
+                     "set 'log_level': 'INFO' / 'DEBUG' or use the -v and "
+                     "-vv flags.".format(log_level))
+      if self.config.get("log_level"):
+         logging.getLogger("ray.rllib").setLevel(self.config["log_level"])
+
+      def get_scope():
+#        if tf1 and not tf1.executing_eagerly():
+#           return tf1.Graph().as_default()
+#        else:
+         return open(os.devnull)  # fake a no-op scope
+
+      with get_scope():
+         self._init(self.config, self.env_creator)
+
+         # Evaluation setup.
+         if self.config.get("evaluation_interval"):
+            # Update env_config with evaluation settings:
+            extra_config = copy.deepcopy(self.config["evaluation_config"])
+            # Assert that user has not unset "in_evaluation".
+            assert "in_evaluation" not in extra_config or \
+                   extra_config["in_evaluation"] is True
+            extra_config.update({
+#              "batch_mode": "complete_episodes",
+               # FIXME: why is rollout_fragment_length x10 what it should be hahah
+               "rollout_fragment_length": 10,
+               "in_evaluation": True,
+            })
+            logger.debug(
+               "using evaluation_config: {}".format(extra_config))
+
+            self.evaluation_workers = self._make_workers(
+               env_creator=self.env_creator,
+               validate_env=None,
+               policy_class=self._policy_class,
+               config=merge_dicts(self.config, extra_config),
+               num_workers=self.config["evaluation_num_workers"])
+            self.evaluation_metrics = {}
+
 
    def log_result(self, stuff):
       return
@@ -735,6 +866,11 @@ class EvoPPOTrainer(ppo.PPOTrainer):
          with open(path) as f:
             path = f.read().splitlines()[0]
          path = os.path.abspath(path)
+      elif self.nmmo_config.FROZEN:
+         path = os.path.join('evo_experiment', model, 'path.txt')
+         with open(path) as f:
+            path = f.read().splitlines()[0]
+         path = os.path.abspath(path)
       else:
          path = model
 #        pass
@@ -744,6 +880,11 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 
       print('Loading from: {}'.format(path))
       super().restore(path)
+
+#     if self.config['env_config']['config'].FROZEN:
+#        workers = self.evaluation_workers
+#        for worker in [workers.local_worker()] + workers.remote_workers():
+#            worker.batch_mode = 'truncate_episodes'
 
    def policyID(self, idx):
       return 'policy_{}'.format(idx)
@@ -765,76 +906,115 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #        self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
       #NOTE: you can't iteratively send indexes to environment with 'foreach_worker', multiprocessing will thwart you
       i = 0
+      if self.config['env_config']['config'].FROZEN:
+         workers = self.evaluation_workers
+      else:
+         workers = self.workers
+
       if self.config['env_config']['config'].N_PROC == self.config['env_config']['config'].N_EVO_MAPS:
-         for worker in self.workers.remote_workers():
+         for worker in [workers.local_worker()] + workers.remote_workers():
             if len(idxs) > 0:
                fuck_id = idxs[i % len(idxs)]
             else:
                fuck_id = idxs[i]
             i += 1
-            # FIXME: fucking FUCK this GARBAGE BULLSHIT
-            # FIXME: must have N_PROC = N_EVO_MAPS. Utter fucking trash garbage.
+            # FIXME: must have N_PROC = N_EVO_MAPS?
          #  worker.foreach_env.remote(lambda env: env.set_map(idx=next(idxs), maps=maps))
             worker.foreach_env(lambda env: env.set_map(idx=fuck_id, maps=maps))
       else:
          # Ha ha what the fuck
          if 'maps' in maps:
             maps = maps['maps']
-         self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
+         workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
 
       if self.config['env_config']['config'].FROZEN:
          stats = self.simulate_frozen()
       else:
          stats = self.simulate_unfrozen()
-      stats_list = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: (env.worldIdx, env.send_agent_stats())))
-      stats = {}
-      for worker_stats in stats_list:
-         if not worker_stats: continue
-         for (envID, env_stats) in worker_stats:
-            if not env_stats: continue
-            if envID not in stats:
-               stats[envID] = env_stats
-            else:
-               for (k, v) in env_stats.items():
-                  if k not in stats[envID]:
-                     stats[envID][k] = v
-                  else:
-                     stats[envID][k] += v
+      if self.config['env_config']['config'].FROZEN and False:
+         global_stats = ray.get_actor('global_stats')
+         stats = ray.get(global_stats.get.remote())
+         global_stats.reset.remote()
+         print('stats keys', stats.keys())
+      else:
+         stats_list = workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: (env.worldIdx, env.send_agent_stats())))
+         stats = {}
+         for worker_stats in stats_list:
+            if not worker_stats: continue
+            for (envID, env_stats) in worker_stats:
+               if not env_stats: continue
+               if envID not in stats:
+                  stats[envID] = env_stats
+               else:
+                  for (k, v) in env_stats.items():
+                     if k not in stats[envID]:
+                        stats[envID][k] = v
+                     else:
+                        stats[envID][k] += v
 
       return stats
 
    def simulate_frozen(self):
-      #self._evaluate()
-      pass
+      stats = super()._evaluate()
+
+      # FIXME: switch this off when already saving for other reasons; control from config
+      if self.training_iteration < 100:
+         save_interval = 10
+      else:
+         save_interval = 100
+
+      if self.training_iteration % save_interval == 0:
+         self.save()
+
+#     nSteps = stats['info']['num_steps_trained']
+#     VERBOSE = False
+
+#     if VERBOSE:
+#        print('Epoch: {}, Samples: {}'.format(self.training_iteration, nSteps))
+#     hist = stats['hist_stats']
+
+#     for key, stat in hist.items():
+#        if len(stat) == 0 or key == 'map_fitness':
+#           continue
+
+#        if VERBOSE:
+#           print('{}:: Total: {:.4f}, N: {:.4f}, Mean: {:.4f}, Std: {:.4f}, Min: {:.4f}, Max: {:.4f}'.format(
+#              key, np.sum(stat), len(stat), np.mean(stat), np.std(stat), np.min(stat), np.max(stat)))
+#        #if key == 'map_fitness':
+#        #    print('DEBUG MAP FITNESS PRINTOUT')
+#        #    print(hist[key])
+#        hist[key] = []
+
+#     return stats
 
    ##          update='counts values attention wilderness'.split())
-      obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(
-         lambda env: (env.worldIdx, env.reset({}))))
-      obs_dict = {}
-      for ob_w in obs:
-         if len(ob_w) > 0:
-            for ob_e in ob_w:
-               obs_dict[ob_e[0]] = ob_e[1]
-#     actions = self.workers.foreach_policy(lambda pol, str: pol.compute_actions(obs))
+ #    obs = self.evaluation_workers.foreach_worker(lambda worker: worker.foreach_env(
+ #       lambda env: (env.worldIdx, env.reset({}))))
+ #    obs_dict = {}
+ #    for ob_w in obs:
+ #       if len(ob_w) > 0:
+ #          for ob_e in ob_w:
+ #             obs_dict[ob_e[0]] = ob_e[1]
+##    actions = self.workers.foreach_policy(lambda pol, str: pol.compute_actions(obs))
 
-      for _ in range(100):
-         actions = {}
-         T()
-         [actions.update({worldIdx: self.compute_actions(ob, policy_id='policy_0', state={})}) for (worldIdx, ob) in obs_dict.items()]
-        #actions, self.state, _ = self.compute_actions(
-        #      self.obs, state=self.state, policy_id='policy_0')
-#     self.registry.step(self.obs, pos, cmd,
+ #    for _ in range(100):
+ #       actions = {}
+ #       T()
+ #       [actions.update({worldIdx: self.compute_actions(ob, policy_id='policy_0', state={})}) for (worldIdx, ob) in obs_dict.items()]
+ #      #actions, self.state, _ = self.compute_actions(
+ #      #      self.obs, state=self.state, policy_id='policy_0')
+##    self.registry.step(self.obs, pos, cmd,
 
-         obs = self.workers.foreach_worker(lambda worker:
-                                     worker.foreach_env(lambda env:
-                                                        (env.worldIdx, env.step(actions[env.worldIdx]))
-                                                        )
-                                     )
-         obs_dict = {}
-         for ob_w in obs:
-            if len(ob_w) > 0:
-               for ob_e in ob_w:
-                  obs_dict[ob_e[0]] = ob_e[1]
+ #       obs = self.workers.foreach_worker(lambda worker:
+ #                                   worker.foreach_env(lambda env:
+ #                                                      (env.worldIdx, env.step(actions[env.worldIdx]))
+ #                                                      )
+ #                                   )
+ #       obs_dict = {}
+ #       for ob_w in obs:
+ #          if len(ob_w) > 0:
+ #             for ob_e in ob_w:
+ #                obs_dict[ob_e[0]] = ob_e[1]
 
    def reset_envs(self):
       obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset({}, step=True)))

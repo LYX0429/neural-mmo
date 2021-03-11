@@ -380,10 +380,10 @@ class EvolverNMMO(LambdaMuEvolver):
          if self.n_epoch > 0:
              self.plot()
       maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in individuals])
-      if self.config.FROZEN:
-         stats = self.train_and_log_frozen(maps)
-      else:
-         stats = self.train_and_log(maps)
+#     if self.config.FROZEN and False:
+#        stats = self.train_and_log_frozen(maps)
+#     else:
+      stats = self.train_and_log(maps)
 
       for ind in individuals:
          if not self.MAP_TEST and not ind.idx in stats:
@@ -423,68 +423,67 @@ class EvolverNMMO(LambdaMuEvolver):
 
 #     self.global_stats.reset.remote()
 
-   def train_and_log_frozen(self, maps):
-      from multiprocessing import Pipe, Process
-      processes = {}
-      n_proc = 0
-      if not hasattr(self, 'frozen_workers'):
-         self.frozen_workers = [self.make_env({'config':self.config}) for _ in range(self.config.N_EVO_MAPS)]
-         [self.frozen_workers[i].set_map(i, maps) for i in range(self.config.N_EVO_MAPS)]
-      for (g_hash, map_arr) in maps.items():
-         parent_conn, child_conn = Pipe()
-         game = self.frozen_workers[g_hash]
-         p = Process(target=self.simulate_game,
-                     args=(
-                        game,
-                        maps,
-                        self.n_sim_ticks,
-                        child_conn,
-                     ))
-         p.start()
-         processes[g_hash] = p, parent_conn, child_conn
-         #              # NB: specific to NMMO!!
-         #              # we simulate a bunch of envs simultaneously through the rllib trainer
-         #              self.simulate_game(game, map_arr, self.n_sim_ticks, g_hash=g_hash)
-         #              parent_conn, child_conn = None, None
-         #              processes[g_hash] = score, parent_conn, child_conn
-         #              for g_hash, (game, score, age) in population.items():
-         #                  try:
-         #                      with open(os.path.join('./evo_experiment', '{}'.format(self.config['config'].EVO_DIR), 'env_{}_skills.json'.format(g_hash))) as f:
-         #                          agent_skills = json.load(f)
-         #                          score = self.update_entropy_skills(agent_skills)
-         #                  except FileNotFoundError:
-         #                      raise Exception
-         #                      # hack
-         #                      score = None
-         #                      processes[g_hash] = score, parent_conn, child_conn
-         #                  self.population[g_hash] = (game, score, age)
+#  def train_and_log_frozen(self, maps):
+#     from multiprocessing import Pipe, Process
+#     processes = {}
+#     n_proc = 0
+#     if not hasattr(self, 'frozen_workers'):
+#        self.frozen_workers = [self.make_env({'config':self.config}) for _ in range(self.config.N_EVO_MAPS)]
+#        [self.frozen_workers[i].set_map(i, maps) for i in range(self.config.N_EVO_MAPS)]
+#     for (g_hash, map_arr) in maps.items():
+#        parent_conn, child_conn = Pipe()
+#        game = self.frozen_workers[g_hash]
+#        p = Process(target=self.simulate_game,
+#                    args=(
+#                       game,
+#                       maps,
+#                       self.n_sim_ticks,
+#                       child_conn,
+#                    ))
+#        p.start()
+#        processes[g_hash] = p, parent_conn, child_conn
+#        #              # NB: specific to NMMO!!
+#        #              # we simulate a bunch of envs simultaneously through the rllib trainer
+#        #              self.simulate_game(game, map_arr, self.n_sim_ticks, g_hash=g_hash)
+#        #              parent_conn, child_conn = None, None
+#        #              processes[g_hash] = score, parent_conn, child_conn
+#        #              for g_hash, (game, score, age) in population.items():
+#        #                  try:
+#        #                      with open(os.path.join('./evo_experiment', '{}'.format(self.config['config'].EVO_DIR), 'env_{}_skills.json'.format(g_hash))) as f:
+#        #                          agent_skills = json.load(f)
+#        #                          score = self.update_entropy_skills(agent_skills)
+#        #                  except FileNotFoundError:
+#        #                      raise Exception
+#        #                      # hack
+#        #                      score = None
+#        #                      processes[g_hash] = score, parent_conn, child_conn
+#        #                  self.population[g_hash] = (game, score, age)
 
-         #              n_proc += 1
-         #              break
+#        #              n_proc += 1
+#        #              break
 
-         if n_proc > 1 and n_proc % self.n_proc == 0:
-            self.join_procs(processes)
+#        if n_proc > 1 and n_proc % self.n_proc == 0:
+#           self.join_procs(processes)
 
-      if len(processes) > 0:
-         self.join_procs(processes)
+#     if len(processes) > 0:
+#        self.join_procs(processes)
 
-      T()
-      stats_list = [w.send_agent_stats() for w in self.frozen_workers]
-      stats = {}
-      for worker_stats in stats_list:
-         if not worker_stats: continue
-         for (envID, env_stats) in worker_stats:
-            if not env_stats: continue
-            if envID not in stats:
-               stats[envID] = env_stats
-            else:
-               for (k, v) in env_stats.items():
-                  if k not in stats[envID]:
-                     stats[envID][k] = v
-                  else:
-                     stats[envID][k] += v
+#     stats_list = [w.send_agent_stats() for w in self.frozen_workers]
+#     stats = {}
+#     for worker_stats in stats_list:
+#        if not worker_stats: continue
+#        for (envID, env_stats) in worker_stats:
+#           if not env_stats: continue
+#           if envID not in stats:
+#              stats[envID] = env_stats
+#           else:
+#              for (k, v) in env_stats.items():
+#                 if k not in stats[envID]:
+#                    stats[envID][k] = v
+#                 else:
+#                    stats[envID][k] += v
 
-      return stats
+#     return stats
 
    def train_and_log(self, maps):
       self.global_counter.set_idxs.remote([i for i in maps.keys()])
@@ -867,10 +866,21 @@ class EvolverNMMO(LambdaMuEvolver):
        #    #get_policy_class=get_policy_class,
        #     execution_plan=frozen_execution_plan,
        # )
-         if self.config.RENDER:
+         if self.config.RENDER or self.config.FROZEN:
             evaluation_interval = 1
+            evaluation_num_workers = self.config.N_PROC
+#           evaluation_num_episodes = self.config.N_EVO_MAPS
+#           evaluation_num_episodes = None
+#           evaluation_config = {
+#              'worker_config': {
+#                 'batch_mode': 'thisgoesnowherehahafuck',
+#                 }
+#           }
+            num_workers = 0
          else:
             evaluation_interval = None
+            evaluation_num_workers = None
+            evaluation_num_episodes = None
          trainer = EvoPPOTrainer(
             execution_plan=frozen_execution_plan,
             env="custom",
@@ -896,7 +906,11 @@ class EvolverNMMO(LambdaMuEvolver):
             '_use_trajectory_view_api': False,
             'no_done_at_end': False,
             'callbacks': LogCallbacks,
-#           'evaluation_interval': evaluation_interval,
+            'evaluation_interval': evaluation_interval,
+#           'evaluation_num_episodes': evaluation_num_episodes,
+            'evaluation_num_workers': evaluation_num_workers,
+#           'evaluation_config': evaluation_config,
+            'batch_mode': 'truncate_episodes',
             'env_config': {
                 'config':
                 self.config,
@@ -1291,6 +1305,8 @@ class EvolverNMMO(LambdaMuEvolver):
        elif self.reloading:
            # use pre-trained model
           self.config.MODEL = 'reload'
+       elif self.config.FROZEN:
+          pass
        else:
           self.config.MODEL = 'current'
        # load the model and initialize and save the population
