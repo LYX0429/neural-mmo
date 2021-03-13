@@ -333,73 +333,44 @@ class RLLibEvaluator(evaluator.Base):
          self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
       if self.config.GRIDDLY:
 
-#        unregister()
-#        wrapper = GymWrapperFactory()
-#        yaml_path = 'nmmo.yaml'
-#        wrapper.build_gym_from_yaml(
-#           'nmmo',
-#           yaml_path,
-#           level=None,
-#           player_observer_type=gd.ObserverType.VECTOR,
-#           global_observer_type=gd.ObserverType.ISOMETRIC,
-#        )
-#        test_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'griddly_nmmo/nmmo.yaml')
-
-#        env_name = 'nmmo.yaml'
-#        config = {'config': self.config}
-#        config.update({
-#           'env': env_name,
-#           'env_config': {
-#              # in the griddly environment we set a variable to let the training environment
-#              # know if that player is no longer active
-#              #           'player_done_variable': 'player_done',
-
-#              #           'record_video_config': {
-#              #               'frequency': 10000  # number of rollouts
-#              #           },
-
-#              'yaml_file': test_path,
-#              'global_observer_type': gd.ObserverType.ISOMETRIC,
-#              'level': None,
-#              'max_steps': 500,
-#           },
-#        })
          self.env = createEnv({'config': config})
       else:
          self.env      = projekt.rllib_wrapper.RLLibEnv({'config': config})
 
-      self.maps = maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in archive])
-      idx = list(maps.keys())[np.random.choice(len(maps))]
-      self.env.set_map(idx=idx, maps=maps)
-      self.env.reset(step=False)
+      if archive is not None:
+         self.maps = maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in archive])
+         idx = list(maps.keys())[np.random.choice(len(maps))]
+         self.env.set_map(idx=idx, maps=maps)
+      self.env.reset(idx=config.INFER_IDX, step=False)
 #     self.env.reset(idx=0, step=False)
       if not config.GRIDDLY:
          self.registry = OverlayRegistry(self.env, self.model, trainer, config)
       self.obs      = self.env.step({})[0]
 
       self.state    = {}
-      self.eval_path_map = os.path.join('eval_experiment', self.config.MAP.split('/')[-1])
 
-      try:
-         os.mkdir(self.eval_path_map)
-      except FileExistsError:
-         print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+      if config.EVALUATE:
+         self.eval_path_map = os.path.join('eval_experiment', self.config.MAP.split('/')[-1])
 
-      self.eval_path_map = os.path.join(self.eval_path_map, str(self.config.INFER_IDX))
+         try:
+            os.mkdir(self.eval_path_map)
+         except FileExistsError:
+            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
 
-      try:
-         os.mkdir(self.eval_path_map)
-      except FileExistsError:
-         print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+         self.eval_path_map = os.path.join(self.eval_path_map, str(self.config.INFER_IDX))
 
-      self.eval_path_model = os.path.join(self.eval_path_map, self.config.MODEL.split('/')[-1])
+         try:
+            os.mkdir(self.eval_path_map)
+         except FileExistsError:
+            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
 
-      try:
-         os.mkdir(self.eval_path_model)
-      except FileExistsError:
-         print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
+         self.eval_path_model = os.path.join(self.eval_path_map, self.config.MODEL.split('/')[-1])
 
-      if self.config.EVALUATE:
+         try:
+            os.mkdir(self.eval_path_model)
+         except FileExistsError:
+            print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
+
          self.calc_diversity = diversity_calc(config)
 
    def test(self):
@@ -562,13 +533,13 @@ class RLLibEvaluator(evaluator.Base):
             update='counts values attention wilderness'.split())
 
       #Step environment
-      if hasattr(self.env, 'evo_dones'):
+      if hasattr(self.env, 'evo_dones') and self.env.evo_dones is not None:
          self.env.evo_dones['__all__'] = False
       ret = super().tick(actions)
 
-      if self.env.dones['__all__'] == True:
-         if self.config.GRIDDLY:
-            self.reset_env()
+      if self.config.GRIDDLY:
+         if self.env.dones['__all__'] == True:
+               self.reset_env()
 
       self.i += 1
 

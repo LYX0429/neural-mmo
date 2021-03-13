@@ -751,7 +751,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
       for ind in individuals:
          i = ind.idx
-#        path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
+         path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
 #        try:
 #           os.mkdir(path)
 #        except FileExistsError:
@@ -762,7 +762,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
 #        if map_arr is None:
 #           raise Exception
-#        Save.np(map_arr, path)
+         Save.np(map_arr, path)
 
          if self.config.TERRAIN_RENDER or checkpointing:
             png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
