@@ -199,6 +199,7 @@ class EvoNMMO(TreeOrerock):
    FEATURE_CALC = 'map entropy'
    TEST = False
    ITEMS_PER_BIN = 1
+   FROZEN = False
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS
@@ -215,7 +216,6 @@ class Griddly(EvoNMMO):
    REGISTERED = False  #FIXME: hack. Do not set this.
    TEST = False
    NENT=5
-   FROZEN = False
    PRETRAIN = False
    EVO_DIR = 'griddly_scratch_0'
    TERRAIN_BORDER = 1

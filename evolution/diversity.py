@@ -22,7 +22,7 @@ def diversity_calc(config):
       calc_diversity = sum_experience
    elif config.FITNESS_METRIC == 'Lifespans':  # or config.FITNESS_METRIC == 'ALP':
       calc_diversity = sum_lifespans
-   elif config.FITNESS_METRIC == 'Lifetimes' or config.FITNESS_METRIC == 'ALP':
+   elif config.FITNESS_METRIC == 'Lifetimes':
        calc_diversity = calc_mean_lifetime
    elif config.FITNESS_METRIC == 'Actions':
        calc_diversity = calc_mean_actions_matched
@@ -32,7 +32,7 @@ def diversity_calc(config):
        calc_diversity = ham_text
    elif config.FITNESS_METRIC == 'y_deltas':
        calc_diversity = calc_y_deltas
-   elif config.FITNESS_METRIC == 'Scores':
+   elif config.FITNESS_METRIC == 'Scores' or config.FITNESS_METRIC == 'ALP':
        calc_diversity = calc_scores
    else:
        raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))

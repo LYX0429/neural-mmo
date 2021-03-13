@@ -2,7 +2,6 @@ import os
 import pickle
 import sys
 # My favorite debugging macro
-from pdb import set_trace as T
 
 import ray
 import torch
@@ -11,9 +10,10 @@ from ray import rllib
 
 import projekt
 from evolution.evolver import init_evolver
+from projekt import rllib_wrapper
+from evolution.global_actors import Counter, Stats
 from pcg import get_tile_data
 TILE_TYPES, TILE_PROBS = get_tile_data(griddly=False)
-from projekt import rllib_wrapper
 
 '''Main file for the neural-mmo/projekt demo
 
@@ -51,89 +51,6 @@ def createPolicies(config):
 
     return policies
 
-#@ray.remote
-#class Counter:
-#   ''' When using rllib trainer to train and simulate on evolved maps, this global object will be
-#   responsible for providing unique indexes to parallel environments.'''
-#   def __init__(self, config):
-#      self.count = 0
-#   def get(self):
-#      self.count += 1
-#
-#      if self.count == config.N_EVO_MAPS:
-#          self.count = 0
-#
-#      return self.count
-#   def set(self, i):
-#      self.count = i - 1
-
-@ray.remote
-class Counter:
-   ''' When using rllib trainer to train and simulate on evolved maps, this global object will be
-   responsible for providing unique indexes to parallel environments.'''
-   def __init__(self, config):
-      self.count = 0
-      self.idxs = None
-
-   def get(self):
-
-      if not self.idxs:
-         # Then we are doing inference and have set the idx directly
-
-         return self.count
-      idx = self.idxs[self.count % len(self.idxs)]
-      self.count += 1
-
-      return idx
-
-   def set(self, i):
-      # For inference
-      self.count = i
-
-   def set_idxs(self, idxs):
-      self.count = 0
-      self.idxs = idxs
-
-#@ray.remote
-#class Stats:
-#   def __init__(self, config):
-#      self.stats = {}
-#      self.mults = {}
-#      self.spawn_points = {}
-#      self.config = config
-#   def add(self, stats, mapIdx):
-#      if config.RENDER:
-##        print(self.headers)
-##        print(stats)
-#         calc_differential_entropy(stats, verbose=True)
-#
-#         return
-#
-#      if mapIdx not in self.stats or 'skills' not in self.stats[mapIdx]:
-#         self.stats[mapIdx] = stats
-#      else:
-#         for (k, v) in stats.items():
-#             if k in self.stats:
-#                 self.stats[k].append(v)
-#             else:
-#                 self.stats[k] = [stats[k]]
-#   def get(self):
-#      return self.stats
-#   def reset(self):
-#      self.stats = {}
-#   def add_mults(self, g_hash, mults):
-#      self.mults[g_hash] = mults
-#   def get_mults(self, g_hash):
-#      if g_hash not in self.mults:
-#         return None
-#
-#      return self.mults[g_hash]
-#   def add_spawn_points(self, g_hash, spawn_points):
-#      self.spawn_points[g_hash] = spawn_points
-#   def get_spawn_points(self, g_hash):
-#      return self.spawn_points[g_hash]
-
-
 
 if __name__ == '__main__':
    # Setup ray
@@ -155,7 +72,7 @@ if __name__ == '__main__':
 
    # on the driver
    counter = Counter.options(name="global_counter").remote(config)
-#  stats = Stats.options(name="global_stats").remote(config)
+   stats = Stats.options(name="global_stats").remote(config)
 
    # RLlib registry
    rllib.models.ModelCatalog.register_custom_model('test_model',

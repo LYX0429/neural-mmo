@@ -319,6 +319,7 @@ class RLLibEvaluator(evaluator.Base):
    the Unity3D client. Makes use of batched GPU inference'''
    def __init__(self, config, trainer, archive=None, createEnv=None):
       super().__init__(config)
+      self.i = 0
       self.trainer  = trainer
 
       if config.GRIDDLY:
@@ -550,10 +551,6 @@ class RLLibEvaluator(evaluator.Base):
           pos: Camera position (r, c) from the server)
           cmd: Consol command from the server
       '''
-      stats = self.env.send_agent_stats()
-      score = self.calc_diversity(stats, verbose=True)
-#     score = DIV_CALCS[1][0](stats, verbose=True)
-      print(score)
 
       #Compute batch of actions
       actions, self.state, _ = self.trainer.compute_actions(
@@ -565,13 +562,22 @@ class RLLibEvaluator(evaluator.Base):
             update='counts values attention wilderness'.split())
 
       #Step environment
+      if hasattr(self.env, 'evo_dones'):
+         self.env.evo_dones['__all__'] = False
       ret = super().tick(actions)
 
       if self.env.dones['__all__'] == True:
          if self.config.GRIDDLY:
             self.reset_env()
 
+      self.i += 1
+
    def reset_env(self):
+      stats = self.env.send_agent_stats()
+      score = self.calc_diversity(stats, verbose=True)
+      #     score = DIV_CALCS[1][0](stats, verbose=True)
+      print(score)
+      self. i = 0
       maps = self.maps
       idx = list(maps.keys())[np.random.choice(len(maps))]
       self.env.set_map(idx=idx, maps=maps)
@@ -803,7 +809,7 @@ class EvoPPOTrainer(ppo.PPOTrainer):
                    extra_config["in_evaluation"] is True
             extra_config.update({
 #              "batch_mode": "complete_episodes",
-               # FIXME: why is rollout_fragment_length x10 what it should be hahah
+               # FIXME: what is this shit hahah
                "rollout_fragment_length": 10,
                "in_evaluation": True,
             })
@@ -906,12 +912,12 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #        self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
       #NOTE: you can't iteratively send indexes to environment with 'foreach_worker', multiprocessing will thwart you
       i = 0
-      if self.config['env_config']['config'].FROZEN:
+      if self.nmmo_config.FROZEN:
          workers = self.evaluation_workers
       else:
          workers = self.workers
 
-      if self.config['env_config']['config'].N_PROC == self.config['env_config']['config'].N_EVO_MAPS:
+      if self.nmmo_config.N_PROC == self.nmmo_config.N_EVO_MAPS:
          for worker in [workers.local_worker()] + workers.remote_workers():
             if len(idxs) > 0:
                fuck_id = idxs[i % len(idxs)]
@@ -920,7 +926,10 @@ class EvoPPOTrainer(ppo.PPOTrainer):
             i += 1
             # FIXME: must have N_PROC = N_EVO_MAPS?
          #  worker.foreach_env.remote(lambda env: env.set_map(idx=next(idxs), maps=maps))
-            worker.foreach_env(lambda env: env.set_map(idx=fuck_id, maps=maps))
+            if isinstance(worker, RolloutWorker):
+               worker.foreach_env(lambda env: env.set_map(idx=fuck_id, maps=maps))
+            else:
+               worker.foreach_env.remote(lambda env: env.set_map(idx=fuck_id, maps=maps))
       else:
          # Ha ha what the fuck
          if 'maps' in maps:
@@ -966,60 +975,9 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       if self.training_iteration % save_interval == 0:
          self.save()
 
-#     nSteps = stats['info']['num_steps_trained']
-#     VERBOSE = False
-
-#     if VERBOSE:
-#        print('Epoch: {}, Samples: {}'.format(self.training_iteration, nSteps))
-#     hist = stats['hist_stats']
-
-#     for key, stat in hist.items():
-#        if len(stat) == 0 or key == 'map_fitness':
-#           continue
-
-#        if VERBOSE:
-#           print('{}:: Total: {:.4f}, N: {:.4f}, Mean: {:.4f}, Std: {:.4f}, Min: {:.4f}, Max: {:.4f}'.format(
-#              key, np.sum(stat), len(stat), np.mean(stat), np.std(stat), np.min(stat), np.max(stat)))
-#        #if key == 'map_fitness':
-#        #    print('DEBUG MAP FITNESS PRINTOUT')
-#        #    print(hist[key])
-#        hist[key] = []
-
-#     return stats
-
-   ##          update='counts values attention wilderness'.split())
- #    obs = self.evaluation_workers.foreach_worker(lambda worker: worker.foreach_env(
- #       lambda env: (env.worldIdx, env.reset({}))))
- #    obs_dict = {}
- #    for ob_w in obs:
- #       if len(ob_w) > 0:
- #          for ob_e in ob_w:
- #             obs_dict[ob_e[0]] = ob_e[1]
-##    actions = self.workers.foreach_policy(lambda pol, str: pol.compute_actions(obs))
-
- #    for _ in range(100):
- #       actions = {}
- #       T()
- #       [actions.update({worldIdx: self.compute_actions(ob, policy_id='policy_0', state={})}) for (worldIdx, ob) in obs_dict.items()]
- #      #actions, self.state, _ = self.compute_actions(
- #      #      self.obs, state=self.state, policy_id='policy_0')
-##    self.registry.step(self.obs, pos, cmd,
-
- #       obs = self.workers.foreach_worker(lambda worker:
- #                                   worker.foreach_env(lambda env:
- #                                                      (env.worldIdx, env.step(actions[env.worldIdx]))
- #                                                      )
- #                                   )
- #       obs_dict = {}
- #       for ob_w in obs:
- #          if len(ob_w) > 0:
- #             for ob_e in ob_w:
- #                obs_dict[ob_e[0]] = ob_e[1]
-
    def reset_envs(self):
       obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset({}, step=True)))
 #     obs = [ob for worker_obs in obs for ob in worker_obs]
-
 
    def simulate_unfrozen(self):
       stats = super().train()

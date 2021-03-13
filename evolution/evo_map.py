@@ -326,7 +326,8 @@ class EvolverNMMO(LambdaMuEvolver):
             assert individual.age == 0
             individual.ALPs = []
          individual.ALPs.append(score)
-         score = abs(np.mean(individual.ALPs))
+#        score = abs(np.mean(individual.ALPs))
+         score = np.mean(individual.ALPs)
          individual.fitness.setValues([-score])
       else:
          score = np.mean(individual.score_hists)
@@ -836,9 +837,9 @@ class EvolverNMMO(LambdaMuEvolver):
          del(self.trainer)
 
          # Create policies
-         if self.config.GRIDDLY:
-            policies = createPolicies(self.config)
-            multiagent_config['policies'] = policies
+#        if self.config.GRIDDLY:
+         policies = createPolicies(self.config)
+         multiagent_config['policies'] = policies
 
          conf = self.config
          model_path = os.path.join(self.save_path, 'models')
@@ -871,16 +872,19 @@ class EvolverNMMO(LambdaMuEvolver):
             evaluation_num_workers = self.config.N_PROC
 #           evaluation_num_episodes = self.config.N_EVO_MAPS
 #           evaluation_num_episodes = None
-#           evaluation_config = {
+            evaluation_config = {
+               'evaluation_interval': evaluation_interval,
+               #           'evaluation_num_episodes': evaluation_num_episodes,
+               'evaluation_num_workers': evaluation_num_workers,
+               'batch_mode': 'truncate_episodes',
 #              'worker_config': {
 #                 'batch_mode': 'thisgoesnowherehahafuck',
 #                 }
-#           }
+            }
             num_workers = 0
          else:
-            evaluation_interval = None
-            evaluation_num_workers = None
-            evaluation_num_episodes = None
+            evaluation_config = {
+            }
          trainer = EvoPPOTrainer(
             execution_plan=frozen_execution_plan,
             env="custom",
@@ -906,11 +910,6 @@ class EvolverNMMO(LambdaMuEvolver):
             '_use_trajectory_view_api': False,
             'no_done_at_end': False,
             'callbacks': LogCallbacks,
-            'evaluation_interval': evaluation_interval,
-#           'evaluation_num_episodes': evaluation_num_episodes,
-            'evaluation_num_workers': evaluation_num_workers,
-#           'evaluation_config': evaluation_config,
-            'batch_mode': 'truncate_episodes',
             'env_config': {
                 'config':
                 self.config,
@@ -918,6 +917,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
             'model': model_config,
             'multiagent': multiagent_config,
+            **evaluation_config,
             **griddly_config
             }
 

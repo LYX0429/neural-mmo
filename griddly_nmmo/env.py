@@ -57,7 +57,6 @@ class NMMO(NMMOWrapper):
      #self.env = None
 
    def set_map(self, idx=None, maps=None):
-#     print('setting map', self.worldIdx)
       if idx is None:
          global_counter = ray.get_actor("global_counter")
          self.mapIdx = ray.get(global_counter.get.remote())
@@ -67,6 +66,7 @@ class NMMO(NMMOWrapper):
          self.mapIdx = idx
       #FIXME: agree w/ NMMO
       self.worldIdx = self.mapIdx
+#     print('setting map', self.worldIdx)
       map_arr = maps[self.mapIdx]
       self.map_arr = map_arr
 #     print(maps.keys())
@@ -150,7 +150,7 @@ class NMMO(NMMOWrapper):
             lifetimes = list(self.lifetimes.values())
             print('Lifetimes: {}'.format(lifetimes))
             print('Mean lifetime: {}'.format(np.mean(lifetimes)))
-            self.dones['__all__'] = True
+#           self.dones['__all__'] = True
 
       # In case we need to load a map assigned to this env at the previous step
       # More generally: we can mark the environment as done from outside or as a result of processes other than usual
