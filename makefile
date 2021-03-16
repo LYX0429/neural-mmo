@@ -616,8 +616,8 @@ life_tileFlip_ES:
 life_CPPN_ES:
 	python ForgeEvo.py\
 		--NENT 3\
-		--EVO_DIR life_CPPN_ES_3\
-		--N_PROC 0\
+		--EVO_DIR life_CPPN_ES_6\
+		--N_PROC 6\
 		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
 		--GENOME CPPN\
@@ -627,17 +627,17 @@ life_CPPN_ES:
 		--ME_BIN_SIZES=[1,1]\
 		--ME_BOUNDS="[(0,100),(0,100)]" \
 		--EVO_SAVE_INTERVAL 100\
-		--TERRAIN_SIZE 50\
+		--TERRAIN_SIZE 80\
 		--FEATURE_CALC=None
 
 render_life_CPPN_ES:
-	cd ../neural-mmo-client &&\
-	./UnityClient/neural-mmo-resources.x86_64 &\
+	sh client.sh &\
     python Forge.py render --config TreeOrerock\
-        --MAP life_CPPN_ES_3\
-		--MODEL life_CPPN_ES_3\
+        --MAP life_CPPN_ES_6\
+		--MODEL life_CPPN_ES_6\
 		--NENT 3\
-		--INFER_IDX "(0,0,0)"
+		--TERRAIN_SIZE 80\
+		--INFER_IDX "(0,0,7)"
 
 
 div_CPPN_ES:
@@ -649,7 +649,7 @@ div_CPPN_ES:
 		--EVO_ALGO MAP-Elites\
 		--GENOME CPPN\
 		--FITNESS_METRIC L2\
-		--SKILLS="['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']"\
+		--SKILLS="['water', 'fishing', 'food', 'hunting', 'prospecting', 'melee', 'carving', 'range', 'alchemy', 'mage', 'exploration']"\
 		--TERRAIN_RENDER False\
 		--ITEMS_PER_BIN=12\
 		--ME_BIN_SIZES=[1,1]\
@@ -659,7 +659,7 @@ div_CPPN_ES:
 		--FEATURE_CALC=None
 
 render_div_CPPN_ES:
-	cd ../neural-mmo-client &&\
+#cd ../neural-mmo-client &&
 	./UnityClient/neural-mmo-resources.x86_64 &\
     python Forge.py render --config TreeOrerock\
         --EVO_DIR div_CPPN_ES_0\

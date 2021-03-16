@@ -4,9 +4,9 @@ import numpy as np
 from forge.blade import core
 from forge.blade.lib import enums
 from forge.blade.lib import material
+from forge.blade.lib import material
 
 import os
-#<<<<<<< HEAD
 import time
 
 def loadTiled(tiles, fPath, materials, config, map_arr=None):
@@ -14,6 +14,7 @@ def loadTiled(tiles, fPath, materials, config, map_arr=None):
       idxMap = map_arr
    else:
       idxMap = np.load(fPath)
+   assert tiles.shape == idxMap.shape
    for r, row in enumerate(idxMap):
       for c, idx in enumerate(row):
 #        mat  = materials[idx]
@@ -39,7 +40,8 @@ def loadTiled(tiles, fPath, materials, config, map_arr=None):
 #      self.shape      = (sz, sz)
 #      self.config     = config
 #      self.map_arr = None
-#=======
+from forge.blade.lib import material
+
 
 class Map:
    '''Map object representing a list of tiles
@@ -52,11 +54,9 @@ class Map:
 
       sz          = config.TERRAIN_SIZE
       self.tiles  = np.zeros((sz, sz), dtype=object)
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
       for r in range(sz):
          for c in range(sz):
-#<<<<<<< HEAD
            #self.tiles[r, c] = core.Tile(realm, config, enums.Grass, r, c, 'grass')
             self.tiles[r, c] = core.Tile(config, realm, r, c)
 
@@ -68,7 +68,7 @@ class Map:
 
    def reset(self, realm, idx, map_arr=None):
 #     self.idx = idx
-      materials = dict((mat.value.index, mat.value) for mat in enums.MaterialEnum)
+      materials = {mat.index: mat for mat in material.All}
 #     materials = {mat.index: mat for mat in material.All}
       fName     = self.config.ROOT + str(idx) + '/map.npy'#+ self.config.PATH_MAP_SUFFIX
       if map_arr is not None:
@@ -93,9 +93,6 @@ class Map:
 
    def inds(self):
       return np.array([[j.index.val for j in i] for i in self.tiles])
-#=======
-#           self.tiles[r, c] = core.Tile(config, realm, r, c)
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
    @property
    def packet(self):
@@ -108,7 +105,18 @@ class Map:
    @property
    def repr(self):
       '''Flat matrix of tile material indices'''
-      return [[t.mat.index for t in row] for row in self.tiles]
+#     for row in self.tiles:
+#         for t in row:
+#             if not hasattr(t, 'mat'):
+#                 T()
+      rep = [[t.mat.index if 0 <t.mat.index < 16 else 1 for t in row] for row in self.tiles]
+#     rep = [[t.mat.index for t in row] for row in self.tiles]
+
+
+#     rep = [[t.index.val + 1 for t in row] for row in self.tiles]
+#     rep = [[0 for t in row] for row in self.tiles]
+#     rep = [[np.random.randint(5, 7) for t in row] for row in self.tiles]
+      return rep
 
 #   def reset(self, realm, idx):
 #      '''Reuse the current tile objects to load a new map'''
@@ -122,15 +130,37 @@ class Map:
 #            mat  = materials[idx]
 #            tile = self.tiles[r, c]
 #            tile.reset(mat, self.config)
+#=======
+#   def reset(self, realm, idx):
+#      '''Reuse the current tile objects to load a new map'''
+#      self.updateList = set()
+#
+#      materials = {mat.index: mat for mat in material.All}
+#      fPath  = os.path.join(self.config.PATH_MAPS,
+#            self.config.PATH_MAP_SUFFIX.format(idx))
+#      for r, row in enumerate(np.load(fPath)):
+#         for c, idx in enumerate(row):
+#            mat  = materials[idx]
+#            tile = self.tiles[r, c]
+#            tile.reset(mat, self.config)
+#>>>>>>> 17f0ddfd1c21ba37d2a5bb44eca6fe7a18aba382
 
    def step(self):
       '''Evaluate updatable tiles'''
       for e in self.updateList.copy():
-         if e.static:
+         if not e.depleted:
             self.updateList.remove(e)
          e.step()
 
-   def harvest(self, r, c):
+#<<<<<<< HEAD
+#   def harvest(self, r, c):
+#      '''Called by actions that harvest a resource tile'''
+#      self.updateList.add(self.tiles[r, c])
+#      return self.tiles[r, c].harvest()
+#=======
+   def harvest(self, r, c, deplete=True):
       '''Called by actions that harvest a resource tile'''
-      self.updateList.add(self.tiles[r, c])
-      return self.tiles[r, c].harvest()
+      if deplete:
+         self.updateList.add(self.tiles[r, c])
+      return self.tiles[r, c].harvest(deplete)
+#>>>>>>> 17f0ddfd1c21ba37d2a5bb44eca6fe7a18aba382

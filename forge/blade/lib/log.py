@@ -16,16 +16,18 @@ from forge.blade.systems.visualizer import plot
 class Quill:
    TRAINING     = -1
    LINE         = 0
-   SCATTER      = 1
-   HISTOGRAM    = 2
-   GANTT        = 3
-   STATS        = 4
-   RADAR        = 5
-   STACKED_AREA = 6
+   INDEX        = 1
+   SCATTER      = 2
+   HISTOGRAM    = 3
+   GANTT        = 4
+   STATS        = 5
+   RADAR        = 6
+   STACKED_AREA = 7
 
    PLOTS = {
       TRAINING:     plot.Training,
       LINE:         plot.Line,
+      INDEX:        plot.Index,
       SCATTER:      plot.Scatter,
       HISTOGRAM:    plot.Histogram,
       GANTT:        plot.Gantt,

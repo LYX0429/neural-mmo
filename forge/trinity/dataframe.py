@@ -185,6 +185,12 @@ class GridTables:
 
       return values
 
+   def getFlat(self, keys):
+      rows = [self.index.get(key) for key in keys]
+      values = {'Continuous': self.continuous.get(rows, self.pad),
+                'Discrete':   self.discrete.get(rows, self.pad)}
+      return values
+
    def update(self, obj, val):
       key, attr = obj.key, obj.attr
       if self.index.full():
@@ -206,6 +212,9 @@ class GridTables:
       self.grid.move(pos, nxt, row)
 
    def init(self, key, pos):
+      if pos is None:
+         return
+
       row = self.index.get(key)
       self.grid.set(pos, row)
 
@@ -238,7 +247,11 @@ class Dataframe:
       stim['Entity'], ents = self.data['Entity'].get(ent, entity=True)
       stim['Entity']['N']  = np.array([len(ents)], dtype=np.int32)
 
-      ent.targets          = ents
-      stim['Tile']         = self.data['Tile'].get(ent)
+      ent.targets  = ents
+      stim['Tile'] = self.data['Tile'].get(ent)
+
+      items             = ent.inventory.dataframeKeys
+      stim['Item']      = self.data['Item'].getFlat(items)
+      stim['Item']['N'] = np.array([len(items)], dtype=np.int32)
 
       return stim

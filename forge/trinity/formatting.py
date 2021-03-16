@@ -10,7 +10,8 @@ BOT     = u'\u2594'
 LEFT    = u'\u258f'
 RIGHT   = u'\u2595'
 
-def table_stats(stats, titleLen=12, entryLen=12):
+
+def table_stats(stats, titleLen=15, entryLen=12):
    titleFmt = '{:<' + str(titleLen) + '}'
    valFmt   = '{:' + str(entryLen) + '.2f}'
    keyFmt   = '{:<' + str(entryLen) + '}'
@@ -73,7 +74,8 @@ def times(stats):
    return lines
 
 def line(title=None, keys=[], vals=[],
-      titleFmt='{:<12}', keyFmt='{}', valFmt='{:8.1f}'):
+
+      titleFmt='{:<15}', keyFmt='{}', valFmt='{:8.1f}'):
    '''Format a line of stats with vertical separators'''
 
    assert len(keys) == len(vals), 'Unequal number of keys and values'

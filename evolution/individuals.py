@@ -5,7 +5,7 @@ import torch
 from torch.nn import Conv2d
 import copy
 import numpy as np
-from forge.blade.lib import enums
+from forge.blade.lib import enums, material
 from evolution.paint_terrain import Line, Rectangle, RectanglePerimeter, Circle, CirclePerimeter, Gaussian
 from pdb import set_trace as T
 from qdpy.phenotype import Individual, Fitness, Features
@@ -120,7 +120,7 @@ def init_weights(m):
 class NeuralCA(torch.nn.Module):
 
     N_HIDDEN = 10
-    N_CHAN = 9
+    N_CHAN = 17
     N_WEIGHTS = 2 * N_HIDDEN * N_CHAN * 3 * 3 + N_HIDDEN + 2 * N_HIDDEN + N_HIDDEN + N_HIDDEN * N_CHAN + N_CHAN + 1
     def __init__(self, n_chan):
         #FIXME
@@ -288,7 +288,8 @@ class DefaultGenome(neat.genome.DefaultGenome, Genome):
            #    else:
                 # CPPN has output channel for each tile type; take argmax over channels
                 # also a spawn-point tile
-                assert len(v) == self.n_tiles
+                if not len(v) == self.n_tiles:
+                    raise Exception("check that tiles in pcg.py ({}) match number specified in config_cppn_nmmo ({})".format(self.n_tiles, len(v)))
                 multi_hot[:, x, y] = v
                 # Shuffle before selecting argmax to prevent bias for certain tile types in case of ties
                 v = np.array(v)
@@ -598,6 +599,8 @@ class EvoIndividual(Individual):
  #          multi_hot = None
  #      else:
  #          multi_hot = self.chromosome.multi_hot
+        #FIXME: anti-lava hack
+        self.chromosome.map_arr = self.chromosome.map_arr + 1
         map_arr = self.chromosome.map_arr
         self.add_border(map_arr, None)
         spawn_idxs = map_arr == self.SPAWN_IDX
@@ -634,13 +637,15 @@ class EvoIndividual(Individual):
 #           map_arr[np.random.choice(all_idxs[all_idxs.shape[0]], 1)] = self.SPAWN_IDX
 
 
+
     def add_border(self, map_arr, multi_hot=None):
         b = self.TERRAIN_BORDER
         # the border must be lava
-        map_arr[0:b, :]= enums.MaterialEnum.LAVA.value.index
-        map_arr[:, 0:b]= enums.MaterialEnum.LAVA.value.index
-        map_arr[-b:, :]= enums.MaterialEnum.LAVA.value.index
-        map_arr[:, -b:]= enums.MaterialEnum.LAVA.value.index
+        lava_index = material.Lava.index
+        map_arr[0:b, :]= lava_index
+        map_arr[:, 0:b]= lava_index
+        map_arr[-b:, :]= lava_index
+        map_arr[:, -b:]= lava_index
 
         if multi_hot is not None:
             multi_hot[:, 0:b, :]= -1

@@ -179,7 +179,7 @@ class Config(Template):
    VIS_BORDER_HEIGHT    = 60
    '''Vertical padding per figure side (pixels)'''
 
-   VIS_LEGEND_WIDTH     = 109
+   VIS_LEGEND_WIDTH     = 129
    '''Width of legend label before offset'''
    
    VIS_LEGEND_OFFSET    = 71 
@@ -232,12 +232,11 @@ class Config(Template):
    TERRAIN_WATER        = 0.25
 #<<<<<<< HEAD
    # Exclude new tile-types by default
-   TERRAIN_TREE         = -1
-   TERRAIN_OREROCK      = -1
+#  TERRAIN_TREE         = -1
+#  TERRAIN_OREROCK      = -1
 #=======
    '''Noise threshold for water generation'''
 
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    TERRAIN_FOREST_LOW   = 0.35
    '''Noise threshold for forest (water adjacent)'''
 
@@ -252,6 +251,35 @@ class Config(Template):
 
    TERRAIN_CENTER_REGION = 19 #Keep this number odd for large maps
    '''Central water square cutout'''
+#<<<<<<< HEAD
+#
+#   TERRAIN_CENTER_WIDTH  = 3
+#   '''Central square grass border'''
+#
+#
+#   ############################################################################
+#   ### Tile Parameters
+#   FOREST_CAPACITY      = 1
+#   '''Maximum number of harvests before a forest tile decays'''
+#
+#   FOREST_RESPAWN       = 0.025
+#   '''Probability that a harvested forest tile will regenerate each tick'''
+#
+#   OREROCK_CAPACITY     = 1
+#   '''Maximum number of harvests before an orerock tile decays'''
+#
+#   OREROCK_RESPAWN      = 0.05
+#   '''Probability that a harvested orerock tile will regenerate each tick'''
+# 
+#   NTILE  = 6
+#   '''Number of distinct terrain tile types'''
+#
+#
+#   ############################################################################
+#   ### Population Parameters                                                   
+#   NENT                    = 256
+#   '''Maximum number of agents spawnable in the environment'''
+#=======
 
    TERRAIN_CENTER_WIDTH  = 3
    '''Central square grass border'''
@@ -259,18 +287,9 @@ class Config(Template):
 
    ############################################################################
    ### Tile Parameters
-   FOREST_CAPACITY      = 1
-   '''Maximum number of harvests before a forest tile decays'''
-
-   FOREST_RESPAWN       = 0.025
+   FOREST_RESPAWN    = 0.025
    '''Probability that a harvested forest tile will regenerate each tick'''
 
-   OREROCK_CAPACITY     = 1
-   '''Maximum number of harvests before an orerock tile decays'''
-
-   OREROCK_RESPAWN      = 0.05
-   '''Probability that a harvested orerock tile will regenerate each tick'''
- 
    NTILE  = 6
    '''Number of distinct terrain tile types'''
 
@@ -305,6 +324,7 @@ class Config(Template):
    ### Experience Parameters                                                   
    XP_SCALE                = 10
    '''Skill level progression speed as a multiplier of typical MMOs'''
+#>>>>>>> 17f0ddfd1c21ba37d2a5bb44eca6fe7a18aba382
 
    CONSTITUTION_XP_SCALE   = 2
    '''Multiplier on top of XP_SCALE for the Constitution skill'''
@@ -312,6 +332,11 @@ class Config(Template):
    COMBAT_XP_SCALE         = 4
    '''Multiplier on top of XP_SCALE for Combat skills'''
 
+   N_TRAIN_MAPS            = 256
+   '''Number of training maps to generate'''
+
+   N_EVAL_MAPS             = 64
+   '''Number of evaluation maps to generate'''
 
    ############################################################################
    ### Skill Parameters                                                   

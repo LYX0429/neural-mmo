@@ -20,7 +20,7 @@ def update(entity):
       entity.food = None
    if not utils.validResource(entity, entity.water, entity.vision):
       entity.water = None
-      
+     
 def pathfind(realm, actions, entity, target):
    actions[Action.Move]   = {Action.Direction: move.pathfind(realm.map.tiles, entity, target)}
 
@@ -79,3 +79,9 @@ def forageDijkstra(realm, actions, entity):
    direction            = utils.forageDijkstra(realm.map.tiles, entity)
    actions[Action.Move] = {Action.Direction: move.towards(direction)}
 
+def harvestDijkstra(realm, actions, entity):
+   direction            = utils.harvestDijkstra(realm.map.tiles, entity)
+   if direction:
+      actions[Action.Move] = {Action.Direction: move.towards(direction)}
+      return True
+   return False 

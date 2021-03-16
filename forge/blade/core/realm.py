@@ -11,6 +11,7 @@ from collections import defaultdict, Mapping
 from typing import Dict, Callable
 
 from forge.blade import core
+from forge.blade.systems.simple_exchange import Exchange
 from forge.blade.lib.enums import Palette
 from forge.blade.entity.npc import NPC
 from forge.blade.entity import Player
@@ -132,16 +133,11 @@ class PlayerManager(EntityGroup):
          if len(self.entities) >= self.config.NENT:
             break
 
-#<<<<<<< HEAD
          if self.config.EVO_MAP:# and not self.config.EVALUATE:
             r, c = self.evo_spawn()
          else:
             r, c   = self.config.SPAWN()
-#        if not self.realm.map.tiles[r, c].habitable:
-#=======
-#         r, c   = self.config.SPAWN()
          if self.realm.map.tiles[r, c].occupied:
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
             continue
 
          pop, name = self.identify()
@@ -170,6 +166,10 @@ class Realm:
       #Entity handlers
       self.players  = PlayerManager(config, self, identify)
       self.npcs     = NPCManager(config, self)
+
+
+      #Global item exchange
+      self.exchange = Exchange()
 
    def reset(self, idx):
       '''Reset the environment and load the specified map
@@ -237,6 +237,9 @@ class Realm:
          actions: Dict of agent actions
       '''
 #>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+      #trades = self.exchange.trades
+      #gold   = self.exchange.gold
+      #print('Trades: {}, Gold: {}'.format(trades, gold))
 
       #Prioritize actions
       npcActions = self.npcs.actions(self)

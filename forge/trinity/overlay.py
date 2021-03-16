@@ -29,11 +29,11 @@ class OverlayRegistry:
    def step(self, obs, pos, cmd):
       '''Per-tick updates'''
       self.realm.overlayPos = pos
-#     for overlay in self.overlays.values():
-#         overlay.update(self.config, obs)
+      for overlay in self.overlays.values():
+          overlay.update(obs)
 
-#     if cmd in self.overlays:
-#         self.overlays[cmd].register(obs)
+      if cmd in self.overlays:
+          self.overlays[cmd].register(obs)
 
 class Overlay:
    '''Define a overlay for visualization in the client
@@ -110,10 +110,10 @@ class Counts(Overlay):
    def update(self, obs):
       '''Computes a count-based exploration map by painting
       tiles as agents walk over them'''
-      for entID, agent in self.realm.players.items():
-         pop  = agent.base.population.val
-         r, c = agent.base.pos
-         self.values[r, c][pop] += 1
+#     for entID, agent in self.realm.players.items():
+#        pop  = agent.base.population.val
+#        r, c = agent.base.pos
+#        self.values[r, c][pop] += 1
 
    def register(self, obs):
       colors    = self.realm.realm.players.palette.colors

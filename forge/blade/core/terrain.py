@@ -2,6 +2,7 @@ from pdb import set_trace as T
 import numpy as np
 
 import os
+import random
 
 import vec_noise
 from imageio import imread, imsave
@@ -38,6 +39,58 @@ class Save:
 class Terrain:
    pass
 
+def fish(config, tiles, mat, mmin, mmax):
+   r    = random.randint(mmin, mmax)
+   c    = random.randint(mmin, mmax)
+
+   allow = {Terrain.GRASS}
+   if (tiles[r, c] not in {Terrain.WATER} or
+      (tiles[r-1, c] not in allow and tiles[r+1, c] not in allow and
+       tiles[r, c-1] not in allow and tiles[r, c+1] not in allow)):
+         fish(config, tiles, mat, mmin, mmax)
+   else:
+      tiles[r, c]   = mat
+
+def uniform(config, tiles, mat, mmin, mmax):
+   r    = random.randint(mmin, mmax)
+   c    = random.randint(mmin, mmax)
+
+   if tiles[r, c] not in {Terrain.GRASS}:
+      uniform(config, tiles, mat, mmin, mmax)
+   else:
+      tiles[r, c]   = mat
+
+def cluster(config, tiles, mat, mmin, mmax):
+   r    = random.randint(mmin, mmax)
+   c    = random.randint(mmin, mmax)
+
+   matls = {Terrain.GRASS}
+   if tiles[r, c] not in matls:
+      return cluster(config, tiles, mat, mmin, mmax)
+
+   tiles[r, c] = mat
+   if tiles[r-1, c] in matls:
+      tiles[r-1, c] = mat
+   if tiles[r+1, c] in matls:
+      tiles[r+1, c] = mat
+   if tiles[r, c-1] in matls:
+      tiles[r, c-1] = mat
+   if tiles[r, c+1] in matls:
+      tiles[r, c+1] = mat
+
+def spawnResources(config, tiles):
+   mmin = config.TERRAIN_BORDER
+   mmax = config.TERRAIN_SIZE - config.TERRAIN_BORDER
+
+   for _ in range(config.SPAWN_CLUSTERS):
+      cluster(config, tiles, Terrain.ORE, mmin, mmax) 
+      cluster(config, tiles, Terrain.TREE, mmin, mmax) 
+      cluster(config, tiles, Terrain.CRYSTAL, mmin, mmax) 
+
+   for _ in range(config.SPAWN_UNIFORMS):
+      uniform(config, tiles, Terrain.HERB, mmin, mmax) 
+      fish(config, tiles, Terrain.FISH, mmin, mmax) 
+ 
 class MapGenerator:
    def __init__(self, config):
       self.config = config
@@ -97,16 +150,17 @@ class MapGenerator:
          return Terrain.IRON_ORE
       return Terrain.STONE
 
-
-
    def generate(self):
       config = self.config
       if config.__class__.__name__ == 'SmallMaps':
          prefix = config.PATH_MAPS_SMALL
       elif config.__class__.__name__ == 'LargeMaps':
          prefix = config.PATH_MAPS_LARGE
+      elif config.__class__.__name__ == 'Dev':
+         prefix = config.PATH_MAPS_DEV
       else:
-         prefix = config.PATH_MAPS
+         print('Specify a valid config')
+         system.exit(0)
 
       #Train and eval map indices
       msg    = 'Generating {} training and {} evaluation maps:'
@@ -188,6 +242,10 @@ class MapGenerator:
 
       #Lava border and center crop
       matl[thresh > sz//2 - border] = Terrain.LAVA
+
+      #Dev resource spawns
+      if config.__class__.__name__ == 'Dev':
+         spawnResources(config, matl)
 
       #Grass border or center spawn region
       if mode == 'expand':

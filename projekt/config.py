@@ -2,22 +2,13 @@ from pdb import set_trace as T
 from forge.blade import core
 import os
 
-#<<<<<<< HEAD
-#class Config(core.Config):
-#   EVO_MAP = False
-#   MELEE_MULT = 45 / 99
-#   RANGE_MULT = 32 / 99
-#   MAGE_MULT =  24 / 99
-#   # Model to load. None will train from scratch
-#   # Baselines: recurrent, attentional, convolutional
-#   # "current" will resume training custom models
-#=======
+
 from forge.blade.systems.ai import behavior
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
 class Base(core.Config):
    '''Base config for RLlib Models
 
+<<<<<<< HEAD
 <<<<<<< HEAD
    ENV_NAME                = 'Neural_MMO'
    ENV_VERSION             = '1.5'
@@ -37,11 +28,15 @@ class Base(core.Config):
    NUM_WORKERS             = 4
    NUM_GPUS_PER_WORKER     = 0
    NUM_GPUS                = 1
+
+   #Hardware Scale
+   NUM_WORKERS             = 4
+   NUM_GPUS_PER_WORKER     = 0
+   NUM_GPUS                = 1
    LOCAL_MODE              = False
 
    #Memory/Batch Scale
    TRAIN_BATCH_SIZE        = 400000
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    ROLLOUT_FRAGMENT_LENGTH = 100
 
    #Optimization Scale
@@ -64,6 +59,8 @@ class Base(core.Config):
    #Scripted model parameters
    SCRIPTED_BACKEND        = 'dijkstra' #Or 'dynamic_programming'
    SCRIPTED_EXPLORE        = True       #Intentional exploration
+
+   DEV_COMBAT = False
 
 
 class LargeMaps(Base):
@@ -136,14 +133,98 @@ class SmallMaps(Base):
    NPC_SPAWN_AGGRESSIVE    = 0.80
 
 
-#<<<<<<< HEAD
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 COMBAT_SKILLS = ['range', 'mage', 'melee']
 EXPLORE_SKILLS = ['exploration']
 HARVEST_SKILLS = ['woodcutting', 'mining']
 
-class TreeOrerock(SmallMaps):
-   NTILE = 9
+
+
+class Dev(SmallMaps):
+   EVO_MAP = False
+   GRIDDLY = False
+   ROOT                 = os.path.join(os.getcwd(), Base.PATH_MAPS_SMALL, 'map')
+
+   MODEL                   = 'scripted-combat'
+
+   NTILE                   = 16
+
+   PATH_MAPS_DEV           = os.path.join(core.Config.PATH_MAPS, 'dev')
+   PATH_MAPS               = PATH_MAPS_DEV
+
+   ORE_RESPAWN       = 0.01
+   '''Probability that a harvested ore tile will regenerate each tick'''
+
+   TREE_RESPAWN      = 0.01
+   '''Probability that a harvested tree tile will regenerate each tick'''
+
+   CRYSTAL_RESPAWN   = 0.01
+   '''Probability that a harvested crystal tile will regenerate each tick'''
+
+   HERB_RESPAWN      = 0.01
+   '''Probability that a harvested herb tile will regenerate each tick'''
+
+   FISH_RESPAWN      = 0.01
+   '''Probability that a harvested fish tile will regenerate each tick'''
+
+
+   N_AMMUNITION      = 3
+   '''Number of inventory spaces for ammunition'''
+
+   N_CONSUMABLES     = 6
+   '''Number of inventory spaces for ammunition'''
+
+   N_LOOT            = 8
+   '''Number of inventory spaces for ammunition'''
+
+   N_ITEM            = 10
+
+
+   SPAWN_CLUSTERS          = 15
+   SPAWN_UNIFORMS          = 50
+
+   DEV_COMBAT = True
+
+   def EQUIPMENT_DEFENSE(self, level):
+      return level / 4
+
+   def EQUIPMENT_OFFENSE(self, level):
+      return level / 4
+
+   def DAMAGE_AMMUNITION(self, level):
+      return level // 5 + 1, level // 3 + 1
+
+   def DAMAGE_MELEE(self, level):
+      return round(10 + level*70/99)
+
+   def DAMAGE_RANGE(self, level):
+      return round(3 + level*32/99)
+
+   def DAMAGE_MAGE(self, level):
+      return round(1 + level*24/99)
+
+   def RESTORE(self, level):
+      return level
+
+class Debug(SmallMaps):
+   '''Debug Neural MMO training setting
+
+   A version of the SmallMap setting with greatly reduced batch parameters.
+   Only intended as a tool for identifying bugs in the model or environment'''
+   MODEL                   = None
+   LOCAL_MODE              = True
+   NUM_WORKERS             = 1
+
+   TRAIN_BATCH_SIZE        = 400
+   TRAIN_HORIZON           = 200
+   EVALUATION_HORIZON      = 50
+
+   HIDDEN                  = 2
+   EMBED                   = 2
+
+
+class TreeOrerock(Dev):
+   NTILE = 17
    NEW_EVAL = False
    EVO_MAP = True
    FIXED_MAPS = True
@@ -152,18 +233,18 @@ class TreeOrerock(SmallMaps):
    NMOB                 = 0
    MODEL                = 'current'
    TERRAIN_SIZE         = 70
-#   TERRAIN_DIR          = Base.TERRAIN_DIR_SMALL
+   #   TERRAIN_DIR          = Base.TERRAIN_DIR_SMALL
    ROOT                 = os.path.join(os.getcwd(), Base.PATH_MAPS_SMALL, 'map')
-#  TERRAIN_RENDER       = True
-#  TERRAIN_ALPHA = 0
-#  TERRAIN_BETA = 0
-#  TERRAIN_WATER        = 0.25
-#  TERRAIN_FOREST_LOW   = 0.35
+   #  TERRAIN_RENDER       = True
+   #  TERRAIN_ALPHA = 0
+   #  TERRAIN_BETA = 0
+   #  TERRAIN_WATER        = 0.25
+   #  TERRAIN_FOREST_LOW   = 0.35
    TERRAIN_GRASS_0   = 0.4
    TERRAIN_LAVA  = 0.45
    TERRAIN_SPAWN = 0.5
-#  TERRAIN_GRASS        = 0.7
-#  TERRAIN_FOREST_HIGH  = 0.725
+   #  TERRAIN_GRASS        = 0.7
+   #  TERRAIN_FOREST_HIGH  = 0.725
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.85
    GRIDDLY = False
@@ -178,7 +259,8 @@ class TreeOrerock(SmallMaps):
    EVO_DIR=None
 
 
-ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
+#ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
+ALL_SKILLS = ['water', 'fishing', 'food', 'hunting', 'prospecting', 'melee', 'carving', 'range', 'alchemy', 'mage', 'exploration']
 COMBAT_SKILLS = ['range', 'mage', 'melee']
 EXPLORE_SKILLS = ['exploration']
 HARVEST_SKILLS = ['woodcutting', 'mining']
@@ -187,8 +269,8 @@ class EvoNMMO(TreeOrerock):
 
    FIXED_MAPS = False
    EVALUATE = False
- # INFER_IDX = 79766
- # INFER_IDX = 80117
+   # INFER_IDX = 79766
+   # INFER_IDX = 80117
    # How to measure diversity of agents on generated map.
    FITNESS_METRIC = 'L2' # 'Differential', 'L2', 'Discrete', 'Hull', 'Sum', 'Lifespans', 'Actions'
    GENOME = 'Random'  # CPPN, Pattern, Random
@@ -214,14 +296,14 @@ class EvoNMMO(TreeOrerock):
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.9
    NET_RENDER = False
-#  SKILLS = ['exploration']
-#  SKILLS = ['woodcutting', 'mining']
-#  SKILLS = ['range', 'mage', 'melee']
+   #  SKILLS = ['exploration']
+   #  SKILLS = ['woodcutting', 'mining']
+   #  SKILLS = ['range', 'mage', 'melee']
    SKILLS = ALL_SKILLS
    EVO_ALGO = 'Simple'  # Simple, MAP-Elites, NEAT
    N_PROC = 6
    PRETRAINED = False
-#  MAP_DIMS = ['woodcutting', 'mining']
+   #  MAP_DIMS = ['woodcutting', 'mining']
    ME_DIMS = ['mining', 'woodcutting']
    ME_BIN_SIZES = [20, 20]
    ME_BOUNDS = [(0, 100), (0, 100)]
@@ -253,22 +335,3 @@ class Griddly(EvoNMMO):
    ME_BIN_SIZES = [100, 100]
    ME_BOUNDS = [(0, 50), (0, 50)]
    SKILLS = ['drink_skill', 'gather_skill', 'woodcut_skill', 'mine_skill']
-#=======
-class Debug(SmallMaps):
-   '''Debug Neural MMO training setting
-
-   A version of the SmallMap setting with greatly reduced batch parameters.
-   Only intended as a tool for identifying bugs in the model or environment'''
-   MODEL                   = None
-   LOCAL_MODE              = True
-   NUM_WORKERS             = 1
-
-   TRAIN_BATCH_SIZE        = 400
-   TRAIN_HORIZON           = 200
-   EVALUATION_HORIZON      = 50
-
-   HIDDEN                  = 2
-   EMBED                   = 2
-
-
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989

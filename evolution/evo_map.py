@@ -232,7 +232,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.SPAWN_IDX = GdyMaterial.SPAWN.value.index
          self.map_generator = GriddlyMapGenerator(self.config)
       else:
-         self.mats = enums.MaterialEnum
+         self.mats = material.MaterialEnum
          if self.config.GRIDDLY:
             self.SPAWN_IDX = self.mats.Spawn.index
          else:
@@ -1299,6 +1299,7 @@ class EvolverNMMO(LambdaMuEvolver):
        # map_arr = self.maps[g_hash]
        copyfile(self.evolver_path, self.evolver_path + '.bkp')
        pickle.dump(self, save_file)
+
        self.population = population
        self.restore(trash_trainer=False)
 

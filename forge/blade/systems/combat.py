@@ -6,18 +6,32 @@ import numpy as np
 from forge.blade.systems import skill as Skill
 
 def level(skills):
-   hp = skills.constitution.level
-   defense = skills.defense.level
-   melee = skills.melee.level
-   ranged = skills.range.level
-   mage   = skills.mage.level
+   melee   = skills.melee.level
+   ranged  = skills.range.level
+   mage    = skills.mage.level
    
-   base = 0.25*(defense + hp)
-   final = np.floor(base + 0.5*max(melee, ranged, mage))
+   final = max(melee, ranged, mage)
    return final
+
+def dev_combat(entity, targ, skillFn):
+   config = entity.config
+   skill  = skillFn(entity)
+   dmg    = damageFn(config, skill.__class__)(skill.level)
+   
+   item = entity.inventory.ammunition.use(skill)
+   if entity.isPlayer and item:
+      dmg += item.damage
+      
+   dmg = min(dmg, entity.resources.health.val)
+   entity.applyDamage(dmg, skill.__class__.__name__.lower())
+   targ.receiveDamage(entity, dmg)
+   return dmg
 
 def attack(entity, targ, skillFn):
    config      = entity.config
+   if config.DEV_COMBAT:
+      return dev_combat(entity, targ, skillFn)
+
    entitySkill = skillFn(entity)
    targetSkill = skillFn(targ)
 
@@ -38,22 +52,13 @@ def attack(entity, targ, skillFn):
 #  targ.receiveDamage(entity, dmg)
    return dmg
 
-#Compute maximum damage roll
-def damage(skill, level, resources, config):
-   # pseudo-smithing
-   mult = min(resources.ore.val + 1, 1.5)
-   if resources.ore.val > 0:
-      resources.ore.decrement(1)
+def damageFn(config, skill):
    if skill == Skill.Melee:
-#<<<<<<< HEAD
-      return np.floor((5 + level * config.MELEE_MULT) * mult)
-#=======
-#     return np.floor(7 + level * 63 / 99)
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+      return config.DAMAGE_MELEE
    if skill == Skill.Range:
-      return np.floor((3 + level * config.RANGE_MULT) * mult)
+      return config.DAMAGE_RANGE
    if skill == Skill.Mage:
-      return np.floor((1 + level * config.MAGE_MULT) * mult)
+      return config.DAMAGE_MAGE
 
 #Compute maximum attack or defense roll (same formula)
 #Max attack 198 - min def 1 = 197. Max 198 - max 198 = 0

@@ -98,7 +98,6 @@ from forge.trinity.overlay import Overlay, OverlayRegistry
 ###############################################################################
 ### RLlib Env Wrapper
 class RLlibEnv(Env, rllib.MultiAgentEnv):
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    def __init__(self, config):
       self.config = config['config']
       if self.config.GRIDDLY:
@@ -126,7 +125,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
 
    def step(self, decisions, omitDead=False, preprocessActions=True):
-#<<<<<<< HEAD
+
 #     print('decisions keys', decisions.keys())
 #     print('ent keys', self.ents.keys())
       obs, rewards, dones, infos = super().step(decisions,
@@ -183,7 +182,8 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
          if k in ['fishing', 'hunting', 'constitution']:
             # FIXME: hack -- just easier on the eyes, mostly. Don't change config.RESOURCE !
-            a_skill_vals[k] -= 1154
+            pass
+#           a_skill_vals[k] -= 1154
       # a_skill_vals['wilderness'] = player_packet['status']['wilderness'] * 10
 #     a_skill_vals['exploration'] = player.exploration_grid.sum() * 20
       a_skill_vals['exploration'] = len(player.explored) * 20
@@ -224,8 +224,9 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
          for j, k in enumerate(self.headers):
             # over skills
-            if k not in ['level', 'cooking', 'smithing']:
+#           if k not in ['level', 'cooking', 'smithing']:
 #             if k in ['exploration']:
+            if k in a_skills:
                stats[i, j] = a_skills[k]
                j += 1
          lifespans[i] = a_skills['time_alive']
@@ -251,19 +252,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
 
 #Neural MMO observation space
-#=======
-#      obs, rewards, dones, infos = super().step(
-#            decisions, omitDead, preprocessActions)
-#
-#      config = self.config
-#      dones['__all__'] = False
-#      test = config.EVALUATE or config.RENDER
-#      if not test and self.realm.tick  >= config.TRAIN_HORIZON:
-#         dones['__all__'] = True
-#
-#      return obs, rewards, dones, infos
-#
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+
 def observationSpace(config):
    if config.GRIDDLY:
       #TODO: this, not manually!
@@ -295,18 +284,19 @@ def observationSpace(config):
          low=0, high=config.N_AGENT_OBS, shape=(1,),
          dtype=DataType.DISCRETE)
 
+   obs['Item']['N']   = gym.spaces.Box(
+         high=config.N_AMMUNITION + config.N_CONSUMABLES + config.N_LOOT + 1,
+         dtype=DataType.DISCRETE,
+         low=0, shape=(1,))
+
    return obs
 
-#<<<<<<< HEAD
 #Neural MMO action space
 def actionSpace(config, n_act_i=3, n_act_j=5):
    if config.GRIDDLY:
       print('WARNING: Are you sure the griddly env action space is {} {}?'.format(n_act_i, n_act_j))
       atns = gym.spaces.MultiDiscrete((n_act_i, n_act_j))
       return atns
-#=======
-#def actionSpace(config):
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    atns = FlexDict(defaultdict(FlexDict))
 
    for atn in sorted(Action.edges):
@@ -316,7 +306,6 @@ def actionSpace(config, n_act_i=3, n_act_j=5):
 
    return atns
 
-#<<<<<<< HEAD
 def plot_diversity(x, y, div_names, exp_name, render=False):
    colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
             'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
@@ -634,12 +623,10 @@ class RLlibEvaluator(evaluator.Base):
       self.env.set_map(idx=idx, maps=maps)
       self.env.reset()
 
-#class RLlibPolicy(RecurrentNetwork, nn.Module):
-#=======
+
 ###############################################################################
 ### RLlib Policy, Evaluator, and Trainer wrappers
 class RLlibPolicy(RecurrentNetwork, nn.Module):
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    '''Wrapper class for using our baseline models with RLlib'''
    def __init__(self, *args, **kwargs):
       self.config = kwargs.pop('config')
@@ -684,55 +671,6 @@ class RLlibPolicy(RecurrentNetwork, nn.Module):
    def attention(self):
       return self.model.attn
 
-#class RLlibEvaluator(evaluator.Base):
-#   '''Test-time evaluation with communication to
-#   the Unity3D client. Makes use of batched GPU inference'''
-#   def __init__(self, config, trainer):
-#      super().__init__(config)
-#      self.trainer  = trainer
-#
-#      self.model    = self.trainer.get_policy('policy_0').model
-#      self.env      = RLlibEnv({'config': config})
-#      self.state    = {}
-#
-###<<<<<<< HEAD
-###      env = base_env.envs[0]
-##
-##      for key in RLlibLogCallbacks.STEP_KEYS:
-##         if not hasattr(env, key):
-##            continue
-##         episode.hist_data[key].append(getattr(env, key))
-##
-##   def on_episode_end(self, *, worker: RolloutWorker, base_env: BaseEnv,
-##         policies: Dict[str, Policy], episode: MultiAgentEpisode, **kwargs):
-##      env = base_env.envs[0]
-##
-##      for key in RLlibLogCallbacks.EPISODE_KEYS:
-##         if not hasattr(env, key):
-##            continue
-##         episode.hist_data[key].append(getattr(env, key))
-##=======
-#   def render(self):
-#      self.obs = self.env.reset(idx=1)
-#      self.registry = RLlibOverlayRegistry(
-#            self.config, self.env).init(self.trainer, self.model)
-#      super().render()
-#
-#   def tick(self, pos, cmd):
-#      '''Simulate a single timestep
-##>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
-#
-#      Args:
-#          pos: Camera position (r, c) from the server)
-#          cmd: Console command from the server
-#      '''
-#      actions, self.state, _ = self.trainer.compute_actions(
-#            self.obs, state=self.state, policy_id='policy_0')
-#      super().tick(self.obs, actions, pos, cmd)
-#
-#global GOT_DUMMI
-#GOT_DUMMI = False
-#global EXEC_RETURN
 
 
 def frozen_execution_plan(workers: WorkerSet, config: TrainerConfigDict):
@@ -999,8 +937,8 @@ class EvoPPOTrainer(ppo.PPOTrainer):
                worker.foreach_env.remote(lambda env: env.set_map(idx=fuck_id, maps=maps))
       else:
          # Ha ha what the fuck
-         if 'maps' in maps:
-            maps = maps['maps']
+       # if 'maps' in maps:
+       #    maps = maps['maps']
          workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
 
       if self.config['env_config']['config'].FROZEN:
@@ -1080,6 +1018,33 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       return stats
 
 
+##class RLlibEvaluator(evaluator.Base):
+#   '''Test-time evaluation with communication to
+#   the Unity3D client. Makes use of batched GPU inference'''
+#   def __init__(self, config, trainer):
+#      super().__init__(config)
+#      self.trainer  = trainer
+#
+#      self.model    = self.trainer.get_policy('policy_0').model
+#      self.env      = RLlibEnv({'config': config})
+#      self.state    = {}
+#
+#   def render(self):
+#      self.obs = self.env.reset(idx=1)
+#      self.registry = RLlibOverlayRegistry(
+#            self.config, self.env).init(self.trainer, self.model)
+#      super().render()
+#
+#   def tick(self, pos, cmd):
+#      '''Simulate a single timestep
+#
+#      Args:
+#          pos: Camera position (r, c) from the server)
+#          cmd: Console command from the server
+#      '''
+#      actions, self.state, _ = self.trainer.compute_actions(
+#            self.obs, state=self.state, policy_id='policy_0')
+#      super().tick(self.obs, actions, pos, cmd)
 
 class SanePPOTrainer(ppo.PPOTrainer):
    '''Small utility class on top of RLlib's base trainer'''
@@ -1089,16 +1054,10 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
    def save(self):
       '''Save model to file. Note: RLlib does not let us chose save paths'''
-#<<<<<<< HEAD
-      savedir = super().save(self.saveDir)
-      with open('experiment/path.txt', 'w') as f:
-         f.write(savedir)
-      print('Saved to: {}'.format(savedir))
-
       config   = self.envConfig
       saveFile = super().save(config.PATH_CHECKPOINTS)
       saveDir  = os.path.dirname(saveFile)
-
+      
       #Clear current save dir
       shutil.rmtree(config.PATH_CURRENT, ignore_errors=True)
       os.mkdir(config.PATH_CURRENT)
@@ -1107,6 +1066,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
       for f in os.listdir(saveDir):
          stripped = re.sub('-\d+', '', f)
          src      = os.path.join(saveDir, f)
+#<<<<<<< HEAD
          dst      = os.path.join(config.PATH_CURRENT, stripped)
          shutil.copy(src, dst)
 
@@ -1178,6 +1138,26 @@ class SanePPOTrainer(ppo.PPOTrainer):
     # modelPath = config.PATH_MODEL.format(config.MODEL)
     # print('Loading from: {}'.format(modelPath))
     # path     = os.path.join(modelPath, 'checkpoint')
+#=======
+#         dst      = os.path.join(config.PATH_CURRENT, stripped)
+#         shutil.copy(src, dst)
+#
+#      print('Saved to: {}'.format(saveDir))
+#
+#   def restore(self, model):
+#      '''Restore model from path'''
+#      config    = self.envConfig
+#
+#      if model is None:
+#         print('Initializing new model...')
+#         trainPath = config.PATH_TRAINING_DATA.format('current')
+#         np.save(trainPath, {})
+#         return
+#
+#      modelPath = config.PATH_MODEL.format(config.MODEL)
+#      print('Loading from: {}'.format(modelPath))
+#      path     = os.path.join(modelPath, 'checkpoint')
+#>>>>>>> 17f0ddfd1c21ba37d2a5bb44eca6fe7a18aba382
       super().restore(path)
 
    def policyID(self, idx):
@@ -1249,29 +1229,13 @@ class SanePPOTrainer(ppo.PPOTrainer):
              if track not in training_logs:
                 training_logs[track] = {}
 
-#<<<<<<< HEAD
-#          epoch += 1
-#
-#          block = []
-#
-#          for key, stat in stats['hist_stats'].items():
-#             if key.startswith('_') and len(stat) > 0:
-#                stat       = stat[-self.envConfig.TRAIN_BATCH_SIZE:]
-#                mmin, mmax = np.min(stat),  np.max(stat)
-#                mean, std  = np.mean(stat), np.std(stat)
-#
-#                block.append(('   ' + left + '{:<12}{}Min: {:8.1f}{}Max: {:8.1f}{}Mean: {:8.1f}{}Std: {:8.1f}').format(
-#                      key.lstrip('_'), sep, mmin, sep, mmax, sep, mean, sep, std))
-#
-#             if not self.envConfig.v:
-#                continue
-#=======
+
              if stat not in training_logs[track]:
                 training_logs[track][stat] = []
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
              training_logs[track][stat] += vals
 
+          print('Save')
           np.save(trainPath, training_logs)
 
           #Representation for CLI
@@ -1282,29 +1246,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
                 mmean = np.mean(vals[-config.TRAIN_SUMMARY_ENVS:])
                 cli[track][stat] = mmean
 
-#<<<<<<< HEAD
-#          if len(block) > 0:
-#             mmax = max(len(l) for l in block) + 1
-#
-#             for idx, l in enumerate(block):
-#                block[idx] = ('{:<'+str(mmax)+'}').format(l + right)
-#
-#             blocks.append([top*len(line), line, bot*len(line), '   ' +
-#                   top*(mmax-3)] + block + ['   ' + bot*(mmax-3)])
-#
-#
-#          if len(blocks) > 3:
-#             blocks = blocks[1:]
-#
-#          for block in blocks:
-#             for line in block:
-#                lines.append(' ' + line)
-#
-#          line = summary.format(sep, epoch, sep, nSteps, sep, total_sample_time, sep, total_learn_time)
-#          lines.append(' ' + top*len(line))
-#          lines.append(' ' + line)
-#          lines.append(' ' + bot*len(line))
-#=======
+
           lines = formatting.precomputed_stats(cli)
           if config.v:
              lines += formatting.timings(timings)
@@ -1318,7 +1260,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
           
           #Assemble Summary Bar Title
           lines = logo.copy() + list(chain.from_iterable(blocks)) + summary
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
           #Cross-platform clear screen
           os.system('cls' if os.name == 'nt' else 'clear')

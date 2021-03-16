@@ -1,7 +1,7 @@
 import numpy as np
 from pdb import set_trace as T
 
-from forge.blade.systems import ai, equipment
+from forge.blade.systems import ai
 from forge.blade.lib import material
 
 from forge.blade.systems.skill import Skills
@@ -19,11 +19,19 @@ class Player(entity.Entity):
       self.target = None
       self.food   = None
       self.water  = None
-      self.vision = 7
+      self.initialized = False
+      self.combat      = False
+      self.forage      = False
+      self.resource    = None
+      self.downtime    = None
+
+      #Logs
+      self.buys   = 0
+      self.sells  = 0
 
       #Submodules
       self.skills     = Skills(self)
-      #self.inventory = Inventory(dataframe)
+      self.inventory  = Inventory(realm, self)
       #self.chat      = Chat(dataframe)
 
       #Update immune
@@ -50,6 +58,18 @@ class Player(entity.Entity):
    def population(self):
       return self.pop
 
+   @property
+   def serial(self):
+      return self.population, self.entID
+
+   @property
+   def isPlayer(self) -> bool:
+      return True
+
+   @property
+   def population(self):
+      return self.pop
+
    def applyDamage(self, dmg, style):
       self.resources.food.increment(dmg)
       self.resources.water.increment(dmg)
@@ -63,34 +83,24 @@ class Player(entity.Entity):
       self.resources.water.decrement(dmg)
       self.skills.receiveDamage(dmg)
 
-   def receiveLoot(self, loadout):
-      if loadout.chestplate.level > self.loadout.chestplate.level:
-         self.loadout.chestplate = loadout.chestplate
-      if loadout.platelegs.level > self.loadout.platelegs.level:
-         self.loadout.platelegs = loadout.platelegs
-
    def packet(self):
       data = super().packet()
 
-      data['entID']    = self.entID
-      data['annID']    = self.population
+      data['entID']     = self.entID
+      data['annID']     = self.population
 
-      data['base']     = self.base.packet()
-      data['resource'] = self.resources.packet()
-      data['skills']   = self.skills.packet()
+      data['base']      = self.base.packet()
+      data['resource']  = self.resources.packet()
+      data['skills']    = self.skills.packet()
+      data['inventory'] = self.inventory.packet()
 
       return data
   
    def update(self, realm, actions):
       '''Post-action update. Do not include history'''
-#<<<<<<< HEAD
-#     print('player {} position {} health {}'.format(self.entID, self.pos, self.resources.health.val))
-#      if not super().update(realm, actions):
-#=======
       super().update(realm, actions)
 
       if not self.alive:
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
          return
       if hasattr(realm, 'target_action_sequence') and len(actions) > 0 and self.entID in actions:
 #        act = actions[self.entID][action.static.Move][action.static.Direction]
@@ -101,17 +111,4 @@ class Player(entity.Entity):
       self.resources.update(realm, self, actions)
       self.skills.update(realm, self, actions)
       #self.inventory.update(world, actions)
-#<<<<<<< HEAD
       self.explored.add(self.pos)
-
-#   def act(self, world, atnArgs):
-#      #Right now we only support one arg. So *args for future update
-#      atn, args = atnArgs
-#      args = args.values()
-#      atn.call(world, self, *args)
-#
-#   @property
-#   def isPlayer(self) -> bool:
-#      return True
-#=======
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989

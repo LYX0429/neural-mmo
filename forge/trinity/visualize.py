@@ -78,7 +78,9 @@ class BokehServer:
          
             ary        = np.array([first] + mid + [last])
             mmin, mmax = np.min(ary), np.max(ary)
-            ary        = (ary - mmin) / (mmax - mmin)
+            ary        = ary - mmin
+            if mmax != mmin:
+               ary    /= mmax - mmin
 
             data[track][key] = ary.tolist()
          data[track]['x'] = [1] + (1 + window*np.arange(1, n)).tolist() + [len(vals)]
@@ -123,7 +125,7 @@ class BokehServer:
                config.VIS_LEGEND_WIDTH + config.VIS_LEGEND_OFFSET,
                config.VIS_HEIGHT, blob, key, colors)
          fig.outline_line_width = 0
-         fig.min_border_right   =0
+         fig.min_border_right   = 0
          items  = list(legend.items())
          legend = bokeh.models.Legend(items=items, location='center')
          legend.label_width = config.VIS_LEGEND_WIDTH

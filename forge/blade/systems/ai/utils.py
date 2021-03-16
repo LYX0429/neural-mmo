@@ -3,6 +3,7 @@ import numpy as np
 
 from forge.blade.lib.utils import inBounds
 from forge.blade.systems import combat
+from forge.blade.lib import material
 from queue import PriorityQueue, Queue
 
 from forge.blade.systems.ai.dynamic_programming import map_to_rewards, \
@@ -19,11 +20,8 @@ def validTarget(ent, targ, rng):
       return False
    return True
 
-
 def validResource(ent, tile, rng):
-   return tile is not None and tile.state.tex in (
-      'forest', 'water') and distance(ent, tile) <= rng
-
+   return tile is not None and not tile.depleted and distance(ent, tile) <= rng
 
 def directionTowards(ent, targ):
    sr, sc = ent.base.pos
@@ -175,6 +173,64 @@ def forageDijkstra(tiles, entity, cutoff=100):
 
          queue.put(nxt)
          backtrace[nxt] = cur
+
+def harvestDijkstra(tiles, entity, cutoff=100):
+   resource = entity.resource
+   start    = entity.pos
+
+   queue = Queue()
+   queue.put(start)
+
+   backtrace = {start: None}
+
+   reward    = {start: 0}
+   best      = -1000 
+   goal      = start
+
+   while not queue.empty():
+      cutoff -= 1
+      if cutoff <= 0:
+         while goal in backtrace and backtrace[goal] != start:
+            goal = backtrace[goal]
+
+         sr, sc = start
+         gr, gc = goal
+
+         if best == 0:
+            return None
+
+         return (gr - sr, gc - sc)
+
+      cur = queue.get()
+
+      for nxt in adjacentPos(cur):
+         if nxt in backtrace:
+            continue
+
+         if tiles[nxt].occupied:
+            continue
+
+         if not inBounds(*nxt, tiles.shape):
+            continue
+
+         rew = reward[cur]
+         if resource == material.Fish:
+            for pos in adjacentPos(nxt):
+               if tiles[pos].state == material.Fish:
+                  rew += 1
+         else:
+            rew += tiles[nxt].state == resource
+ 
+         reward[nxt] = rew
+         total       = rew
+
+         if total > best:
+            best = total
+            goal = nxt
+
+         queue.put(nxt)
+         backtrace[nxt] = cur
+
 
 # A* Search
 def l1(start, goal):

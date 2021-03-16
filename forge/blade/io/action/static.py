@@ -1,10 +1,11 @@
 from pdb import set_trace as T
 import numpy as np
 
+from forge.blade import item
 from forge.blade.lib import utils, material
 from forge.blade.lib.utils import staticproperty
-from forge.blade.io.node import Node, NodeType
 from forge.blade.systems import combat
+from forge.blade.io.node import Node, NodeType
 from forge.blade.io.stimulus import Static
 import forge
 
@@ -17,9 +18,7 @@ class Action(Node):
 
    @staticproperty
    def edges():
-      #return [Move, Attack, Exchange, Skill]
-      return [Move, Attack]
-      #return [Move]
+      return [Move, Attack, Buy, InventoryAction]
 
    @staticproperty
    def n():
@@ -58,26 +57,20 @@ class Move(Node):
       tile = env.map.tiles[trg_pos]
       dest_idx = tile.mat.index
       #One agent per cell
-#<<<<<<< HEAD
-#      if len(env.map.tiles[trg_pos].ents) != 0:
-#         return
-#      if tile.impassible:
-#=======
-      tile = env.map.tiles[rNew, cNew]
+      tile = env.map.tiles[rNew, cNew] 
       if tile.occupied and not tile.lava:
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
          return
       if entity.status.freeze > 0:
          return
-      #FIXME: hack. Check if tile is degenerated and thus passible.
-      hack_passible = tile.capacity == 0
-      if dest_idx == material.Tree.index and not hack_passible:
-         return Woodcut.call(env, entity, trg_pos)
-      if dest_idx == material.Orerock.index:
-         if not hack_passible:
-            return Mine.call(env, entity, trg_pos)
-         else:
-            pass
+#     #FIXME: hack. Check if tile is degenerated and thus passible.
+#     hack_passible = tile.depleted
+#     if dest_idx == material.Tree.index and not hack_passible:
+#        return Woodcut.call(env, entity, trg_pos)
+#     if dest_idx == material.Orerock.index:
+#        if not hack_passible:
+#           return Mine.call(env, entity, trg_pos)
+#        else:
+#           pass
 
 #     if not utils.inBounds(rNew, cNew, env.shape):
       if not utils.inBounds(rNew, cNew, env.map.inds().shape):
@@ -169,12 +162,11 @@ class Attack(Node):
       return abs(r - rCent) + abs(c - cCent)
 
    def call(env, entity, style, targ):
-      #Can't attack if either party is immune
-      if entity.status.immune > 0 or targ.status.immune > 0:
+      if targ is None or entity.entID == targ.entID:
          return
 
-      #Check if self targeted
-      if entity.entID == targ.entID:
+      #Can't attack if either party is immune
+      if entity.status.immune > 0 or targ.status.immune > 0:
          return
 
       #Check wilderness level
@@ -210,6 +202,7 @@ class Attack(Node):
 
 class Style(Node):
    argType = Fixed
+
    @staticproperty
    def edges():
       return [Melee, Range, Mage]
@@ -217,10 +210,8 @@ class Style(Node):
    def args(stim, entity, config):
       return Style.edges
 
-
 class Target(Node):
-   argType = None
-   #argType = Player 
+   argType  = 'Entity'
 
    @classmethod
    def N(cls, config):
@@ -230,6 +221,10 @@ class Target(Node):
    def args(stim, entity, config):
       #Should pass max range?
       return Attack.inRange(entity, stim, config, None)
+
+   @classmethod
+   def gameObjects(cls, realm, entity, val):
+      return [realm.entity(targ) for targ in entity.targets]
 
 class Melee(Node):
    nodeType = NodeType.ACTION
@@ -264,116 +259,169 @@ class Mage(Node):
    def skill(entity):
       return entity.skills.mage
 
-class Reproduce:
-   pass
-
-class Skill(Node):
+class Buy(Node):
+   priority = -1 
    nodeType = NodeType.SELECTION
-   @staticproperty
-   def edges():
-     #return [Harvest, Process]
-      return [Harvest]
-
-   def args(stim, entity, config):
-      return Skill.edges
-
-class Harvest(Node):
-   priority = 2
-   nodeType = NodeType.SELECTION
-   @staticproperty
-   def edges():
-     #return [Fish, Mine]
-      return [Mine, Woodcut]
-
-   def args(stim, entity, config):
-      return Harvest.edges
-
-class Fish(Node):
-   nodeType = NodeType.ACTION
-
-class Mine(Node):
-   nodeType = NodeType.SELECTION
-
-#  def update(self, realm, entity):
-   def call(env, entity, trg):
-      if not env.map.harvest(*trg):
-         return
-      ore = entity.resources.ore
-      mining = entity.skills.mining
-
-      restore = np.floor(mining.level * 1)
-      ore.increment(restore)
-
-      scale = entity.config.XP_SCALE
-      # we don't use RESOURCE_RESTORE to affect inventory, but factor it into experience for the
-      # sake of diversity calculations
-      entity.skills.mining.exp += scale * restore * 10 
 
    @staticproperty
    def edges():
-      return [Direction]
-
-  #@staticproperty
-  #def leaf():
-  #   return True
-
-class Woodcut(Node):
-   nodeType = NodeType.SELECTION
-
-   def call(env, entity, trg):
-      if not env.map.harvest(*trg):
-         return
-      wood = entity.resources.wood
-      woodcutting = entity.skills.woodcutting
-
-      restore = np.floor(woodcutting.level * 1)
-      wood.increment(restore)
-
-      scale = entity.config.XP_SCALE
-      entity.skills.woodcutting.exp += scale * restore * 10
-
-   @staticproperty
-   def edges():
-      return [Direction]
+      return [ItemType]
 
    @staticproperty
    def leaf():
       return True
 
-class Process(Node):
-   nodeType = NodeType.SELECTION
+#<<<<<<< HEAD
+#class Harvest(Node):
+#   priority = 2
+#   nodeType = NodeType.SELECTION
+#   @staticproperty
+#   def edges():
+#     #return [Fish, Mine]
+#      return [Mine, Woodcut]
+#
+#   def args(stim, entity, config):
+#      return Harvest.edges
+#
+#class Fish(Node):
+#   nodeType = NodeType.ACTION
+#
+#class Mine(Node):
+#   nodeType = NodeType.SELECTION
+#
+##  def update(self, realm, entity):
+#   def call(env, entity, trg):
+#      if not env.map.harvest(*trg):
+#         return
+#      ore = entity.resources.ore
+#      mining = entity.skills.mining
+#
+#      restore = np.floor(mining.level * 1)
+#      ore.increment(restore)
+#
+#      scale = entity.config.XP_SCALE
+#      # we don't use RESOURCE_RESTORE to affect inventory, but factor it into experience for the
+#      # sake of diversity calculations
+#      entity.skills.mining.exp += scale * restore * 10 
+#
+#   @staticproperty
+#   def edges():
+#      return [Direction]
+#
+#  #@staticproperty
+#  #def leaf():
+#  #   return True
+#
+#class Woodcut(Node):
+#   nodeType = NodeType.SELECTION
+#
+#   def call(env, entity, trg):
+#      if not env.map.harvest(*trg):
+#         return
+#      wood = entity.resources.wood
+#      woodcutting = entity.skills.woodcutting
+#
+#      restore = np.floor(woodcutting.level * 1)
+#      wood.increment(restore)
+#
+#      scale = entity.config.XP_SCALE
+#      entity.skills.woodcutting.exp += scale * restore * 10
+#
+#   @staticproperty
+#   def edges():
+#      return [Direction]
+#
+#   @staticproperty
+#   def leaf():
+#      return True
+#=======
+   def call(env, entity, item):
+      if not item:
+         return
+      
+      return env.exchange.buy(entity, item, 0, 99)
+
+class ItemType(Node):
+   argType = Fixed
    @staticproperty
    def edges():
-      return [Cook, Smith]
+      return [item.Hat, item.Top, item.Bottom, item.Weapon,
+              item.Scrap, item.Shaving, item.Shard,
+              item.Food, item.Potion]
 
    def args(stim, entity, config):
-      return Process.edges
+      return Item.edges
+#>>>>>>> 17f0ddfd1c21ba37d2a5bb44eca6fe7a18aba382
 
-class Cook(Node):
-   nodeType = NodeType.ACTION
-
-class Smith(Node):
-   nodeType = NodeType.ACTION
-
-class Exchange(Node):
+class InventoryAction(Node):
+   priority = -2 
    nodeType = NodeType.SELECTION
+
    @staticproperty
    def edges():
-      return [Buy, Sell, CancelOffer]
+      return [InventoryActionType, Item]
+
+   @staticproperty
+   def leaf():
+      return True
+
+   def call(env, entity, actionType, item):
+      assert actionType in (Discard, Use, Sell)
+
+      if item is None:
+         return
+
+      if actionType == Discard:
+         return
+         return entity.inventory.consumables.remove(item)
+      if actionType == Sell:
+         return env.exchange.sell(entity, item)
+
+      if not entity.inventory.consumables.__contains__(type(item)):
+         return
+
+      item.use(entity)
+      entity.inventory.consumables.remove(item)
+      return True
+
+class Item(Node):
+   argType  = 'Item'
+
+   @classmethod
+   def N(cls, config):
+      return config.N_AMMUNITION + config.N_CONSUMABLES + config.N_LOOT + 1
 
    def args(stim, entity, config):
-      return Exchange.edges
+      return entity.items
 
-class Buy(Node):
+   @classmethod
+   def gameObjects(cls, realm, entity, val):
+      return entity.inventory.items[5:]
+
+class InventoryActionType(Node):
+   priority = -3 
+   argType  = Fixed
+
+   @staticproperty
+   def edges():
+      return [Discard, Sell, Use]
+
+   def args(env, entity, item):
+      return InventoryActionType.edges
+
+class Discard(Node):
    nodeType = NodeType.ACTION
 
 class Sell(Node):
    nodeType = NodeType.ACTION
 
-class CancelOffer(Node):
+class Use(Node):
    nodeType = NodeType.ACTION
 
 class Message:
+   pass
+
+class Reproduce:
    pass
 
 class BecomeSkynet:

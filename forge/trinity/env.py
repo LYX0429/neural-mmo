@@ -10,10 +10,10 @@ from copy import deepcopy
 from forge.blade import entity, core
 from forge.blade.io import stimulus
 from forge.blade.io.stimulus import Static
+from forge.blade.io.action import static as Action
 from forge.blade.systems import combat
 
-from forge.blade.lib.enums import MaterialEnum
-from forge.blade.lib.material import Material
+from forge.blade.lib import material
 from forge.blade.lib import log
 import ray
 
@@ -49,6 +49,8 @@ class Env:
       self.realm.set_map(idx, map_arr)
       self.worldIdx = idx
 
+
+
    ############################################################################
    ### Core API
    def reset(self, idx=None, step=True):
@@ -62,7 +64,7 @@ class Env:
          step: Whether to step the environment and return initial obs
 
       Returns:
-         obs: Initial obs if step=True, None otherwise 
+         obs: Initial obs if step=True, None otherwise
 
       Notes:
          Neural MMO simulates a persistent world. Ideally, you should reset
@@ -76,24 +78,9 @@ class Env:
       Returns:
          observations, as documented by step()
       '''
-#     self.quill = log.Quill(self.realm.identify)
-#
-#     if idx is None:
-#        idx = np.random.randint(self.config.N_TRAIN_MAPS) + 1
 
-#     if self.worldIdx is None:
-#        self.worldIdx = idx
-#     self.realm.reset(self.worldIdx)
 
-#     obs = None
-#     if step:
-#        obs, _, _, _ = self.step({})
-
-#     return obs
-
-      self.quill = log.Quill(self.realm.identify)
-
-#     self.env_reset = time.time()
+      #     self.env_reset = time.time()
 
       self.agent_skills = []
       self.lifetimes = []
@@ -117,18 +104,23 @@ class Env:
          #          atk_mults = json.load(f)
          pass
       elif idx is None:
-         idx = np.random.randint(self.config.NMAPS)
+#        idx = np.random.randint(self.config.NMAPS)
+         idx = np.random.randint(self.config.N_TRAIN_MAPS) + 1
 
       #     self.worldIdx = idx
       #     print('trinity env idx: {}'.format(idx))
       self.dead = {}
 
+
+      self.quill = log.Quill(self.realm.identify)
+
+
+      self.worldIdx = idx
       self.realm.reset(idx)
 
       if self.config.EVO_MAP:  # and not self.config.MAP == 'PCG':
          #   self.realm.spawn_points = ray.get(global_stats.get_spawn_points.remote(idx))
-         self.realm.spawn_points = np.vstack(np.where(self.realm.map.inds() == MaterialEnum.SPAWN.value.index)).transpose()
-
+         self.realm.spawn_points = np.vstack(np.where(self.realm.map.inds() == material.Spawn.index)).transpose()
       obs = None
       if step:
          obs, _, _, _ = self.step({})
@@ -230,15 +222,8 @@ class Env:
          infos:
             An empty dictionary provided only for conformity with OpenAI Gym.
       '''
-#<<<<<<< HEAD
-##     print(self.realm.tick)
-#      self.env_step = time.time()
-#
-#      ###Preprocess actions
-#      self.preprocess_actions = time.time()
-#=======
       #Preprocess actions
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+      #Preprocess actions
       if preprocessActions:
          for entID in list(actions.keys()):
             ent = self.realm.players[entID]
@@ -247,14 +232,17 @@ class Env:
 
             for atn, args in actions[entID].items():
                for arg, val in args.items():
-                  if len(arg.edges) > 0:
-                     actions[entID][atn][arg] = arg.edges[val]
-                  elif val < len(ent.targets):
-                     targ                     = ent.targets[val]
-                     actions[entID][atn][arg] = self.realm.entity(targ)
-                  else: #Need to fix -inf in classifier before removing this
-                     actions[entID][atn][arg] = ent
 
+                  obj = None
+                  if len(arg.edges) > 0:
+                     obj = arg.edges[val]
+                  else:
+                     objs = arg.gameObjects(self.realm, ent, val)
+                     if val < len(objs):
+                        obj = objs[val]
+
+                  actions[entID][atn][arg] = obj
+               
       #Step: Realm, Observations, Logs
       dead = self.realm.step(actions)
       obs, rewards, dones, self.raw = {}, {}, {}, {}
@@ -268,7 +256,7 @@ class Env:
       for entID, ent in dead.items():
          self.log(ent)
 
-      #Postprocess dead agents
+       #Postprocess dead agents
       if omitDead:
          return obs, rewards, dones, {}
 
@@ -330,11 +318,8 @@ class Env:
       quill.stat('Skilling',  (ent.skills.fishing.level + ent.skills.hunting.level)/2.0)
       quill.stat('Combat',    combat.level(ent.skills))
       quill.stat('Equipment', ent.loadout.defense)
-#<<<<<<< HEAD
-#     quill.stat('Exploration', ent.exploration_grid.sum())
-#=======
+
       quill.stat('Exploration', ent.history.exploration)
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
    def terminal(self):
       '''Logs currently alive agents and returns all collected logs
@@ -370,7 +355,6 @@ class Env:
       agents that are still alive at the end of that horizon. This function
       performs that logging and returns the associated a data structure
       containing logs for the entire evaluation
->>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
       Returns:
          Log datastructure. Use them to update an InkWell logger.
@@ -378,10 +362,7 @@ class Env:
       Args:
          ent: An agent
       '''
-#<<<<<<< HEAD
 
-#=======
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
       for entID, ent in self.realm.players.entities.items():
          self.log(ent)
@@ -389,6 +370,121 @@ class Env:
       return self.quill.packet
 
 
+      #TODO: Figure out how to integrate this into realm
+      self.realm.exchange.step()
+
+      #Postprocess dead agents
+      if omitDead:
+         return obs, rewards, dones, {}
+
+      for entID, ent in dead.items():
+         rewards[ent.entID] = self.reward(ent)
+         dones[ent.entID]   = True
+         obs[ent.entID]     = ob
+
+      return obs, rewards, dones, {}
+
+   ############################################################################
+   ### Logging
+   def log(self, ent) -> None:
+      '''Logs agent data upon death
+
+      This function is called automatically when an agent dies. Logs are used
+      to compute summary stats and populate the dashboard. You should not
+      call it manually. Instead, override this method to customize logging.
+
+      Args:
+         ent: An agent
+      '''
+
+      quill = self.quill
+
+      blob = quill.register('Population', self.realm.tick,
+            quill.HISTOGRAM, quill.INDEX, quill.SCATTER)
+      blob.log(self.realm.population)
+
+      blob = quill.register('Lifetime', self.realm.tick,
+            quill.HISTOGRAM, quill.INDEX, quill.SCATTER, quill.GANTT)
+      blob.log(ent.history.timeAlive.val)
+
+      blob = quill.register('Basic Skills', self.realm.tick,
+            quill.HISTOGRAM, quill.STACKED_AREA, quill.STATS)
+      blob.log(ent.skills.water.level,        'Water')
+      blob.log(ent.skills.food.level,         'Food')
+
+      blob = quill.register('Harvest Skills', self.realm.tick,
+            quill.HISTOGRAM, quill.STACKED_AREA, quill.STATS, quill.RADAR)
+      blob.log(ent.skills.fishing.level,      'Fishing')
+      blob.log(ent.skills.hunting.level,      'Hunting')
+      blob.log(ent.skills.prospecting.level,  'Prospecting')
+      blob.log(ent.skills.carving.level,      'Carving')
+      blob.log(ent.skills.alchemy.level,      'Alchemy')
+
+      blob = quill.register('Combat Skills', self.realm.tick,
+            quill.HISTOGRAM, quill.STACKED_AREA, quill.STATS, quill.RADAR)
+      blob.log(ent.skills.melee.level,        'Melee')
+      blob.log(ent.skills.range.level,        'Range')
+      blob.log(ent.skills.mage.level,         'Mage')
+
+      blob = quill.register('Equipment', self.realm.tick,
+            quill.HISTOGRAM, quill.SCATTER)
+      blob.log(ent.inventory.equipment.offense, 'Offense')
+      blob.log(ent.inventory.equipment.defense, 'Defense')
+
+      blob = quill.register('Trades', self.realm.tick,
+            quill.HISTOGRAM, quill.SCATTER)
+      blob.log(ent.sells, 'Sells')
+      blob.log(ent.buys,  'Buys')
+
+      prices = quill.register('Market Prices', self.realm.tick, quill.LINE)
+      levels = quill.register('Market Levels', self.realm.tick, quill.LINE)
+      volume = quill.register('Market Volume', self.realm.tick, quill.LINE)
+      supply = quill.register('Market Supply', self.realm.tick, quill.LINE)
+      value  = quill.register('Market Value',  self.realm.tick, quill.LINE)
+      for item, listing in self.realm.exchange.items.items():
+         prices.log(listing.price(),  item.__name__)
+         levels.log(listing.level(),  item.__name__)
+         volume.log(listing.volume,   item.__name__)
+         supply.log(listing.supply(), item.__name__)
+         value.log(listing.value(),   item.__name__)
+
+      blob = quill.register('Population Wealth', self.realm.tick, quill.LINE)
+      wealth = [p.inventory.gold.quantity.val for _, p in self.realm.players.items()]
+      blob.log(sum(wealth), 'Gold')
+
+      blob = quill.register('Exploration', self.realm.tick,
+            quill.HISTOGRAM, quill.SCATTER)
+      blob.log(ent.history.exploration)
+
+      quill.stat('Population',      self.realm.population)
+      quill.stat('Lifetime',        ent.history.timeAlive.val)
+      quill.stat('Basic Skills',    ent.skills.basicLevel)
+      quill.stat('Harvest Skills',  ent.skills.harvestLevel)
+      quill.stat('Combat Skills',   ent.skills.combatLevel)
+      quill.stat('Equipment',       ent.inventory.equipment.level)
+      quill.stat('Exchange',        ent.buys + ent.sells)
+      quill.stat('Exploration',     ent.history.exploration)
+
+   def terminal(self):
+      '''Logs currently alive agents and returns all collected logs
+
+      Automatic log calls occur only when agents die. To evaluate agent
+      performance over a fixed horizon, you will need to include logs for
+      agents that are still alive at the end of that horizon. This function
+      performs that logging and returns the associated a data structure
+      containing logs for the entire evaluation
+
+      Returns:
+         Log datastructure. Use them to update an InkWell logger.
+         
+      Args:
+         ent: An agent
+      '''
+
+      for entID, ent in self.realm.players.entities.items():
+         self.log(ent)
+
+      return self.quill.packet
 
    ############################################################################
    ### Override hooks
@@ -462,6 +558,7 @@ class Env:
       '''Register an overlay to be sent to the client
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       Args:
          packets: A dictionary of Packet objects
 
@@ -528,7 +625,10 @@ class Env:
       The intended use of this function is: User types overlay ->
       client sends cmd to server -> server computes overlay update -> 
       register(overlay) -> overlay is sent to client -> overlay rendered
->>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+=======
+      The intended use of this function is: User types overlay ->
+      client sends cmd to server -> server computes overlay update -> 
+      register(overlay) -> overlay is sent to client -> overlay rendered
 
       Args:
          values: A map-sized (self.size) array of floating point values

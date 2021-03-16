@@ -93,14 +93,9 @@ class MarginPlot(Plot):
  
 class Training(Plot):
    def preprocess(self, data, key, color, idx, w=20):
-      mean                   = np.array(data['Mean'])
-      std                    = np.array(data['Std'])
-
       preprocessed           = {}
       preprocessed['x']      = data['x']
-      preprocessed['smooth'] = mean
-      preprocessed['lower']  = mean - std
-      preprocessed['upper']  = mean + std
+      preprocessed['smooth'] = np.array(data['Mean'])
 
       return preprocessed
 
@@ -117,8 +112,31 @@ class Training(Plot):
 
       return [line]
 
+class Line(MarginPlot):
+   def preprocess(self, data, key, color, idx, w=20):
+      preprocessed = defaultdict(list)
 
-class Line(Plot):
+      for t, vList in data.items():
+         for val in vList:
+            preprocessed['x'].append(t)
+            preprocessed['y'].append(val)
+
+      return preprocessed
+
+   def plot(self, source, key, color, idx):
+      self.fig.xaxis.axis_label = 'Game Tick'
+      self.fig.yaxis.axis_label = 'Value'
+
+      circle = self.fig.line(
+         source=source,
+         name=key,
+         x='x',
+         y='y',
+         color=color)
+
+      return [circle]
+
+class Index(Plot):
    def preprocess(self, data, key, color, idx, w=20):
       sliding = rolling_window(flat(data), w)
       smooth  = np.mean(sliding, axis=1)
