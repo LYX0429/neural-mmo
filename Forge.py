@@ -1,20 +1,16 @@
 '''Main file for the neural-mmo/projekt demo
 
-/projeckt contains all necessary code to train and
-evaluate capable policies on Neural MMO using RLlib,
-as well as rendering, logging, and visualization tools.
+/projeckt contains all necessary RLlib wrappers to train and
+evaluate capable policies on Neural MMO as well as rendering,
+logging, and visualization tools.
 
 Associated docs and tutorials are hosted on jsuarez5341.github.io.'''
-
-#My favorite debugging macro
 from pdb import set_trace as T
 
 import numpy as np
 import torch
 
 from fire import Fire
-import sys
-import time
 
 import ray
 from ray import rllib
@@ -22,17 +18,17 @@ from ray import rllib
 from forge.ethyr.torch import utils
 from forge.blade.systems import ai
 
-from forge.trinity.visualize import visualize
+from forge.trinity.visualize import BokehServer
 from forge.trinity.evaluator import Evaluator
 
 import projekt
-from projekt import rllib_wrapper
+from projekt import rllib_wrapper as wrapper
 from forge.blade.core import terrain
 
-#Generate RLlib policies
 def createPolicies(config, mapPolicy):
-   obs      = rllib_wrapper.observationSpace(config)
-   atns     = rllib_wrapper.actionSpace(config)
+   '''Generate RLlib policies'''
+   obs      = wrapper.observationSpace(config)
+   atns     = wrapper.actionSpace(config)
    policies = {}
 
    for i in range(config.NPOLICIES):
@@ -46,21 +42,21 @@ def createPolicies(config, mapPolicy):
    return policies
 
 def loadTrainer(config):
+   '''Create monolithic RLlib trainer object'''
    torch.set_num_threads(1)
    ray.init(local_mode=config.LOCAL_MODE)
 
    #Register custom env
    ray.tune.registry.register_env("Neural_MMO",
-         lambda config: rllib_wrapper.RLLibEnv(config))
+         lambda config: wrapper.RLlibEnv(config))
 
    #Create policies
-   rllib.models.ModelCatalog.register_custom_model('godsword', rllib_wrapper.Policy)
+   rllib.models.ModelCatalog.register_custom_model('godsword', wrapper.RLlibPolicy)
    mapPolicy = lambda agentID: 'policy_{}'.format(agentID % config.NPOLICIES)
    policies  = createPolicies(config, mapPolicy)
 
    #Instantiate monolithic RLlib Trainer object.
-   return rllib_wrapper.SanePPOTrainer(
-      env=config.ENV_NAME, path='experiment', config={
+   return wrapper.SanePPOTrainer(config={
       'num_workers': config.NUM_WORKERS,
       'num_gpus_per_worker': config.NUM_GPUS_PER_WORKER,
       'num_gpus': config.NUM_GPUS,
@@ -74,13 +70,14 @@ def loadTrainer(config):
       'soft_horizon': False, 
       '_use_trajectory_view_api': False,
       'no_done_at_end': False,
-      'callbacks': rllib_wrapper.LogCallbacks,
+      'callbacks': wrapper.RLlibLogCallbacks,
       'env_config': {
          'config': config
       },
       'multiagent': {
-         "policies": policies,
-         "policy_mapping_fn": mapPolicy
+         'policies': policies,
+         'policy_mapping_fn': mapPolicy,
+         'count_steps_by': 'agent_steps'
       },
       'model': {
          'custom_model': 'godsword',
@@ -88,50 +85,87 @@ def loadTrainer(config):
       },
    })
 
+def loadEvaluator(config):
+   '''Create test/render evaluator'''
+   if config.MODEL not in ('scripted-forage', 'scripted-combat'):
+      return wrapper.RLlibEvaluator(config, loadModel(config))
+
+   #Scripted policy backend
+   if config.MODEL == 'scripted-forage':
+      policy = ai.policy.forage 
+   else:
+      policy = ai.policy.combat
+
+   #Search backend
+   err = 'SCRIPTED_BACKEND may be either dijkstra or dynamic_programming'
+   assert config.SCRIPTED_BACKEND in ('dijkstra', 'dynamic_programming'), err
+   if config.SCRIPTED_BACKEND == 'dijkstra':
+      backend = ai.behavior.forageDijkstra
+   elif config.SCRIPTED_BACKEND == 'dynamic_programming':
+      backend = ai.behavior.forageDP
+
+   return Evaluator(config, policy, config.SCRIPTED_EXPLORE, backend)
+
 def loadModel(config):
+   '''Load NN weights and optimizer state'''
    trainer = loadTrainer(config)
    utils.modelSize(trainer.defaultModel())
    trainer.restore(config.MODEL)
    return trainer
 
-def loadEvaluator(config):
-   config.EVALUATE = True
-   if config.SCRIPTED_DP:
-      evaluator = Evaluator(config, ai.policy.baselineDP)
-   elif config.SCRIPTED_BFS:
-      evaluator = Evaluator(config, ai.policy.baselineBFS)
-   else:
-      trainer   = loadModel(config)
-      evaluator = rllib_wrapper.RLLibEvaluator(config, trainer)
-
-   return evaluator
-
 class Anvil():
-   '''Docstring'''
+   '''Neural MMO CLI powered by Google Fire
+
+   Main file for the RLlib demo included with Neural MMO.
+
+   Usage:
+      python Forge.py <COMMAND> --config=<CONFIG> --ARG1=<ARG1> ...
+
+   The User API documents core env flags. Additional config options specific
+   to this demo are available in projekt/config.py. 
+
+   The --config flag may be used to load an entire group of options at once.
+   The Debug, SmallMaps, and LargeMaps options are included in this demo with
+   the latter being the default -- or write your own in projekt/config.py
+   '''
    def __init__(self, **kwargs):
+      if 'help' in kwargs:
+         kwargs.pop('help')
       if 'config' in kwargs:
          config = kwargs.pop('config')
          config = getattr(projekt.config, config)()
       else:
-         config = projekt.config.Config()
+         config = projekt.config.LargeMaps()
       config.override(**kwargs)
       self.config = config
 
    def train(self, **kwargs):
+      '''Train a model starting with the current value of --MODEL'''
       loadModel(self.config).train()
 
    def evaluate(self, **kwargs):
-      loadEvaluator(self.config).test()
+      '''Evaluate a model on --EVAL_MAPS maps'''
+      self.config.EVALUATE = True
+      loadEvaluator(self.config).evaluate(self.config.GENERALIZE)
 
    def render(self, **kwargs):
+      '''Start a WebSocket server that autoconnects to the 3D Unity client'''
+      self.config.RENDER = True
       loadEvaluator(self.config).render()
 
    def generate(self, **kwargs):
+      '''Generate game maps for the current --config setting'''
       terrain.MapGenerator(self.config).generate()
 
    def visualize(self, **kwargs):
-      visualize(self.config)
+      '''Training/Evaluation results Web dashboard'''
+      BokehServer(self.config)
       
 if __name__ == '__main__':
-   #Build config with CLI overrides
+   def Display(lines, out):
+        text = "\n".join(lines) + "\n"
+        out.write(text)
+
+   from fire import core
+   core.Display = Display
    Fire(Anvil)

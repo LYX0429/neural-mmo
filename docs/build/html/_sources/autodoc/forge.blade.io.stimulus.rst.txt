@@ -8,6 +8,7 @@ forge.blade.io.stimulus package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.io.stimulus.dynamic
    forge.blade.io.stimulus.hook

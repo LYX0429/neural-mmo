@@ -1,9 +1,23 @@
+#<<<<<<< HEAD
 import os
 from pathlib import Path
 from collections import defaultdict
 from pdb import set_trace as T
 from typing import Dict
 import json
+#=======
+from pdb import set_trace as T
+
+from collections import defaultdict
+from itertools import chain
+import shutil
+import contextlib
+import os
+import re
+
+from tqdm import tqdm
+import numpy as np
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
 import gym
 from matplotlib import pyplot as plt
@@ -21,6 +35,7 @@ import numpy as np
 import ray
 import ray.rllib.agents.ppo.ppo as ppo
 import torch
+#<<<<<<< HEAD
 from ray import rllib
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.env import BaseEnv
@@ -30,7 +45,7 @@ from ray.rllib.policy import Policy
 from ray.rllib.policy.rnn_sequencing import add_time_dimension
 from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID, SampleBatch
 from ray.rllib.utils.spaces.flexdict import FlexDict
-from forge.blade.lib.enums import Water, Lava, Stone
+from forge.blade.lib.material import Water, Lava, Stone
 from torch import nn
 from tqdm import tqdm
 from plot_diversity import heatmap
@@ -60,7 +75,30 @@ from ray.rllib.utils.typing import EnvConfigDict, EnvType, ResultDict, TrainerCo
 
 
 #Moved log to forge/trinity/env
-class RLLibEnv(Env, rllib.MultiAgentEnv):
+#class RLLibEnv(Env, rllib.MultiAgentEnv):
+#=======
+from torch import nn
+
+from ray import rllib
+import ray.rllib.agents.ppo.ppo as ppo
+from ray.rllib.agents.callbacks import DefaultCallbacks
+from ray.rllib.utils.spaces.flexdict import FlexDict
+from ray.rllib.models.torch.recurrent_net import RecurrentNetwork
+
+from forge.blade.io.stimulus.static import Stimulus
+from forge.blade.io.action.static import Action
+from forge.blade.lib import overlay
+
+from forge.ethyr.torch.policy import baseline
+
+from forge.trinity import Env, evaluator, formatting
+from forge.trinity.dataframe import DataType
+from forge.trinity.overlay import Overlay, OverlayRegistry
+
+###############################################################################
+### RLlib Env Wrapper
+class RLlibEnv(Env, rllib.MultiAgentEnv):
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    def __init__(self, config):
       self.config = config['config']
       if self.config.GRIDDLY:
@@ -88,6 +126,7 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
 
    def step(self, decisions, omitDead=False, preprocessActions=True):
+#<<<<<<< HEAD
 #     print('decisions keys', decisions.keys())
 #     print('ent keys', self.ents.keys())
       obs, rewards, dones, infos = super().step(decisions,
@@ -155,7 +194,7 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
       return a_skill_vals
 
-   def get_all_agent_stats(self):
+   def get_all_agent_stats(self, verbose=False):
       skills = {}
       a_skills = None
 
@@ -212,6 +251,19 @@ class RLLibEnv(Env, rllib.MultiAgentEnv):
 
 
 #Neural MMO observation space
+#=======
+#      obs, rewards, dones, infos = super().step(
+#            decisions, omitDead, preprocessActions)
+#
+#      config = self.config
+#      dones['__all__'] = False
+#      test = config.EVALUATE or config.RENDER
+#      if not test and self.realm.tick  >= config.TRAIN_HORIZON:
+#         dones['__all__'] = True
+#
+#      return obs, rewards, dones, infos
+#
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 def observationSpace(config):
    if config.GRIDDLY:
       #TODO: this, not manually!
@@ -232,7 +284,7 @@ def observationSpace(config):
             nContinuous += 1
 
       obs[entity.__name__]['Continuous'] = gym.spaces.Box(
-            low=-2**16, high=2**16, shape=(nRows, nContinuous),
+            low=-2**20, high=2**20, shape=(nRows, nContinuous),
             dtype=DataType.CONTINUOUS)
 
       obs[entity.__name__]['Discrete']   = gym.spaces.Box(
@@ -245,12 +297,16 @@ def observationSpace(config):
 
    return obs
 
+#<<<<<<< HEAD
 #Neural MMO action space
 def actionSpace(config, n_act_i=3, n_act_j=5):
    if config.GRIDDLY:
       print('WARNING: Are you sure the griddly env action space is {} {}?'.format(n_act_i, n_act_j))
       atns = gym.spaces.MultiDiscrete((n_act_i, n_act_j))
       return atns
+#=======
+#def actionSpace(config):
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    atns = FlexDict(defaultdict(FlexDict))
 
    for atn in sorted(Action.edges):
@@ -260,6 +316,7 @@ def actionSpace(config, n_act_i=3, n_act_j=5):
 
    return atns
 
+#<<<<<<< HEAD
 def plot_diversity(x, y, div_names, exp_name, render=False):
    colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
             'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
@@ -314,7 +371,7 @@ def unregister():
          del gym.envs.registry.env_specs[env]
 
 
-class RLLibEvaluator(evaluator.Base):
+class RLlibEvaluator(evaluator.Base):
    '''Test-time evaluation with communication to
    the Unity3D client. Makes use of batched GPU inference'''
    def __init__(self, config, trainer, archive=None, createEnv=None):
@@ -335,7 +392,7 @@ class RLLibEvaluator(evaluator.Base):
 
          self.env = createEnv({'config': config})
       else:
-         self.env      = projekt.rllib_wrapper.RLLibEnv({'config': config})
+         self.env      = projekt.rllib_wrapper.RLlibEnv({'config': config})
 
       if archive is not None:
          self.maps = maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in archive])
@@ -344,7 +401,7 @@ class RLLibEvaluator(evaluator.Base):
       self.env.reset(idx=config.INFER_IDX, step=False)
 #     self.env.reset(idx=0, step=False)
       if not config.GRIDDLY:
-         self.registry = OverlayRegistry(self.env, self.model, trainer, config)
+         self.registry = OverlayRegistry(self.env, self.model)#, trainer, config)
       self.obs      = self.env.step({})[0]
 
       self.state    = {}
@@ -372,6 +429,25 @@ class RLLibEvaluator(evaluator.Base):
             print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
 
          self.calc_diversity = diversity_calc(config)
+
+   def render(self):
+      self.obs = self.env.reset(idx=self.config.INFER_IDX)
+      self.registry = RLlibOverlayRegistry(
+            self.config, self.env).init(self.trainer, self.model)
+      super().render()
+
+#   def tick(self, pos, cmd):
+#      '''Simulate a single timestep
+##>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+#
+#      Args:
+#          pos: Camera position (r, c) from the server)
+#          cmd: Console command from the server
+#      '''
+#      actions, self.state, _ = self.trainer.compute_actions(
+#            self.obs, state=self.state, policy_id='policy_0')
+#      super().tick(self.obs, actions, pos, cmd)
+
 
    def test(self):
 
@@ -530,16 +606,20 @@ class RLLibEvaluator(evaluator.Base):
 #     actions = dict([(i, val) for (i, val) in self.env.env.action_space.sample().items()])
       if not self.config.GRIDDLY:
          self.registry.step(self.obs, pos, cmd,
-            update='counts values attention wilderness'.split())
+          # update='counts values attention wilderness'.split())
+                            )
 
       #Step environment
       if hasattr(self.env, 'evo_dones') and self.env.evo_dones is not None:
          self.env.evo_dones['__all__'] = False
-      ret = super().tick(actions)
+      ret = super().tick(self.obs, actions, pos, cmd)
 
       if self.config.GRIDDLY:
          if self.env.dones['__all__'] == True:
                self.reset_env()
+
+      stats = self.env.get_all_agent_stats()
+      score = self.calc_diversity(stats, verbose=True)
 
       self.i += 1
 
@@ -554,7 +634,12 @@ class RLLibEvaluator(evaluator.Base):
       self.env.set_map(idx=idx, maps=maps)
       self.env.reset()
 
-class Policy(RecurrentNetwork, nn.Module):
+#class RLlibPolicy(RecurrentNetwork, nn.Module):
+#=======
+###############################################################################
+### RLlib Policy, Evaluator, and Trainer wrappers
+class RLlibPolicy(RecurrentNetwork, nn.Module):
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    '''Wrapper class for using our baseline models with RLlib'''
    def __init__(self, *args, **kwargs):
       self.config = kwargs.pop('config')
@@ -599,44 +684,55 @@ class Policy(RecurrentNetwork, nn.Module):
    def attention(self):
       return self.model.attn
 
-class LogCallbacks(DefaultCallbacks):
-   STEP_KEYS    = 'env_step preprocess_actions realm_step env_stim'.split()
-   EPISODE_KEYS = ['env_reset']
-
-   def init(self, episode):
-      for key in LogCallbacks.STEP_KEYS + LogCallbacks.EPISODE_KEYS:
-         episode.hist_data[key] = []
-
-   def on_episode_start(self, *, worker: RolloutWorker, base_env: BaseEnv,
-         policies: Dict[str, Policy],
-         episode: MultiAgentEpisode, **kwargs):
-      self.init(episode)
-
-   def on_episode_step(self, *, worker: RolloutWorker, base_env: BaseEnv,
-         episode: MultiAgentEpisode, **kwargs):
-
-      env = base_env.envs[0]
-
-      for key in LogCallbacks.STEP_KEYS:
-         if not hasattr(env, key):
-            continue
-         episode.hist_data[key].append(getattr(env, key))
-
-   def on_episode_end(self, *, worker: RolloutWorker, base_env: BaseEnv,
-         policies: Dict[str, Policy], episode: MultiAgentEpisode, **kwargs):
-      env = base_env.envs[0]
-
-      for key in LogCallbacks.EPISODE_KEYS:
-         if not hasattr(env, key):
-            continue
-         episode.hist_data[key].append(getattr(env, key))
-
-      for key, val in env.terminal()['Stats'].items():
-         episode.hist_data['_'+key] = val
-
-global GOT_DUMMI
-GOT_DUMMI = False
-global EXEC_RETURN
+#class RLlibEvaluator(evaluator.Base):
+#   '''Test-time evaluation with communication to
+#   the Unity3D client. Makes use of batched GPU inference'''
+#   def __init__(self, config, trainer):
+#      super().__init__(config)
+#      self.trainer  = trainer
+#
+#      self.model    = self.trainer.get_policy('policy_0').model
+#      self.env      = RLlibEnv({'config': config})
+#      self.state    = {}
+#
+###<<<<<<< HEAD
+###      env = base_env.envs[0]
+##
+##      for key in RLlibLogCallbacks.STEP_KEYS:
+##         if not hasattr(env, key):
+##            continue
+##         episode.hist_data[key].append(getattr(env, key))
+##
+##   def on_episode_end(self, *, worker: RolloutWorker, base_env: BaseEnv,
+##         policies: Dict[str, Policy], episode: MultiAgentEpisode, **kwargs):
+##      env = base_env.envs[0]
+##
+##      for key in RLlibLogCallbacks.EPISODE_KEYS:
+##         if not hasattr(env, key):
+##            continue
+##         episode.hist_data[key].append(getattr(env, key))
+##=======
+#   def render(self):
+#      self.obs = self.env.reset(idx=1)
+#      self.registry = RLlibOverlayRegistry(
+#            self.config, self.env).init(self.trainer, self.model)
+#      super().render()
+#
+#   def tick(self, pos, cmd):
+#      '''Simulate a single timestep
+##>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+#
+#      Args:
+#          pos: Camera position (r, c) from the server)
+#          cmd: Console command from the server
+#      '''
+#      actions, self.state, _ = self.trainer.compute_actions(
+#            self.obs, state=self.state, policy_id='policy_0')
+#      super().tick(self.obs, actions, pos, cmd)
+#
+#global GOT_DUMMI
+#GOT_DUMMI = False
+#global EXEC_RETURN
 
 
 def frozen_execution_plan(workers: WorkerSet, config: TrainerConfigDict):
@@ -987,19 +1083,36 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 
 class SanePPOTrainer(ppo.PPOTrainer):
    '''Small utility class on top of RLlib's base trainer'''
-   def __init__(self, env, path, config):
-      super().__init__(env=env, config=config)
+   def __init__(self, config):
       self.envConfig = config['env_config']['config']
-      self.saveDir   = path
+      super().__init__(env=self.envConfig.ENV_NAME, config=config)
 
    def save(self):
       '''Save model to file. Note: RLlib does not let us chose save paths'''
+#<<<<<<< HEAD
       savedir = super().save(self.saveDir)
       with open('experiment/path.txt', 'w') as f:
          f.write(savedir)
       print('Saved to: {}'.format(savedir))
 
-      return savedir
+      config   = self.envConfig
+      saveFile = super().save(config.PATH_CHECKPOINTS)
+      saveDir  = os.path.dirname(saveFile)
+
+      #Clear current save dir
+      shutil.rmtree(config.PATH_CURRENT, ignore_errors=True)
+      os.mkdir(config.PATH_CURRENT)
+
+      #Copy checkpoints
+      for f in os.listdir(saveDir):
+         stripped = re.sub('-\d+', '', f)
+         src      = os.path.join(saveDir, f)
+         dst      = os.path.join(config.PATH_CURRENT, stripped)
+         shutil.copy(src, dst)
+
+      print('Saved to: {}'.format(saveDir))
+
+#     return savedir
 
    def restore(self, model):
       '''Restore model from path'''
@@ -1033,8 +1146,38 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
 #     else:
 #        path = 'experiment/{}/checkpoint'.format(model)
+#=======
+#     config   = self.envConfig
+#     saveFile = super().save(config.PATH_CHECKPOINTS)
+#     saveDir  = os.path.dirname(saveFile)
+#
+#     #Clear current save dir
+#     shutil.rmtree(config.PATH_CURRENT, ignore_errors=True)
+#     os.mkdir(config.PATH_CURRENT)
 
-      print('Loading from: {}'.format(path))
+#     #Copy checkpoints
+#     for f in os.listdir(saveDir):
+#        stripped = re.sub('-\d+', '', f)
+#        src      = os.path.join(saveDir, f)
+#        dst      = os.path.join(config.PATH_CURRENT, stripped)
+#        shutil.copy(src, dst)
+
+#     print('Saved to: {}'.format(saveDir))
+
+#  def restore(self, model):
+#     '''Restore model from path'''
+      config    = self.envConfig
+
+#     if model is None:
+#        print('Initializing new model...')
+#        trainPath = config.PATH_TRAINING_DATA.format('current')
+#        np.save(trainPath, {})
+#        return
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+
+    # modelPath = config.PATH_MODEL.format(config.MODEL)
+    # print('Loading from: {}'.format(modelPath))
+    # path     = os.path.join(modelPath, 'checkpoint')
       super().restore(path)
 
    def policyID(self, idx):
@@ -1048,88 +1191,271 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
    def train(self):
       '''Train forever, printing per epoch'''
-      logo   = open(self.envConfig.LOGO_DIR).read().splitlines()
-      epoch  = 0
+      config = self.envConfig
+
+      logo   = open(config.PATH_LOGO).read().splitlines()
+
+      model         = config.MODEL if config.MODEL is not None else 'current'
+      trainPath     = config.PATH_TRAINING_DATA.format(model)
+      training_logs = np.load(trainPath, allow_pickle=True).item()
 
       total_sample_time = 0
       total_learn_time = 0
 
-      sep     = u'\u2595\u258f'
-      block   = u'\u2591'
-      top     = u'\u2581'
-      bot     = u'\u2594'
-      left    = u'\u258f'
-      right   = u'\u2595'
-
-      summary = left + 'Neural MMO v1.5{}Epochs: {}{}Samples: {}{}Sample Time: {:.1f}s{}Learn Time: {:.1f}s' + right
+      epoch   = 0
       blocks  = []
 
       while True:
+          #Train model
           stats = super().train()
           self.save()
+          epoch += 1
 
-          lines = logo.copy()
+          if epoch == 1:
+            continue
 
-          nSteps = stats['info']['num_steps_trained']
-
+          #Time Stats
           timers             = stats['timers']
           sample_time        = timers['sample_time_ms'] / 1000
           learn_time         = timers['learn_time_ms'] / 1000
           sample_throughput  = timers['sample_throughput']
           learn_throughput   = timers['learn_throughput']
 
+          #Summary
+          nSteps             = stats['info']['num_steps_trained']
           total_sample_time += sample_time
           total_learn_time  += learn_time
+          summary = formatting.box([formatting.line(
+                title  = 'Neural MMO v1.5',
+                keys   = ['Epochs', 'kSamples', 'Sample Time', 'Learn Time'],
+                vals   = [epoch, nSteps/1000, total_sample_time, total_learn_time],
+                valFmt = '{:.1f}')])
 
-          line = (left + 'Epoch: {}{}Sample: {:.1f}/s ({:.1f}s){}Train: {:.1f}/s ({:.1f}s)' + right).format(
-               epoch, sep, sample_throughput, sample_time, sep, learn_throughput, learn_time)
+          #Block Title
+          sample_stat = '{:.1f}/s ({:.1f}s)'.format(sample_throughput, sample_time)
+          learn_stat  = '{:.1f}/s ({:.1f}s)'.format(learn_throughput, learn_time)
+          header = formatting.box([formatting.line(
+                keys   = 'Epoch Sample Train'.split(),
+                vals   = [epoch, sample_stat, learn_stat],
+                valFmt = '{}')])
 
-          epoch += 1
-
-          block = []
-
-          for key, stat in stats['hist_stats'].items():
-             if key.startswith('_') and len(stat) > 0:
-                stat       = stat[-self.envConfig.TRAIN_BATCH_SIZE:]
-                mmin, mmax = np.min(stat),  np.max(stat)
-                mean, std  = np.mean(stat), np.std(stat)
-
-                block.append(('   ' + left + '{:<12}{}Min: {:8.1f}{}Max: {:8.1f}{}Mean: {:8.1f}{}Std: {:8.1f}').format(
-                      key.lstrip('_'), sep, mmin, sep, mmax, sep, mean, sep, std))
-
-             if not self.envConfig.v:
+          #Format stats (RLlib callback format limitation)
+          for k, vals in stats['hist_stats'].items():
+             if not k.startswith('_'):
                 continue
+             k                 = k.lstrip('_')
+             track, stat       = re.split('_', k)
 
-             if len(stat) == 0:
-                continue
+             if track not in training_logs:
+                training_logs[track] = {}
 
-             lines.append('{}:: Total: {:.4f}, N: {:.4f}, Mean: {:.4f}, Std: {:.4f}'.format(
-                   key, np.sum(stat), len(stat), np.mean(stat), np.std(stat)))
+#<<<<<<< HEAD
+#          epoch += 1
+#
+#          block = []
+#
+#          for key, stat in stats['hist_stats'].items():
+#             if key.startswith('_') and len(stat) > 0:
+#                stat       = stat[-self.envConfig.TRAIN_BATCH_SIZE:]
+#                mmin, mmax = np.min(stat),  np.max(stat)
+#                mean, std  = np.mean(stat), np.std(stat)
+#
+#                block.append(('   ' + left + '{:<12}{}Min: {:8.1f}{}Max: {:8.1f}{}Mean: {:8.1f}{}Std: {:8.1f}').format(
+#                      key.lstrip('_'), sep, mmin, sep, mmax, sep, mean, sep, std))
+#
+#             if not self.envConfig.v:
+#                continue
+#=======
+             if stat not in training_logs[track]:
+                training_logs[track][stat] = []
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
-          if len(block) > 0:
-             mmax = max(len(l) for l in block) + 1
+             training_logs[track][stat] += vals
 
-             for idx, l in enumerate(block):
-                block[idx] = ('{:<'+str(mmax)+'}').format(l + right)
+          np.save(trainPath, training_logs)
 
-             blocks.append([top*len(line), line, bot*len(line), '   ' +
-                   top*(mmax-3)] + block + ['   ' + bot*(mmax-3)])
+          #Representation for CLI
+          cli = {}
+          for track, stats in training_logs.items():
+             cli[track] = {}
+             for stat, vals in stats.items():
+                mmean = np.mean(vals[-config.TRAIN_SUMMARY_ENVS:])
+                cli[track][stat] = mmean
 
+#<<<<<<< HEAD
+#          if len(block) > 0:
+#             mmax = max(len(l) for l in block) + 1
+#
+#             for idx, l in enumerate(block):
+#                block[idx] = ('{:<'+str(mmax)+'}').format(l + right)
+#
+#             blocks.append([top*len(line), line, bot*len(line), '   ' +
+#                   top*(mmax-3)] + block + ['   ' + bot*(mmax-3)])
+#
+#
+#          if len(blocks) > 3:
+#             blocks = blocks[1:]
+#
+#          for block in blocks:
+#             for line in block:
+#                lines.append(' ' + line)
+#
+#          line = summary.format(sep, epoch, sep, nSteps, sep, total_sample_time, sep, total_learn_time)
+#          lines.append(' ' + top*len(line))
+#          lines.append(' ' + line)
+#          lines.append(' ' + bot*len(line))
+#=======
+          lines = formatting.precomputed_stats(cli)
+          if config.v:
+             lines += formatting.timings(timings)
 
+          #Extend blocks
+          if len(lines) > 0:
+             blocks.append(header + formatting.box(lines, indent=4))
+             
           if len(blocks) > 3:
              blocks = blocks[1:]
-
-          for block in blocks:
-             for line in block:
-                lines.append(' ' + line)
-
-          line = summary.format(sep, epoch, sep, nSteps, sep, total_sample_time, sep, total_learn_time)
-          lines.append(' ' + top*len(line))
-          lines.append(' ' + line)
-          lines.append(' ' + bot*len(line))
+          
+          #Assemble Summary Bar Title
+          lines = logo.copy() + list(chain.from_iterable(blocks)) + summary
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
           #Cross-platform clear screen
           os.system('cls' if os.name == 'nt' else 'clear')
 
           for idx, line in enumerate(lines):
              print(line)
+
+###############################################################################
+### RLlib Overlays
+class RLlibOverlayRegistry(OverlayRegistry):
+   '''Host class for RLlib Map overlays'''
+   def __init__(self, config, realm):
+      super().__init__(config, realm)
+
+      self.overlays['values']       = Values
+      self.overlays['attention']    = Attention
+      self.overlays['tileValues']   = TileValues
+      self.overlays['entityValues'] = EntityValues
+
+class RLlibOverlay(Overlay):
+   '''RLlib Map overlay wrapper'''
+   def __init__(self, config, realm, trainer, model):
+      super().__init__(config, realm)
+      self.trainer = trainer
+      self.model   = model
+
+class Attention(RLlibOverlay):
+   def register(self, obs):
+      '''Computes local attentional maps with respect to each agent'''
+      tiles      = self.realm.realm.map.tiles
+      players    = self.realm.realm.players
+
+      attentions = defaultdict(list)
+      for idx, playerID in enumerate(obs):
+         if playerID not in players:
+            continue
+         player = players[playerID]
+         r, c   = player.pos
+
+         rad     = self.config.STIM
+         obTiles = self.realm.realm.map.tiles[r-rad:r+rad+1, c-rad:c+rad+1].ravel()
+
+         for tile, a in zip(obTiles, self.model.attention()[idx]):
+            attentions[tile].append(float(a))
+
+      sz    = self.config.TERRAIN_SIZE
+      data  = np.zeros((sz, sz))
+      for r, tList in enumerate(tiles):
+         for c, tile in enumerate(tList):
+            if tile not in attentions:
+               continue
+            data[r, c] = np.mean(attentions[tile])
+
+      colorized = overlay.twoTone(data)
+      self.realm.register(colorized)
+
+class Values(RLlibOverlay):
+   def update(self, obs):
+      '''Computes a local value function by painting tiles as agents
+      walk over them. This is fast and does not require additional
+      network forward passes'''
+      players = self.realm.realm.players
+      for idx, playerID in enumerate(obs):
+         if playerID not in players:
+            continue
+         r, c = players[playerID].base.pos
+         self.values[r, c] = float(self.model.value_function()[idx])
+
+   def register(self, obs):
+      colorized = overlay.twoTone(self.values[:, :])
+      self.realm.register(colorized)
+
+def zeroOb(ob, key):
+   for k in ob[key]:
+      ob[key][k] *= 0
+
+class GlobalValues(RLlibOverlay):
+   '''Abstract base for global value functions'''
+   def init(self, zeroKey):
+      if self.trainer is None:
+         return
+
+      print('Computing value map...')
+      model     = self.trainer.get_policy('policy_0').model
+      obs, ents = self.realm.dense()
+      values    = 0 * self.values
+
+      #Compute actions to populate model value function
+      BATCH_SIZE = 128
+      batch = {}
+      final = list(obs.keys())[-1]
+      for agentID in tqdm(obs):
+         ob             = obs[agentID]
+         batch[agentID] = ob
+         zeroOb(ob, zeroKey)
+         if len(batch) == BATCH_SIZE or agentID == final:
+            self.trainer.compute_actions(batch, state={}, policy_id='policy_0')
+            for idx, agentID in enumerate(batch):
+               r, c         = ents[agentID].base.pos
+               values[r, c] = float(self.model.value_function()[idx])
+            batch = {}
+
+      print('Value map computed')
+      self.colorized = overlay.twoTone(values)
+
+   def register(self, obs):
+      print('Computing Global Values. This requires one NN pass per tile')
+      self.init()
+
+      self.realm.register(self.colorized)
+
+class TileValues(GlobalValues):
+   def init(self, zeroKey='Entity'):
+      '''Compute a global value function map excluding other agents. This
+      requires a forward pass for every tile and will be slow on large maps'''
+      super().init(zeroKey)
+
+class EntityValues(GlobalValues):
+   def init(self, zeroKey='Tile'):
+      '''Compute a global value function map excluding tiles. This
+      requires a forward pass for every tile and will be slow on large maps'''
+      super().init(zeroKey)
+
+
+###############################################################################
+### Logging
+class RLlibLogCallbacks(DefaultCallbacks):
+   def on_episode_end(self, *, worker, base_env, policies, episode, **kwargs):
+      assert len(base_env.envs) == 1, 'One env per worker'
+      env    = base_env.envs[0]
+      config = env.config
+
+      for key, vals in env.terminal()['Stats'].items():
+         logs = episode.hist_data
+         key  = '_' + key
+
+         logs[key + '_Min']  = [np.min(vals)]
+         logs[key + '_Max']  = [np.max(vals)]
+         logs[key + '_Mean'] = [np.mean(vals)]
+         logs[key + '_Std']  = [np.std(vals)]

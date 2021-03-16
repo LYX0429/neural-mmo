@@ -5,19 +5,48 @@ from collections import defaultdict
 from tqdm import tqdm
 
 from forge.blade.lib import overlay
+from forge.blade.lib.enums import Neon
 from forge.blade.systems import combat
 from forge.blade.io.stimulus.static import Stimulus
 from forge.blade.entity import entity, player
 
-class Overlay:
-   def __init__(self, realm, model, trainer, config):
-      self.realm     = realm
-      self.model     = model
-      self.trainer   = trainer
-      self.config    = config
+class OverlayRegistry:
+   def __init__(self, config, realm):
+      '''Manager class for overlays'''
+      self.config = config
+      self.realm  = realm
 
-      self.R, self.C = realm.size
-      self.values    = np.zeros((self.R, self.C))
+      self.overlays = {
+              'counts':     Counts,
+              'skills':     Skills,
+              'wilderness': Wilderness}
+
+   def init(self, *args):
+      for cmd, overlay in self.overlays.items():
+         self.overlays[cmd] = overlay(self.config, self.realm, *args)
+      return self
+
+   def step(self, obs, pos, cmd):
+      '''Per-tick updates'''
+      self.realm.overlayPos = pos
+#     for overlay in self.overlays.values():
+#         overlay.update(self.config, obs)
+
+#     if cmd in self.overlays:
+#         self.overlays[cmd].register(obs)
+
+class Overlay:
+   '''Define a overlay for visualization in the client
+
+   Overlays are color images of the same size as the game map.
+   They are rendered over the environment with transparency and
+   can be used to gain insight about agent behaviors.'''
+   def __init__(self, config, realm, *args):
+      self.config     = config
+      self.realm      = realm
+
+      self.size       = config.TERRAIN_SIZE
+      self.values     = np.zeros((self.size, self.size))
 
    def update(self, obs):
        '''Compute per-tick updates to this overlay'''
@@ -27,45 +56,61 @@ class Overlay:
        '''Compute the overlay and register it within realm'''
        pass
 
-class OverlayRegistry:
-   def __init__(self, realm, model, trainer, config):
-      '''Manager class for custom overlays'''
-      self.realm    = realm
+class Skills(Overlay):
+   def __init__(self, config, realm, *args):
+      '''Indicates whether agents specialize in foraging or combat'''
+      super().__init__(config, realm)
+      self.nSkills = 2
 
-      self.overlays = {
-              'counts':         Counts,
-              'values':         Values,
-              'globalValues':   GlobalValues,
-              'attention':      Attention,
-              'wilderness':     Wilderness}
-
-      for cmd, overlay in self.overlays.items():
-         self.overlays[cmd] = overlay(realm, model, trainer, config)
-
-      if config.OVERLAY_GLOBALS:
-         self.overlays['wilderness'].init()
-         self.overlays['globalValues'].init()
-
-   def step(self, obs, pos, cmd, update=[]):
-      '''Compute overlays and send to the environment'''
-      #Per-tick updates
-      for overlay in update:
-          self.overlays[overlay].update(obs)
-
-      if cmd in self.overlays:
-          self.overlays[cmd].register(obs)
-
-      self.realm.overlayPos = pos
-
-class Counts(Overlay):
-   def __init__(self, realm, model, trainer, config):
-      super().__init__(realm, model, trainer, config)
-      self.values = np.zeros((self.R, self.C, config.NPOP))
+      self.values  = np.zeros((self.size, self.size, self.nSkills))
 
    def update(self, obs):
       '''Computes a count-based exploration map by painting
       tiles as agents walk over them'''
       for entID, agent in self.realm.realm.players.items():
+         r, c = agent.base.pos
+
+         skillLvl  = (agent.skills.fishing.level + agent.skills.hunting.level)/2.0
+         combatLvl = combat.level(agent.skills)
+
+         if skillLvl == 10 and combatLvl == 3:
+            continue
+
+         self.values[r, c, 0] = skillLvl
+         self.values[r, c, 1] = combatLvl
+
+   def register(self, obs):
+      values = np.zeros((self.size, self.size, self.nSkills))
+      for idx in range(self.nSkills):
+         ary  = self.values[:, :, idx]
+         vals = ary[ary != 0]
+         mean = np.mean(vals)
+         std  = np.std(vals)
+         if std == 0:
+            std = 1
+
+         values[:, :, idx] = (ary - mean) / std
+         values[ary == 0] = 0
+
+      colors    = np.array([Neon.BLUE.rgb, Neon.BLOOD.rgb])
+      colorized = np.zeros((self.size, self.size, 3))
+      amax      = np.argmax(values, -1)
+
+      for idx in range(self.nSkills):
+         colorized[amax == idx] = colors[idx] / 255
+         colorized[values[:, :, idx] == 0] = 0
+
+      self.realm.register(colorized)
+
+class Counts(Overlay):
+   def __init__(self, config, realm, *args):
+      super().__init__(config, realm)
+      self.values = np.zeros((self.size, self.size, config.NPOP))
+
+   def update(self, obs):
+      '''Computes a count-based exploration map by painting
+      tiles as agents walk over them'''
+      for entID, agent in self.realm.players.items():
          pop  = agent.base.population.val
          r, c = agent.base.pos
          self.values[r, c][pop] += 1
@@ -83,89 +128,21 @@ class Counts(Overlay):
       countSum[countSum==0] = 1
       colorized = colorized * data / countSum[..., None]
 
-      self.realm.registerOverlay(colorized)
-
-class Values(Overlay):
-   def update(self, obs):
-      '''Computes a local value function by painting tiles as agents
-      walk over them. This is fast and does not require additional
-      network forward passes'''
-      for idx, agentID in enumerate(obs):
-         r, c = self.realm.realm.players[agentID].base.pos
-         self.values[r, c] = float(self.model.value_function()[idx])
-
-   def register(self, obs):
-      colorized = overlay.twoTone(self.values[:, :])
-      self.realm.registerOverlay(colorized)
-
-class GlobalValues(Overlay):
-   def init(self):
-      '''Compute a global value function map. This requires ~6400 forward
-      passes and may take up to a minute. You can disable this computation
-      in the config file'''
-      if self.trainer is None:
-         return
-
-      print('Computing value map...')
-      values    = np.zeros(self.realm.size)
-      model     = self.trainer.get_policy('policy_0').model
-      obs, ents = self.realm.getValStim()
-
-      #Compute actions to populate model value function
-      BATCH_SIZE = 128
-      batch = {}
-      final = list(obs.keys())[-1]
-      for agentID in tqdm(obs):
-         batch[agentID] = obs[agentID]
-         if len(batch) == BATCH_SIZE or agentID == final:
-            self.trainer.compute_actions(batch, state={}, policy_id='policy_0')
-            for idx, agentID in enumerate(batch):
-               r, c = ents[agentID].base.pos
-               values[r, c] = float(self.model.value_function()[idx])
-            batch = {}
-
-      print('Value map computed')
-      self.colorized = overlay.twoTone(values)
-
-   def register(self, obs):
-      self.realm.registerOverlay(self.colorized)
-
-class Attention(Overlay):
-   def register(self, obs):
-      '''Computes local attentional maps with respect to each agent'''
-      attentions = defaultdict(list)
-      for idx, agentID in enumerate(obs):
-         ent   = self.realm.realm.players[agentID]
-         rad   = self.config.STIM
-         r, c  = ent.pos
-
-         tiles = self.realm.realm.map.tiles[r-rad:r+rad+1, c-rad:c+rad+1].ravel()
-         for tile, a in zip(tiles, self.model.attention()[idx]):
-            attentions[tile].append(float(a))
-
-      data = np.zeros((self.R, self.C))
-      tiles = self.realm.realm.map.tiles
-      for r, tList in enumerate(tiles):
-         for c, tile in enumerate(tList):
-            if tile not in attentions:
-               continue
-            data[r, c] = np.mean(attentions[tile])
-
-      colorized = overlay.twoTone(data)
-      self.realm.registerOverlay(colorized)
+      self.realm.register(colorized)
 
 class Wilderness(Overlay):
    def init(self):
       '''Computes the local wilderness level'''
-      data = np.zeros((self.R, self.C))
-      for r in range(self.R):
-         for c in range(self.C):
+      data = np.zeros((self.size, self.size))
+      for r in range(self.size):
+         for c in range(self.size):
             data[r, c] = combat.wilderness(self.config, (r, c))
 
-      colorized = overlay.twoTone(data, preprocess='clip', invert=True, periods=5)
-      self.realm.registerOverlay(colorized)
-      self.wildy = colorized
+      self.wildy = overlay.twoTone(data, preprocess='clip', invert=True, periods=5)
 
    def register(self, obs):
-      self.realm.registerOverlay(self.wildy)
+      if not hasattr(self, 'wildy'):
+         print('Initializing Wilderness')
+         self.init()
 
+      self.realm.register(self.wildy)

@@ -8,5 +8,6 @@ forge.ethyr package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.ethyr.torch

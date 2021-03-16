@@ -14,7 +14,9 @@ class NPC(entity.Entity):
       self.skills = skill.Combat(self)
 
    def update(self, realm, actions):
-      if not super().update(realm, actions):
+      super().update(realm, actions)
+
+      if not self.alive:
          return
 
       self.resources.health.increment(1)
@@ -48,7 +50,8 @@ class NPC(entity.Entity):
       ent.skills.range.setExpByLevel(ranged)
       ent.skills.mage.setExpByLevel(mage)
 
-      ent.skills.style = random.choice((Action.Melee, Action.Range, Action.Mage))
+      ent.skills.style = random.choice(
+         (Action.Melee, Action.Range, Action.Mage))
 
       #Set equipment levels
       ent.loadout.chestplate.level = NPC.gearLevel(defense)
@@ -101,7 +104,6 @@ class Passive(NPC):
       super().__init__(realm, pos, iden, 'Passive', Neon.GREEN, -1)
       self.dataframe.init(Static.Entity, iden, pos)
 
-   #NPCs have direct access to the world
    def decide(self, realm):
       return ai.policy.passive(realm, self)
 

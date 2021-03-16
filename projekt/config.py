@@ -2,17 +2,23 @@ from pdb import set_trace as T
 from forge.blade import core
 import os
 
-class Config(core.Config):
-   EVO_MAP = False
-   MELEE_MULT = 45 / 99
-   RANGE_MULT = 32 / 99
-   MAGE_MULT =  24 / 99
-   # Model to load. None will train from scratch
-   # Baselines: recurrent, attentional, convolutional
-   # "current" will resume training custom models
+#<<<<<<< HEAD
+#class Config(core.Config):
+#   EVO_MAP = False
+#   MELEE_MULT = 45 / 99
+#   RANGE_MULT = 32 / 99
+#   MAGE_MULT =  24 / 99
+#   # Model to load. None will train from scratch
+#   # Baselines: recurrent, attentional, convolutional
+#   # "current" will resume training custom models
+#=======
+from forge.blade.systems.ai import behavior
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
-   v                       = False
+class Base(core.Config):
+   '''Base config for RLlib Models
 
+<<<<<<< HEAD
    ENV_NAME                = 'Neural_MMO'
    ENV_VERSION             = '1.5'
    NUM_WORKERS             = 6
@@ -20,74 +26,99 @@ class Config(core.Config):
    NUM_GPUS                = 1
    TRAIN_BATCH_SIZE        = 4800 # to match evo, normally 4000
    #TRAIN_BATCH_SIZE        = 400
+=======
+   Extends core Config, which contains environment, evaluation,
+   and non-RLlib-specific learning parameters'''
+
+   MELEE_MULT = 63 / 99
+   RANGE_MULT = 32 / 99
+   MAGE_MULT =  24 / 99
+   #Hardware Scale
+   NUM_WORKERS             = 4
+   NUM_GPUS_PER_WORKER     = 0
+   NUM_GPUS                = 1
+   LOCAL_MODE              = False
+
+   #Memory/Batch Scale
+   TRAIN_BATCH_SIZE        = 400000
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    ROLLOUT_FRAGMENT_LENGTH = 100
+
+   #Optimization Scale
    SGD_MINIBATCH_SIZE      = 128
    NUM_SGD_ITER            = 1
 
-   MODEL        = 'current'
-   SCRIPTED_BFS = False
-   SCRIPTED_DP  = False
-   EVALUATE     = False
-   LOCAL_MODE   = False
+   #Model Parameters 
+   #large-map:        Large maps baseline
+   #small-map:        Small maps baseline
+   #scripted-combat:  Scripted with combat
+   #scripted-forage:  Scripted without combat
+   #current:          Resume latest checkpoint
+   #None:             Train from scratch
+   MODEL                   = 'current'
+   N_AGENT_OBS             = 100
+   NPOLICIES               = 1
+   HIDDEN                  = 64
+   EMBED                   = 64
 
-   # Model dimensions
-   EMBED  = 64
-   HIDDEN = 64
+   #Scripted model parameters
+   SCRIPTED_BACKEND        = 'dijkstra' #Or 'dynamic_programming'
+   SCRIPTED_EXPLORE        = True       #Intentional exploration
 
-   # Environment parameters
-   NPOP = 1    # Number of populations #SET SHARE POLICY TRUE
-   NENT = 1024 # Maximum population size
-   NMOB = 1024 # Number of NPCS
 
-   NMAPS = 256 # Number maps to generate
+class LargeMaps(Base):
+   '''Large scale Neural MMO training setting
 
-   #Horizons for training and evaluation
-   #TRAIN_HORIZON      = 500 #This in in agent trajs
-   TRAIN_HORIZON      = 1000 #This in in agent trajs
-   EVALUATION_HORIZON = 2048 #This is in timesteps
+   Features up to 1000 concurrent agents and 1000 concurrent NPCs,
+   1km x 1km maps, and 5/10k timestep train/eval horizons
 
-   #Agent vision range
-   STIM    = 7
+   This is the default setting as of v1.5 and allows for large
+   scale multiagent research even on relatively modest hardware'''
 
-   #Maximum number of observed agents
-   N_AGENT_OBS = 100
+   NAME                    = __qualname__
+   MODEL                   = 'large-map'
 
-   # Whether to share weights across policies
-   # The 1.4 baselines use one policy
-   POPULATIONS_SHARE_POLICIES = False
-   NPOLICIES = 1 if POPULATIONS_SHARE_POLICIES else NPOP
+   PATH_MAPS               = core.Config.PATH_MAPS_LARGE
 
-   #Overlays
-   OVERLAY_GLOBALS = False
+   TRAIN_HORIZON           = 5000
+   EVALUATION_HORIZON      = 10000
 
-   #Evaluation
-   LOG_DIR = 'experiment/'
-   LOG_FILE = 'evaluation.npy'
-   LOG_FIGURE = 'evaluation.html'
+   NENT                    = 1024
+   NMOB                    = 1024
 
-   #Visualization
-   THEME_DIR = 'forge/blade/systems/visualizer/'
-   THEME_NAME = 'web'  # publication or web
-   THEME_FILE = 'theme_temp.json'
-   THEME_WEB_INDEX = 'index_web.html'
-   THEME_PUBLICATION_INDEX = 'index_publication.html'
-   PORT = 5006
-   PLOT_WIDTH = 1920
-   PLOT_HEIGHT = 270
-   PLOT_COLUMNS = 4
-   PLOT_TOOLS = False
-   PLOT_INTERACTIVE = False
 
-#Small map preset
-class SmallMap(Config):
+class SmallMaps(Base):
+   '''Small scale Neural MMO training setting
+
+   Features up to 128 concurrent agents and 32 concurrent NPCs,
+   60x60 maps (excluding the border), and 1000 timestep train/eval horizons.
+   
+   This setting is modeled off of v1.1-v1.4 It is appropriate as a quick train
+   task for new ideas, a transfer target for agents trained on large maps,
+   or as a primary research target for PCG methods.'''
+
+   NAME                    = __qualname__
    MODEL                   = 'small-map'
+   SCRIPTED_EXPLORE        = False
+
+   TRAIN_HORIZON           = 1000
+   EVALUATION_HORIZON      = 1000
 
    NENT                    = 128
    NMOB                    = 0
 
+   #Path settings
+   PATH_MAPS               = core.Config.PATH_MAPS_SMALL
+   PATH_ROOT               = os.path.join(os.getcwd(), PATH_MAPS, 'map')
+
+   #Outside-in map design
+   SPAWN_CENTER            = False
+   INVERT_WILDERNESS       = True
+   WILDERNESS              = False
+
+   #Terrain generation parameters
    TERRAIN_MODE            = 'contract'
    TERRAIN_LERP            = False
-
    TERRAIN_SIZE            = 80 
    TERRAIN_OCTAVES         = 1
    TERRAIN_FOREST_LOW      = 0.30
@@ -96,12 +127,8 @@ class SmallMap(Config):
    TERRAIN_ALPHA           = -0.025
    TERRAIN_BETA            = 0.035
 
-   TERRAIN_DIR             = Config.TERRAIN_DIR_SMALL
-   ROOT                    = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
-
-   INVERT_WILDERNESS       = True
-   WILDERNESS              = False
-
+   #Entity spawning parameters
+   PLAYER_SPAWN_ATTEMPTS   = 1
    NPC_LEVEL_MAX           = 35
    NPC_LEVEL_SPREAD        = 5
    NPC_SPAWN_PASSIVE       = 0.00
@@ -109,12 +136,14 @@ class SmallMap(Config):
    NPC_SPAWN_AGGRESSIVE    = 0.80
 
 
+#<<<<<<< HEAD
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 COMBAT_SKILLS = ['range', 'mage', 'melee']
 EXPLORE_SKILLS = ['exploration']
 HARVEST_SKILLS = ['woodcutting', 'mining']
 
-class TreeOrerock(SmallMap):
+class TreeOrerock(SmallMaps):
+   NTILE = 9
    NEW_EVAL = False
    EVO_MAP = True
    FIXED_MAPS = True
@@ -123,8 +152,8 @@ class TreeOrerock(SmallMap):
    NMOB                 = 0
    MODEL                = 'current'
    TERRAIN_SIZE         = 70
-   TERRAIN_DIR          = Config.TERRAIN_DIR_SMALL
-   ROOT                 = os.path.join(os.getcwd(), TERRAIN_DIR, 'map')
+#   TERRAIN_DIR          = Base.TERRAIN_DIR_SMALL
+   ROOT                 = os.path.join(os.getcwd(), Base.PATH_MAPS_SMALL, 'map')
 #  TERRAIN_RENDER       = True
 #  TERRAIN_ALPHA = 0
 #  TERRAIN_BETA = 0
@@ -146,6 +175,7 @@ class TreeOrerock(SmallMap):
    EVO_VERBOSE          = True
    EVO_SAVE_INTERVAL    = 5
    GRIDDLY = False
+   EVO_DIR=None
 
 
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
@@ -170,7 +200,7 @@ class EvoNMMO(TreeOrerock):
    NENT = 16  # Maximum population size
    TERRAIN_SIZE = 70
    EVO_DIR = 'all_random_l2_1'
-#  ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
+   ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 3
@@ -223,3 +253,22 @@ class Griddly(EvoNMMO):
    ME_BIN_SIZES = [100, 100]
    ME_BOUNDS = [(0, 50), (0, 50)]
    SKILLS = ['drink_skill', 'gather_skill', 'woodcut_skill', 'mine_skill']
+#=======
+class Debug(SmallMaps):
+   '''Debug Neural MMO training setting
+
+   A version of the SmallMap setting with greatly reduced batch parameters.
+   Only intended as a tool for identifying bugs in the model or environment'''
+   MODEL                   = None
+   LOCAL_MODE              = True
+   NUM_WORKERS             = 1
+
+   TRAIN_BATCH_SIZE        = 400
+   TRAIN_HORIZON           = 200
+   EVALUATION_HORIZON      = 50
+
+   HIDDEN                  = 2
+   EMBED                   = 2
+
+
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989

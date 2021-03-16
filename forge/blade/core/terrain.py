@@ -1,12 +1,13 @@
 from pdb import set_trace as T
 import numpy as np
+
 import os
 
 import vec_noise
 from imageio import imread, imsave
 from tqdm import tqdm
 
-from forge.blade.lib import enums
+from forge.blade.lib import material
 
 def mkdir(path):
    try:
@@ -28,10 +29,11 @@ class Save:
       imsave(path, frac)
 
    def np(mats, path):
-      """"Saved a map into into a tiled compatiable file given a save_path, width
-       and height of the map, and 2D numpy array specifiying enums for the array"""
+      '''Saves a map into into a tiled compatiable file given a save_path, width
+       and height of the map, and 2D numpy array specifiying enums for the array'''
       mkdir(path)
-      np.save(path + '/map.npy', mats.astype(np.int))
+      path = os.path.join(path, 'map.npy')
+      np.save(path, mats.astype(np.int))
 
 class Terrain:
    pass
@@ -43,11 +45,10 @@ class MapGenerator:
 
    def loadTextures(self):
       lookup = {}
-      for mat in enums.Material:
-         mat = mat.value
-         tex = imread(
-               'resource/assets/tiles/' + mat.tex + '.png')
+      path = self.config.PATH_TILE
+      for mat in material.All:
          key = mat.tex
+         tex = imread(path.format(key))
          mat.tex = tex[:, :, :3][::4, ::4]
          lookup[mat.index] = mat.tex
          setattr(Terrain, key.upper(), mat.index)
@@ -99,24 +100,29 @@ class MapGenerator:
 
 
    def generate(self):
-      print('Generating {} game maps. This may take a moment'.format(self.config.NMAPS))
-      for seed in tqdm(range(self.config.NMAPS)):
-         if self.config.__class__.__name__ == 'SmallMap':
-            prefix = self.config.TERRAIN_DIR_SMALL
-         elif self.config.__class__.__name__ == 'LargeMap':
-            prefix = self.config.TERRAIN_DIR_LARGE
-         else:
-            prefix = self.config.TERRAIN_DIR
+      config = self.config
+      if config.__class__.__name__ == 'SmallMaps':
+         prefix = config.PATH_MAPS_SMALL
+      elif config.__class__.__name__ == 'LargeMaps':
+         prefix = config.PATH_MAPS_LARGE
+      else:
+         prefix = config.PATH_MAPS
 
+      #Train and eval map indices
+      msg    = 'Generating {} training and {} evaluation maps:'
+      evalMaps  = range(-config.N_EVAL_MAPS, 0)
+      trainMaps = range(1, config.N_TRAIN_MAPS+1)
+      print(msg.format(config.N_TRAIN_MAPS, config.N_EVAL_MAPS))
 
+      for seed in tqdm([*evalMaps, *trainMaps]):
          path = prefix + '/map' + str(seed)
          mkdir(prefix)
          mkdir(path)
 
-         terrain, tiles = self.grid(self.config, seed)
+         terrain, tiles = self.grid(config, seed)
 
          Save.np(tiles, path)
-         if self.config.TERRAIN_RENDER:
+         if config.TERRAIN_RENDER:
             Save.fractal(terrain, path+'/fractal.png')
             Save.render(tiles, self.textures, path+'/map.png')
 

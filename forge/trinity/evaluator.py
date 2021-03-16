@@ -19,8 +19,7 @@ from matplotlib import pyplot as plt
 
 
 class Base:
-   '''Test-time evaluation with communication to
-   the Unity3D client. Makes use of batched GPU inference'''
+   '''Base class for test-time evaluators'''
    def __init__(self, config):
       self.config  = config
       self.done    = {}
@@ -35,7 +34,10 @@ class Base:
       from forge.trinity.twistedserver import Application
       Application(self.env, self.tick)
 
-   def test(self):
+#<<<<<<< HEAD
+#  def test(self):
+   def evaluate(self, generalize=True):
+      '''Evaluate the model on maps according to config params'''
       if self.config.MAP != 'PCG':
          self.config.ROOT = self.config.MAP
          self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
@@ -60,43 +62,73 @@ class Base:
          div_mat[i] = divs
       plot_diversity(ts, div_mat, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
       print('Diversity: {}'.format(diversity))
+#=======
+#   def evaluate(self, generalize=True):
+#      '''Evaluate the model on maps according to config params'''
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
-      log = InkWell()
-      log.update(self.env.terminal())
+      config = self.config
+      log    = InkWell()
 
-      fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
-      np.save(fpath, log.packet)
+      if generalize:
+         maps = range(-1, -config.EVAL_MAPS-1, -1)
+      else:
+         maps = range(1, config.EVAL_MAPS+1)
 
-   def tick(self, actions, preprocessActions=True):
-      '''Compute actions and overlays for a single timestep
+      print('Number of evaluation maps: {}'.format(len(maps)))
+      for idx in maps:
+         self.obs = self.env.reset(idx)
+         for t in tqdm(range(config.EVALUATION_HORIZON)):
+            self.tick(None, None)
+
+         log.update(self.env.terminal())
+
+      #Save data
+      path = config.PATH_EVALUATION.format(config.NAME, config.MODEL)
+      np.save(path, log.packet)
+
+   def tick(self, obs, actions, pos, cmd, preprocessActions=True):
+      '''Simulate a single timestep
+
+      Args:
+          obs: dict of agent observations
+          actions: dict of policy actions
+          pos: Camera position (r, c) from the server
+          cmd: Console command from the server
+          preprocessActions: Required for actions provided as indices
+      '''
+      self.obs, rewards, self.done, _ = self.env.step(
+            actions, omitDead=True, preprocessActions=preprocessActions)
+      if self.config.RENDER:
+         self.registry.step(obs, pos, cmd)
+
+
+class Evaluator(Base):
+   '''Evaluator for scripted models'''
+   def __init__(self, config, policy, *args):
+      super().__init__(config)
+      self.policy   = policy
+      self.args     = args
+
+      self.env      = Env(config)
+
+   def render(self):
+      '''Render override for scripted models'''
+      self.obs      = self.env.reset()
+      self.registry = OverlayRegistry(self.config, self.env).init()
+      super().render()
+
+   def tick(self, pos, cmd):
+      '''Simulate a single timestep
+
       Args:
           pos: Camera position (r, c) from the server)
           cmd: Console command from the server
       '''
-      #Step the environment
-      self.obs, rewards, self.done, _ = self.env.step(
-            actions, omitDead=True, preprocessActions=preprocessActions)
-
-
-class Evaluator(Base):
-   def __init__(self, config, policy):
-      super().__init__(config)
-      self.policy   = policy
-
-      self.env      = Env(config)
-      self.obs      = self.env.reset()
-      self.registry = OverlayRegistry(self.env, None, None, config)
-
-   def tick(self, pos, cmd):
       realm, actions    = self.env.realm, {}
       for agentID in self.obs:
          agent              = realm.players[agentID]
          agent.skills.style = Action.Range
-         actions[agentID]   = self.policy(realm, agent)
+         actions[agentID]   = self.policy(realm, agent, *self.args)
 
-         self.registry.step(self.obs, pos, cmd, update=
-               'counts wilderness'.split())
-
-      super().tick(actions, preprocessActions=False)
- 
-
+      super().tick(self.obs, actions, pos, cmd, preprocessActions=False)

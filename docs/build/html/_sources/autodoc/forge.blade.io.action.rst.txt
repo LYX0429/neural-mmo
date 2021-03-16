@@ -8,6 +8,7 @@ forge.blade.io.action package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.io.action.node
    forge.blade.io.action.static

@@ -532,7 +532,7 @@ class EvoIndividual(Individual):
                 self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
             elif rnd < 2/5:
                 self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
-                                                evolver.mats.Material.GRASS.value.index)
+                                                evolver.mats.MaterialEnum.GRASS.value.index)
             elif rnd < 3/5:
                 self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
             elif rnd < 4/5:
@@ -555,7 +555,7 @@ class EvoIndividual(Individual):
             self.chromosome = TileFlipGenome(self.n_tiles, evolver.map_width)
         elif evolver.PRIMITIVES:
             self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
-                                            enums.Material.GRASS.value.index)
+                                            enums.MaterialEnum.GRASS.value.index)
         self.chromosome.gen_map()
         self.validate_map()
         self.score_hists = []
@@ -637,10 +637,10 @@ class EvoIndividual(Individual):
     def add_border(self, map_arr, multi_hot=None):
         b = self.TERRAIN_BORDER
         # the border must be lava
-        map_arr[0:b, :]= enums.Material.LAVA.value.index
-        map_arr[:, 0:b]= enums.Material.LAVA.value.index
-        map_arr[-b:, :]= enums.Material.LAVA.value.index
-        map_arr[:, -b:]= enums.Material.LAVA.value.index
+        map_arr[0:b, :]= enums.MaterialEnum.LAVA.value.index
+        map_arr[:, 0:b]= enums.MaterialEnum.LAVA.value.index
+        map_arr[-b:, :]= enums.MaterialEnum.LAVA.value.index
+        map_arr[:, -b:]= enums.MaterialEnum.LAVA.value.index
 
         if multi_hot is not None:
             multi_hot[:, 0:b, :]= -1

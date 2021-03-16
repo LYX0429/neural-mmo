@@ -1,11 +1,12 @@
 from pdb import set_trace as T
 import numpy as np
 
-from forge.blade.lib import utils, enums
+from forge.blade.lib import utils, material
 from forge.blade.lib.utils import staticproperty
 from forge.blade.io.node import Node, NodeType
 from forge.blade.systems import combat
 from forge.blade.io.stimulus import Static
+import forge
 
 class Fixed:
    pass
@@ -47,9 +48,6 @@ class Move(Node):
    priority = 1
    nodeType = NodeType.SELECTION
    def call(env, entity, direction):
-      if not entity.alive:
-         return
-
       r, c  = entity.pos
       entID = entity.entID
       entity.history.lastPos = (r, c)
@@ -60,23 +58,29 @@ class Move(Node):
       tile = env.map.tiles[trg_pos]
       dest_idx = tile.mat.index
       #One agent per cell
-      if len(env.map.tiles[trg_pos].ents) != 0:
-         return
-      if tile.impassible:
+#<<<<<<< HEAD
+#      if len(env.map.tiles[trg_pos].ents) != 0:
+#         return
+#      if tile.impassible:
+#=======
+      tile = env.map.tiles[rNew, cNew]
+      if tile.occupied and not tile.lava:
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
          return
       if entity.status.freeze > 0:
          return
       #FIXME: hack. Check if tile is degenerated and thus passible.
       hack_passible = tile.capacity == 0
-      if dest_idx == enums.Tree.index and not hack_passible:
+      if dest_idx == material.Tree.index and not hack_passible:
          return Woodcut.call(env, entity, trg_pos)
-      if dest_idx == enums.Orerock.index:
+      if dest_idx == material.Orerock.index:
          if not hack_passible:
             return Mine.call(env, entity, trg_pos)
-         else: 
+         else:
             pass
 
-      if not utils.inBounds(rNew, cNew, env.shape):
+#     if not utils.inBounds(rNew, cNew, env.shape):
+      if not utils.inBounds(rNew, cNew, env.map.inds().shape):
          return
 
       if not tile.habitable and not tile.lava:
@@ -88,6 +92,9 @@ class Move(Node):
 
       env.map.tiles[r, c].delEnt(entID)
       env.map.tiles[rNew, cNew].addEnt(entity)
+
+      if env.map.tiles[rNew, cNew].lava:
+         entity.receiveDamage(None, entity.resources.health.val)
 
    @staticproperty
    def edges():
@@ -162,7 +169,9 @@ class Attack(Node):
       return abs(r - rCent) + abs(c - cCent)
 
    def call(env, entity, style, targ):
-      entity.history.attack = None
+      #Can't attack if either party is immune
+      if entity.status.immune > 0 or targ.status.immune > 0:
+         return
 
       #Check if self targeted
       if entity.entID == targ.entID:

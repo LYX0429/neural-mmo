@@ -4,7 +4,7 @@ import abc
 import numpy as np
 from forge.blade.systems import experience, combat, ai
 
-from forge.blade.lib.enums import Material
+from forge.blade.lib import material
 
 ### Infrastructure ###
 class SkillGroup:
@@ -179,10 +179,10 @@ class Fishing(HarvestingSkill):
 
    def update(self, realm, entity):
       water = entity.resources.water
-      if entity.history.timeAlive > self.config.RESOURCE_GRACE_PERIOD:
+      if entity.status.immune <= 0:
          water.decrement(1)
 
-      if Material.WATER.value not in ai.utils.adjacentMats(
+      if material.Water not in ai.utils.adjacentMats(
             realm.map.tiles, entity.pos):
          return
 
@@ -200,12 +200,16 @@ class Hunting(HarvestingSkill):
 
    def update(self, realm, entity):
       food = entity.resources.food
+#<<<<<<< HEAD
       wood = entity.resources.wood
-      if entity.history.timeAlive > self.config.RESOURCE_GRACE_PERIOD:
+#      if entity.history.timeAlive > self.config.RESOURCE_GRACE_PERIOD:
+#=======
+      if entity.status.immune <= 0:
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
          food.decrement(1)
 
       r, c = entity.pos
-      if (type(realm.map.tiles[r, c].mat) not in [Material.FOREST.value] or
+      if (type(realm.map.tiles[r, c].mat) not in [material.Forest] or
             not realm.map.harvest(r, c)):
          return
 

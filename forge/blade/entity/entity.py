@@ -2,7 +2,7 @@ from pdb import set_trace as T
 import numpy as np
 
 from forge.blade.systems import skill, droptable, combat, equipment
-from forge.blade.lib.enums import Material, Neon
+from forge.blade.lib import material, utils
 
 from forge.blade.io.action import static as Action
 from forge.blade.io.stimulus import Static
@@ -57,28 +57,24 @@ class History:
    def __init__(self, ent):
       self.actions = None
       self.attack  = None
+  
+      self.origPos     = ent.pos
+      self.exploration = 0
 
       self.damage    = Static.Entity.Damage(   ent.dataframe, ent.entID)
       self.timeAlive = Static.Entity.TimeAlive(ent.dataframe, ent.entID)
 
-      self.attackMap = np.zeros((7, 7, 3)).tolist()
       self.lastPos = None
 
    def update(self, realm, entity, actions):
-      self.attack = None
-      self.damage.update(0)
+      self.attack  = None
       self.actions = actions
+      self.damage.update(0)
 
-      #No way around this circular import I can see :/
-      from forge.blade.io.action import static as action
-      key = action.Attack
+      exploration      = utils.l1(entity.pos, self.origPos)
+      self.exploration = max(exploration, self.exploration)
 
       self.timeAlive.increment()
-
-      '''
-      if key in actions:
-         action = actions[key]
-      '''
 
    def packet(self):
       data = {}
@@ -104,17 +100,8 @@ class Base:
 
       ent.dataframe.init(Static.Entity, ent.entID, (r, c))
 
-
    def update(self, realm, entity, actions):
-      r, c = self.pos
-      if realm.map.tiles[r, c].lava:
-         entity.receiveDamage(None, entity.resources.health.val)
-
-      if entity.resources.health.empty:
-         self.killed = True
-         return None
-
-      return True
+      pass
 
    @property
    def pos(self):
@@ -139,12 +126,12 @@ class Entity:
       self.entID        = iden
 
       self.repr         = None
-      self.killed       = False
       self.vision       = 5
 
       self.attacker     = None
       self.target       = None
       self.closest      = None
+      self.spawnPos     = pos
 
       #Submodules
       self.base      = Base(self, pos, iden, name, color, pop)
@@ -165,13 +152,12 @@ class Entity:
 
    def update(self, realm, actions):
       '''Update occurs after actions, e.g. does not include history'''
+      if self.history.damage == 0:
+         self.attacker = None
+
       self.base.update(realm, self, actions)
       self.status.update(realm, self, actions)
-
-      if not self.alive:
-         return False
-
-      return True
+      self.history.update(realm, self, actions)
 
    def receiveDamage(self, source, dmg):
       self.history.damage.update(dmg)
@@ -195,9 +181,6 @@ class Entity:
 
    @property
    def alive(self):
-      if self.killed:
-         return False
-
       if self.resources.health.empty:
          return False
 

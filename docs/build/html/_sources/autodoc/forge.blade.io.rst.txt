@@ -8,12 +8,15 @@ forge.blade.io package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.io.action
    forge.blade.io.stimulus
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.io.comparable
+   forge.blade.io.node
    forge.blade.io.utils

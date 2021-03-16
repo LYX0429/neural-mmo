@@ -35,84 +35,165 @@ def move(orig, targ):
         return ro + sign(dr), co + sign(dc)
 
 class GodswordServerProtocol(WebSocketServerProtocol):
-   def __init__(self):
-       super().__init__()
-       print("Created a server")
-       self.frame  = 0
+#<<<<<<< HEAD
+#   def __init__(self):
+#       super().__init__()
+#       print("Created a server")
+#       self.frame  = 0
+#
+#       #"connected" is already used by WSSP
+#       self.isConnected = False
+#       self.pos = [512, 512]
+#       self.cmd = None
+#
+#       self.WINDOW = 128
+#
+#   def onOpen(self):
+#       print("Opened connection to server")
+#
+#   def onClose(self, wasClean, code=None, reason=None):
+#       self.isConnected = False
+#       print('Connection closed')
+#
+#   def connectionMade(self):
+#       super().connectionMade()
+#       self.factory.clientConnectionMade(self)
+#
+#   def connectionLost(self, reason):
+#       super().connectionLost(reason)
+#       self.factory.clientConnectionLost(self)
+#
+#   #Not used without player interaction
+#   def onMessage(self, packet, isBinary):
+#       print("Server packet", packet)
+#       packet    = packet.decode()
+#       _, packet = packet.split(';') #Strip headeer
+#       r, c, cmd = packet.split(' ') #Split camera coords
+#       if len(cmd) == 0:
+#           cmd = None
+#
+#       self.pos = [int(r), int(c)]
+#       self.cmd = cmd
+#
+#       self.isConnected = True
+#
+#   def onConnect(self, request):
+#       print("WebSocket connection request: {}".format(request))
+#       realm = self.factory.realm
+#       self.realm = realm
+#       self.frame += 1
+#
+#       data = self.serverPacket()
+#       self.sendUpdate()
+#
+#   def serverPacket(self):
+#       data = self.realm.clientData()
+#       return data
+#
+#   def sendUpdate(self):
+#       data = self.serverPacket()
+#
+#       packet               = {}
+#       packet['resource']   = data['resource']
+#       packet['player']     = data['player']
+#       packet['npc']        = data['npc']
+#       packet['pos']        = data['pos']
+#       packet['wilderness'] = data['wilderness']
+#
+#       config = data['config']
+#
+#       print('Is Connected? : {}'.format(self.isConnected))
+#       if not self.isConnected:
+#          packet['map']    = data['environment']
+#          packet['border'] = config.TERRAIN_BORDER
+#          packet['size']   = config.TERRAIN_SIZE
+#
+#       if 'overlay' in data:
+#          packet['overlay'] = data['overlay']
+#          print('SENDING OVERLAY: ', len(packet['overlay']))
+#
+#       packet = json.dumps(packet).encode('utf8')
+#       self.sendMessage(packet, False)
+#=======
+    def __init__(self):
+        super().__init__()
+        print("Created a server")
+        self.frame  = 0
 
-       #"connected" is already used by WSSP
-       self.isConnected = False
-       self.pos = [512, 512]
-       self.cmd = None
+        #"connected" is already used by WSSP
+        self.isConnected = False
+        self.pos = [512, 512]
+        self.cmd = None
 
-       self.WINDOW = 128
+        self.WINDOW = 128
 
-   def onOpen(self):
-       print("Opened connection to server")
+    def onOpen(self):
+        print("Opened connection to server")
 
-   def onClose(self, wasClean, code=None, reason=None):
-       self.isConnected = False
-       print('Connection closed')
+    def onClose(self, wasClean, code=None, reason=None):
+        self.isConnected = False
+        print('Connection closed')
 
-   def connectionMade(self):
-       super().connectionMade()
-       self.factory.clientConnectionMade(self)
+    def connectionMade(self):
+        super().connectionMade()
+        self.factory.clientConnectionMade(self)
 
-   def connectionLost(self, reason):
-       super().connectionLost(reason)
-       self.factory.clientConnectionLost(self)
+    def connectionLost(self, reason):
+        super().connectionLost(reason)
+        self.factory.clientConnectionLost(self)
 
-   #Not used without player interaction
-   def onMessage(self, packet, isBinary):
-       print("Server packet", packet)
-       packet    = packet.decode()
-       _, packet = packet.split(';') #Strip headeer
-       r, c, cmd = packet.split(' ') #Split camera coords
-       if len(cmd) == 0:
-           cmd = None
+    #Not used without player interaction
+    def onMessage(self, packet, isBinary):
+        print("Server packet", packet)
+        packet    = packet.decode()
+        _, packet = packet.split(';') #Strip headeer
+        r, c, cmd = packet.split(' ') #Split camera coords
+        if len(cmd) == 0:
+            cmd = None
 
-       self.pos = [int(r), int(c)]
-       self.cmd = cmd
+        self.pos = [int(r), int(c)]
+        self.cmd = cmd
 
-       self.isConnected = True
+        self.isConnected = True
 
-   def onConnect(self, request):
-       print("WebSocket connection request: {}".format(request))
-       realm = self.factory.realm
-       self.realm = realm
-       self.frame += 1
+    def onConnect(self, request):
+        print("WebSocket connection request: {}".format(request))
+        realm = self.factory.realm
+        self.realm = realm
+        self.frame += 1
 
-       data = self.serverPacket()
-       self.sendUpdate()
+        data = self.serverPacket()
+        self.sendUpdate()
 
-   def serverPacket(self):
-       data = self.realm.clientData()
-       return data
+    def serverPacket(self):
+        data = self.realm.packet
+        return data
 
-   def sendUpdate(self):
-       data = self.serverPacket()
+    def sendUpdate(self):
+        data = self.serverPacket()
 
-       packet               = {}
-       packet['resource']   = data['resource']
-       packet['player']     = data['player']
-       packet['npc']        = data['npc']
-       packet['pos']        = data['pos']
-       packet['wilderness'] = data['wilderness']
+        packet               = {}
+        packet['resource']   = data['resource']
+        packet['player']     = data['player']
+        packet['npc']        = data['npc']
+        packet['pos']        = data['pos']
+        packet['wilderness'] = data['wilderness']
 
-       config = data['config']
+        config = data['config']
 
-       print('Is Connected? : {}'.format(self.isConnected))
-       if not self.isConnected:
-          packet['map']    = data['environment']
-          packet['border'] = config.TERRAIN_BORDER
-          packet['size']   = config.TERRAIN_SIZE
+        print('Is Connected? : {}'.format(self.isConnected))
+        if not self.isConnected:
+            packet['map']    = data['environment']
+            packet['border'] = config.TERRAIN_BORDER
+            packet['size']   = config.TERRAIN_SIZE
 
-       if 'overlay' in data:
-          packet['overlay'] = data['overlay']
-          print('SENDING OVERLAY: ', len(packet['overlay']))
+        if 'overlay' in data:
+           packet['overlay'] = data['overlay']
+           print('SENDING OVERLAY: ', len(packet['overlay']))
 
-       packet = json.dumps(packet).encode('utf8')
-       self.sendMessage(packet, False)
+        packet = json.dumps(packet).encode('utf8')
+        self.sendMessage(packet, False)
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
 class WSServerFactory(WebSocketServerFactory):
     def __init__(self, ip, realm, step):

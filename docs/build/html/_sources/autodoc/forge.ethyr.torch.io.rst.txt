@@ -8,6 +8,7 @@ forge.ethyr.torch.io package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.ethyr.torch.io.action
    forge.ethyr.torch.io.stimulus

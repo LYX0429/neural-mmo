@@ -1,7 +1,6 @@
 from pdb import set_trace as T
 from collections import defaultdict
-from forge.blade.lib.enums import Material
-from forge.blade.lib import enums
+from forge.blade.lib import material 
 from copy import deepcopy
 import os
 
@@ -15,6 +14,7 @@ from forge.blade.systems import visualizer
 from forge.blade.systems.visualizer import plot
 
 class Quill:
+   TRAINING     = -1
    LINE         = 0
    SCATTER      = 1
    HISTOGRAM    = 2
@@ -24,6 +24,7 @@ class Quill:
    STACKED_AREA = 6
 
    PLOTS = {
+      TRAINING:     plot.Training,
       LINE:         plot.Line,
       SCATTER:      plot.Scatter,
       HISTOGRAM:    plot.Histogram,
@@ -92,6 +93,7 @@ class InkWell:
       self.stats = defaultdict(list)
 
    def update(self, quill, realm=0):
+      '''Realm param unused -- for future interactive expansions'''
       log, stats = quill['Log'], quill['Stats']
       for key, blob in log.items():
          for subkey, (plots, track) in blob.items():

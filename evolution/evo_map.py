@@ -36,6 +36,7 @@ from evolution.individuals import DefaultGenome
 from evolution.individuals import CAGenome
 from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
+from forge.blade.lib import material
 from forge.ethyr.torch import utils
 from forge.trinity.overlay import OverlayRegistry
 
@@ -43,7 +44,7 @@ from pcg import get_tile_data
 from plot_evo import plot_exp
 #from projekt import rlutils
 #from projekt.evaluator import Evaluator
-from projekt.rllib_wrapper import (EvoPPOTrainer, LogCallbacks, RLLibEvaluator,
+from projekt.rllib_wrapper import (EvoPPOTrainer, RLlibLogCallbacks, RLlibEvaluator,
                                    actionSpace, frozen_execution_plan,
                                    observationSpace)
 from pureples.shared.visualize import draw_net
@@ -231,8 +232,11 @@ class EvolverNMMO(LambdaMuEvolver):
          self.SPAWN_IDX = GdyMaterial.SPAWN.value.index
          self.map_generator = GriddlyMapGenerator(self.config)
       else:
-         self.mats = enums.Material
-         self.SPAWN_IDX = self.mats.SPAWN.value.index
+         self.mats = enums.MaterialEnum
+         if self.config.GRIDDLY:
+            self.SPAWN_IDX = self.mats.Spawn.index
+         else:
+            self.SPAWN_IDX = material.Spawn.index
          self.map_generator = MapGenerator(config)
       self.skill_idxs = {}
       self.idx_skills = {}
@@ -604,9 +608,9 @@ class EvolverNMMO(LambdaMuEvolver):
             # Impossible maps are no good
             tile_counts = np.bincount(map_arr.reshape(-1))
 
-            if False and (len(tile_counts) <= enums.Material.FOREST.value.index or \
-                  tile_counts[enums.Material.FOREST.value.index] <= self.config.NENT * 3 or \
-                  tile_counts[enums.Material.WATER.value.index] <= self.config.NENT * 3):
+            if False and (len(tile_counts) <= material.All.materials.FOREST.index or \
+                  tile_counts[material.All.materials.FOREST.index] <= self.config.NENT * 3 or \
+                  tile_counts[material.All.materials.WATER.index] <= self.config.NENT * 3):
                print('map {} rejected for lack of food and water'.format(g_idx))
                g.fitness = 0
                neat_idxs.remove(idx)

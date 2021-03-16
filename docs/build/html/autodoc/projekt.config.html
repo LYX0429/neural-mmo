@@ -3,11 +3,11 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>projekt.config module &mdash; Neural MMO v1.4 1.4 documentation</title>
+  <title>projekt.config module &mdash; Neural MMO v1.5 1.5 documentation</title>
   
 
   
@@ -16,7 +16,10 @@
 
   
   
+
   
+  
+
   
 
   
@@ -36,7 +39,7 @@
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="projekt.evaluator module" href="projekt.evaluator.html" />
+    <link rel="next" title="projekt.rllib_wrapper module" href="projekt.rllib_wrapper.html" />
     <link rel="prev" title="projekt package" href="projekt.html" /> 
 </head>
 
@@ -51,7 +54,7 @@
           
 
           
-            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> Neural MMO v1.4
+            <a href="../index.html" class="icon icon-home"> Neural MMO v1.5
           
 
           
@@ -84,22 +87,25 @@
             
               <p class="caption"><span class="caption-text">User Guide</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html"> Abstract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html"> Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-installation"> Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-overview"> Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-getting-started"> Getting Started</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-training-from-scratch"> Training from scratch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-cli"> CLI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-terrain-generation"> Terrain Generation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-rendering-and-overlays"> Rendering and Overlays</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-the-io-api"> The IO API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-training"> Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-evaluation"> Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-dashboard-and-statistics"> Dashboard and Statistics</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Update Materials</span></p>
+<p class="caption"><span class="caption-text">Developer Guide</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html"> Video Demos</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-publications"> Publications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-presentations"> Presentations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-update-slides"> Update Slides</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-additional-links"> Additional Links</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-patch-notes-version-history"> Patch Notes + Version History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html"> Foreword</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-contributing"> Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-code-structure"> Code Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-style"> Style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-tech-stack"> Tech Stack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-client-map-representation"> Client Map Representation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-observation-representation"> Observation Representation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-model-io"> Model IO</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Documentation</span></p>
 <ul class="current">
@@ -107,24 +113,27 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../rst/api.html#icon-developer-api"> Developer API</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="projekt.html">projekt package</a><ul class="current">
 <li class="toctree-l3 current"><a class="current reference internal" href="#">projekt.config module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="projekt.evaluator.html">projekt.evaluator module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="projekt.overlay.html">projekt.overlay module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="projekt.policy.html">projekt.policy module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="projekt.realm.html">projekt.realm module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="projekt.rlutils.html">projekt.rlutils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="projekt.rllib_wrapper.html">projekt.rllib_wrapper module</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="forge.html">forge package</a></li>
 </ul>
 </li>
 </ul>
-<p class="caption"><span class="caption-text">Developer Guide</span></p>
+<p class="caption"><span class="caption-text">Baselines</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html"> Foreword</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-before-you-start"> Before You Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-tech-stack"> Tech Stack</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-versioning"> Versioning</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-style"> Style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/baselines.html"> Evaluation Protocol</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/baselines.html#icon-small-maps"> Small Maps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/baselines.html#icon-large-maps"> Large Maps</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Updates</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html"> Video Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-publications"> Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-presentations"> Presentations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-update-slides"> Update Slides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-additional-links"> Additional Links</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-patch-notes-version-history"> Patch Notes + Version History</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Ideology</span></p>
 <ul>
@@ -151,7 +160,7 @@
       <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">Neural MMO v1.4</a>
+          <a href="../index.html">Neural MMO v1.5</a>
         
       </nav>
 
@@ -161,6 +170,8 @@
         <div class="rst-content">
         
           
+
+
 
 
 
@@ -191,7 +202,7 @@
     
       <li class="wy-breadcrumbs-aside">
         
-            
+          
             <a href="../_sources/autodoc/projekt.config.rst.txt" rel="nofollow"> View page source</a>
           
         
@@ -205,8 +216,153 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="projekt-config-module">
-<h1>projekt.config module<a class="headerlink" href="#projekt-config-module" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="module-projekt.config">
+<span id="projekt-config-module"></span><h1>projekt.config module<a class="headerlink" href="#module-projekt.config" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="projekt.config.Base">
+<em class="property">class </em><code class="sig-prename descclassname">projekt.config.</code><code class="sig-name descname">Base</code><a class="headerlink" href="#projekt.config.Base" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="forge.blade.core.config.html#forge.blade.core.config.Config" title="forge.blade.core.config.Config"><code class="xref py py-class docutils literal notranslate"><span class="pre">forge.blade.core.config.Config</span></code></a></p>
+<p>Base config for RLlib Models</p>
+<p>Extends core Config, which contains environment, evaluation,
+and non-RLlib-specific learning parameters</p>
+<dl class="py method">
+<dt id="projekt.config.Base.SPAWN">
+<code class="sig-name descname">SPAWN</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#projekt.config.Base.SPAWN" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates spawn positions for new agents</p>
+<p>Default behavior randomly selects a tile position
+along the borders of the square game map</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>position:</dt><dd><p>The position (row, col) to spawn the given agent</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>tuple(int, int)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="projekt.config.Base.WINDOW">
+<em class="property">property </em><code class="sig-name descname">WINDOW</code><a class="headerlink" href="#projekt.config.Base.WINDOW" title="Permalink to this definition">¶</a></dt>
+<dd><p>Size of the square tile crop visible to an agent</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="projekt.config.LargeMaps">
+<em class="property">class </em><code class="sig-prename descclassname">projekt.config.</code><code class="sig-name descname">LargeMaps</code><a class="headerlink" href="#projekt.config.LargeMaps" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#projekt.config.Base" title="projekt.config.Base"><code class="xref py py-class docutils literal notranslate"><span class="pre">projekt.config.Base</span></code></a></p>
+<p>Large scale Neural MMO training setting</p>
+<p>Features up to 1000 concurrent agents and 1000 concurrent NPCs,
+1km x 1km maps, and 5/10k timestep train/eval horizons</p>
+<p>This is the default setting as of v1.5 and allows for large
+scale multiagent research even on relatively modest hardware</p>
+<dl class="py method">
+<dt id="projekt.config.LargeMaps.SPAWN">
+<code class="sig-name descname">SPAWN</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#projekt.config.LargeMaps.SPAWN" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates spawn positions for new agents</p>
+<p>Default behavior randomly selects a tile position
+along the borders of the square game map</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>position:</dt><dd><p>The position (row, col) to spawn the given agent</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>tuple(int, int)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="projekt.config.LargeMaps.WINDOW">
+<em class="property">property </em><code class="sig-name descname">WINDOW</code><a class="headerlink" href="#projekt.config.LargeMaps.WINDOW" title="Permalink to this definition">¶</a></dt>
+<dd><p>Size of the square tile crop visible to an agent</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="projekt.config.SmallMaps">
+<em class="property">class </em><code class="sig-prename descclassname">projekt.config.</code><code class="sig-name descname">SmallMaps</code><a class="headerlink" href="#projekt.config.SmallMaps" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#projekt.config.Base" title="projekt.config.Base"><code class="xref py py-class docutils literal notranslate"><span class="pre">projekt.config.Base</span></code></a></p>
+<p>Small scale Neural MMO training setting</p>
+<p>Features up to 128 concurrent agents and 32 concurrent NPCs,
+60x60 maps (excluding the border), and 1000 timestep train/eval horizons.</p>
+<p>This setting is modeled off of v1.1-v1.4 It is appropriate as a quick train
+task for new ideas, a transfer target for agents trained on large maps,
+or as a primary research target for PCG methods.</p>
+<dl class="py method">
+<dt id="projekt.config.SmallMaps.SPAWN">
+<code class="sig-name descname">SPAWN</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#projekt.config.SmallMaps.SPAWN" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates spawn positions for new agents</p>
+<p>Default behavior randomly selects a tile position
+along the borders of the square game map</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>position:</dt><dd><p>The position (row, col) to spawn the given agent</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>tuple(int, int)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="projekt.config.SmallMaps.WINDOW">
+<em class="property">property </em><code class="sig-name descname">WINDOW</code><a class="headerlink" href="#projekt.config.SmallMaps.WINDOW" title="Permalink to this definition">¶</a></dt>
+<dd><p>Size of the square tile crop visible to an agent</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="projekt.config.Debug">
+<em class="property">class </em><code class="sig-prename descclassname">projekt.config.</code><code class="sig-name descname">Debug</code><a class="headerlink" href="#projekt.config.Debug" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#projekt.config.SmallMaps" title="projekt.config.SmallMaps"><code class="xref py py-class docutils literal notranslate"><span class="pre">projekt.config.SmallMaps</span></code></a></p>
+<p>Debug Neural MMO training setting</p>
+<p>A version of the SmallMap setting with greatly reduced batch parameters.
+Only intended as a tool for identifying bugs in the model or environment</p>
+<dl class="py method">
+<dt id="projekt.config.Debug.SPAWN">
+<code class="sig-name descname">SPAWN</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#projekt.config.Debug.SPAWN" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates spawn positions for new agents</p>
+<p>Default behavior randomly selects a tile position
+along the borders of the square game map</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>position:</dt><dd><p>The position (row, col) to spawn the given agent</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>tuple(int, int)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="projekt.config.Debug.WINDOW">
+<em class="property">property </em><code class="sig-name descname">WINDOW</code><a class="headerlink" href="#projekt.config.Debug.WINDOW" title="Permalink to this definition">¶</a></dt>
+<dd><p>Size of the square tile crop visible to an agent</p>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 
 
@@ -214,37 +370,29 @@
            
           </div>
           <footer>
-  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="projekt.evaluator.html" class="btn btn-neutral float-right" title="projekt.evaluator module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="projekt.html" class="btn btn-neutral float-left" title="projekt package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+        <a href="projekt.rllib_wrapper.html" class="btn btn-neutral float-right" title="projekt.rllib_wrapper module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="projekt.html" class="btn btn-neutral float-left" title="projekt package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        
-        &copy; Copyright 2020, Joseph Suarez
+        &#169; Copyright 2020, Joseph Suarez.
 
     </p>
   </div>
     
     
     
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     
     provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
-
         </div>
       </div>
 
@@ -311,6 +459,10 @@
 
     .row-even {
       background: var(--accent);
+    }
+
+    html.writer-html5 .rst-content table.docutils th {
+      border: 1px solid var(--accent);
     }
 
     /* Top line */
@@ -550,10 +702,12 @@ html.writer-html4 .rst-content dl:not(.docutils) dl:not(.field-list) > dt, html.
     }
     h1 {
       color: var(--title);
+      font-size: 150%
     }
 
     h2 {
       color: var(--accent);
+      font-size: 125%
     }
 
     h3 {

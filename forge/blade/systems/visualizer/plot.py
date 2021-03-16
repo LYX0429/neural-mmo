@@ -14,9 +14,6 @@ from forge.blade.lib.enums import Neon, Solid
 from tornado.ioloop import IOLoop
 import bokeh, jinja2
 
-def load(f):
-   return np.load(f, allow_pickle=True).tolist()
-
 #Adapted from https://rigtorp.se/2011/01/01/rolling-statistics-numpy.html
 def rolling_window(a, window, pad=True):
    a = np.array(a)
@@ -36,6 +33,36 @@ def flat(vals):
       flat += val
    return flat
 
+def disableAxis(axis):
+   axis.major_label_text_font_size = '0pt'
+   axis.major_tick_line_color      = None
+   axis.minor_tick_line_color      = None
+   axis.axis_line_color            = None
+
+def blank(width, height, blob={}, ylabel=None, colors=[]):
+   fig = bokeh.plotting.figure(
+         plot_width=width,
+         plot_height=height,
+         toolbar_location=None)
+
+   fig.grid[0].visible = False
+   fig.grid[1].visible = False
+
+   line = fig.line([0, 0], [0, 0])
+   line.visible = False
+
+   disableAxis(fig.xaxis)
+   disableAxis(fig.yaxis)
+
+   legend = {}
+   for idx, (color, (key, source)) in enumerate(zip(colors, blob.items())):
+      if key is None:
+         key = ylabel
+      glyph = fig.circle([0], [0], name=key, size=0, color=color)
+      legend[key] = [glyph]
+
+   return fig, legend
+
 class Plot:
    def __init__(self, config, fig, key, n):
       self.config = config
@@ -44,12 +71,12 @@ class Plot:
       self.n      = n
 
    def render(self, blob, colors):
-      legend = {}
+      legend = []
       for idx, (color, (key, source)) in enumerate(zip(colors, blob.items())):
          if key is None:
             key = self.key
 
-         legend[key] = self.glyphs(source, key, color, idx)
+         legend.append(self.glyphs(source, key, color, idx))
 
       return legend
 
@@ -64,6 +91,33 @@ class MarginPlot(Plot):
       self.fig.y_range.range_padding = margin
       self.fig.x_range.range_padding = margin
  
+class Training(Plot):
+   def preprocess(self, data, key, color, idx, w=20):
+      mean                   = np.array(data['Mean'])
+      std                    = np.array(data['Std'])
+
+      preprocessed           = {}
+      preprocessed['x']      = data['x']
+      preprocessed['smooth'] = mean
+      preprocessed['lower']  = mean - std
+      preprocessed['upper']  = mean + std
+
+      return preprocessed
+
+   def plot(self, source, key, color, idx):
+      self.fig.xaxis.axis_label = 'Environment Episodes'
+      self.fig.yaxis.axis_label = 'Normalized Value'
+
+      line = self.fig.line(
+         source=source,
+         name=key,
+         x='x',
+         y='smooth',
+         color=color)
+
+      return [line]
+
+
 class Line(Plot):
    def preprocess(self, data, key, color, idx, w=20):
       sliding = rolling_window(flat(data), w)
@@ -79,7 +133,8 @@ class Line(Plot):
       return preprocessed
 
    def plot(self, source, key, color, idx):
-      self.fig.title.text = 'Log Index'
+      self.fig.xaxis.axis_label = 'Index in Logs'
+      self.fig.yaxis.axis_label = 'Value'
 
       band = self.fig.varea(
          source=source,
@@ -130,14 +185,14 @@ class Scatter(MarginPlot):
       return preprocessed
 
    def plot(self, source, key, color, idx):
-      self.fig.title.text = 'Game Tick'
+      self.fig.xaxis.axis_label = 'Game Tick'
+      self.fig.yaxis.axis_label = 'Value'
 
       circle = self.fig.circle(
          source=source,
          name=key,
          x='x',
          y='y',
-         size=6,
          color=color)
 
       return [circle]
@@ -155,7 +210,8 @@ class Histogram(Plot):
       return preprocessed
 
    def plot(self, source, key, color, idx):
-      self.fig.title.text = 'Value'
+      self.fig.xaxis.axis_label = 'Value'
+      self.fig.yaxis.axis_label = 'Count'
 
       quad = self.fig.quad(
          source=source,
@@ -191,7 +247,8 @@ class Gantt(Plot):
       return preprocessed
 
    def plot(self, source, key, color, idx):
-      self.fig.title.text = 'Game Tick'
+      self.fig.xaxis.axis_label = 'Game Tick'
+      self.fig.yaxis.axis_label = 'Range'
 
       quad = self.fig.quad(
          source=source,
@@ -201,7 +258,7 @@ class Gantt(Plot):
          left='left',
          right='right',
          fill_color=color,
-         line_color=color,
+         line_color=None,
          )
 
       return [quad]
@@ -223,7 +280,9 @@ class Stats(Plot):
       return preprocessed
 
    def plot(self, source, key, color, idx):
-      self.fig.title.text = 'Statistics'
+      self.fig.xaxis.axis_label = 'Value'
+      self.fig.yaxis.axis_label = 'Stat'
+      disableAxis(self.fig.xaxis)
 
       quad = self.fig.quad(
          source=source,
@@ -270,8 +329,10 @@ class Radar(MarginPlot):
 
 
    def render(self, blob, colors):
-       self.fig.title.text = 'Raw Coords'
-       #self.fig.axis.visible = False
+       self.fig.xaxis.axis_label = 'Radar Axis'
+       self.fig.yaxis.axis_label = 'Radar Axis'
+       disableAxis(self.fig.xaxis)
+       disableAxis(self.fig.yaxis)
 
        legend, data = {}, defaultdict(list)
        for idx, (color, (subkey, source)) in enumerate(zip(colors, blob.items())):
@@ -392,7 +453,8 @@ class StackedArea(Plot):
       return preprocessed
 
    def render(self, blob, colors):
-       self.fig.title.text = 'Log Index'
+       self.fig.xaxis.axis_label = 'Index in Logs'
+       self.fig.yaxis.axis_label = 'Value'
 
        legend, bottom = {}, None
        for idx, (color, (subkey, source)) in enumerate(zip(colors, blob.items())):

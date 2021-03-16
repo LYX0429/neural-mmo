@@ -8,6 +8,7 @@ forge.blade.hook package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.hook.item
    forge.blade.hook.modules

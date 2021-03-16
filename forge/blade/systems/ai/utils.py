@@ -119,7 +119,7 @@ def forageDP(tiles, entity):
    return max_value_line, max_value_column
 
 
-def forageBFS(tiles, entity, cutoff=100):
+def forageDijkstra(tiles, entity, cutoff=100):
    start = entity.pos
 
    queue = Queue()
@@ -148,14 +148,14 @@ def forageBFS(tiles, entity, cutoff=100):
          if nxt in backtrace:
             continue
 
-         if not tiles[nxt].habitable:
+         if tiles[nxt].occupied:
             continue
 
          if not inBounds(*nxt, tiles.shape):
             continue
 
          food, water = reward[cur]
-         food = max(0, food - 1)
+         food  = max(0, food - 1)
          water = max(0, water - 1)
 
          if tiles[nxt].state.tex == 'forest':
@@ -176,13 +176,22 @@ def forageBFS(tiles, entity, cutoff=100):
          queue.put(nxt)
          backtrace[nxt] = cur
 
-
 # A* Search
 def l1(start, goal):
    sr, sc = start
    gr, gc = goal
    return abs(gr - sr) + abs(gc - sc)
 
+def l2(start, goal):
+   sr, sc = start
+   gr, gc = goal
+   return 0.5*((gr - sr)**2 + (gc - sc)**2)**0.5
+
+#TODO: unify lInfty and lInf
+def lInfty(start, goal):
+   sr, sc = start
+   gr, gc = goal
+   return max(abs(gr - sr), abs(gc - sc))
 
 def aStar(tiles, start, goal, cutoff=100):
    if start == goal:
@@ -220,7 +229,7 @@ def aStar(tiles, start, goal, cutoff=100):
          newCost = cost[cur] + 1
          if nxt not in cost or newCost < cost[nxt]:
             cost[nxt] = newCost
-            heuristic = l1(goal, nxt)
+            heuristic = lInfty(goal, nxt)
             priority = newCost + heuristic
 
             # Compute approximate solution

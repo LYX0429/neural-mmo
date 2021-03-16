@@ -28,7 +28,7 @@ own models immediately or hack on the environment'''
 def createEnv(config):
 #   map_arr = config['map_arr']
 
-    return rllib_wrapper.RLLibEnv(#map_arr,
+    return rllib_wrapper.RLlibEnv(#map_arr,
             config)
 
 # Map agentID to policyID -- requires config global
@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
    # RLlib registry
    rllib.models.ModelCatalog.register_custom_model('test_model',
-                                                   rllib_wrapper.Policy)
+                                                   rllib_wrapper.RLlibPolicy)
    ray.tune.registry.register_env("custom", createEnv)
 
  # save_path = 'evo_experiment/skill_entropy_life'
@@ -99,6 +99,7 @@ if __name__ == '__main__':
       evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
       evolver.config.NENT = config.NENT
       evolver.config.MODEL = 'reload'
+      evolver.config.ROOT = config.ROOT
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
       evolver.restore(trash_trainer=True)

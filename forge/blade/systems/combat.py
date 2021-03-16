@@ -42,9 +42,14 @@ def attack(entity, targ, skillFn):
 def damage(skill, level, resources, config):
    # pseudo-smithing
    mult = min(resources.ore.val + 1, 1.5)
-   resources.ore.decrement(1)
+   if resources.ore.val > 0:
+      resources.ore.decrement(1)
    if skill == Skill.Melee:
+#<<<<<<< HEAD
       return np.floor((5 + level * config.MELEE_MULT) * mult)
+#=======
+#     return np.floor(7 + level * 63 / 99)
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    if skill == Skill.Range:
       return np.floor((3 + level * config.RANGE_MULT) * mult)
    if skill == Skill.Mage:

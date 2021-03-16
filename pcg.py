@@ -1,7 +1,7 @@
 #TILE_TYPES = ['grass', 'stone', 'water', 'lava', 'forest', 
 #        #'tree', 'iron_ore'
 #        ]
-from forge.blade.lib.enums import Material
+from forge.blade.lib import material
 from collections import OrderedDict
 
 def get_tile_data(griddly=False):
@@ -17,10 +17,10 @@ def get_tile_data(griddly=False):
             'iron_ore':  0.03,
             'spawn':     0.01,
               }
-      TILE_TYPES = [None for _ in range(len(Material))]
-      TILE_PROBS = [None for _ in range(len(Material))]
-      for mat in Material:
-         val = mat.value
+      TILE_TYPES = [None for _ in range(len(material.All.materials))]
+      TILE_PROBS = [None for _ in range(len(material.All.materials))]
+      for mat in material.All.materials:
+         val = mat
          # no inland lava allowed
        # if val.tex == 'lava':
        #    continue
