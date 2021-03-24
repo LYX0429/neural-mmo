@@ -792,7 +792,7 @@ div_xplor_pair_prims_ES:
 		--NENT 8\
 		--EVO_DIR div_xplor_pair_prims_ES_0\
 		--N_PROC 12\
-		--N_EVO_MAPS 48\
+		--N_EVO_MAPS 24\
 		--EVO_ALGO MAP-Elites\
 		--GENOME Pattern\
 		--FITNESS_METRIC L2\
@@ -805,12 +805,24 @@ div_xplor_pair_prims_ES:
 		--TERRAIN_SIZE 70\
 		--FEATURE_CALC=None
 
+render_xplor_pair_prims_ES:
+	cd ../neural-mmo-client &&\
+	./UnityClient/neural-mmo-resources.x86_64 &\
+    python Forge.py render --config TreeOrerock\
+        --EVO_DIR div_xplor_pair_prims_ES_0\
+        --MAP div_xplor_pair_prims_ES_0\
+		--MODEL div_xplor_pair_prims_ES_0\
+		--NENT 8\
+		--TERRAIN_SIZE 70\
+		--INFER_IDX "(0,0,0)"
+
+
 div_harvest_pair_prims_ES:
 	python ForgeEvo.py\
 		--NENT 8\
 		--EVO_DIR div_harvest_pair_prims_ES_0\
 		--N_PROC 12\
-		--N_EVO_MAPS 48\
+		--N_EVO_MAPS 24\
 		--EVO_ALGO MAP-Elites\
 		--GENOME Pattern\
 		--FITNESS_METRIC L2\
@@ -822,6 +834,17 @@ div_harvest_pair_prims_ES:
 		--EVO_SAVE_INTERVAL 100\
 		--TERRAIN_SIZE 70\
 		--FEATURE_CALC=None
+
+render_harvest_pair_prims_ES:
+	cd ../neural-mmo-client &&\
+	./UnityClient/neural-mmo-resources.x86_64 &\
+    python Forge.py render --config TreeOrerock\
+        --EVO_DIR div_harvest_pair_prims_ES_0\
+        --MAP div_harvest_pair_prims_ES_0\
+		--MODEL div_harvest_pair_prims_ES_0\
+		--NENT 8\
+		--TERRAIN_SIZE 70\
+		--INFER_IDX "(0,0,0)"
 
 
 
