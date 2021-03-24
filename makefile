@@ -787,6 +787,45 @@ render_div_pair_prims_ES:
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
 
+div_xplor_pair_prims_ES:
+	python ForgeEvo.py\
+		--NENT 8\
+		--EVO_DIR div_xplor_pair_prims_ES_0\
+		--N_PROC 12\
+		--N_EVO_MAPS 48\
+		--EVO_ALGO MAP-Elites\
+		--GENOME Pattern\
+		--FITNESS_METRIC L2\
+		--SKILLS="['exploration']"\
+		--TERRAIN_RENDER False\
+		--ITEMS_PER_BIN=12\
+		--ME_BIN_SIZES=[1,1]\
+		--ME_BOUNDS="[(0,100),(0,100)]" \
+		--EVO_SAVE_INTERVAL 100\
+		--TERRAIN_SIZE 70\
+		--FEATURE_CALC=None
+
+div_harvest_pair_prims_ES:
+	python ForgeEvo.py\
+		--NENT 8\
+		--EVO_DIR div_harvest_pair_prims_ES_0\
+		--N_PROC 12\
+		--N_EVO_MAPS 48\
+		--EVO_ALGO MAP-Elites\
+		--GENOME Pattern\
+		--FITNESS_METRIC L2\
+		--SKILLS="['mining', 'woodcutting']"\
+		--TERRAIN_RENDER False\
+		--ITEMS_PER_BIN=12\
+		--ME_BIN_SIZES=[1,1]\
+		--ME_BOUNDS="[(0,100),(0,100)]" \
+		--EVO_SAVE_INTERVAL 100\
+		--TERRAIN_SIZE 70\
+		--FEATURE_CALC=None
+
+
+
+
 div_pair_CPPN_ES:
 	python ForgeEvo.py\
 		--NENT 3\

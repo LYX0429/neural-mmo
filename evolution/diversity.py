@@ -7,6 +7,7 @@ from skimage.morphology import disk
 
 import skbio
 
+global trg_image
 
 
 def diversity_calc(config):
@@ -30,6 +31,7 @@ def diversity_calc(config):
        calc_diversity = calc_local_map_entropy
    elif config.FITNESS_METRIC == 'MapTestText':
        calc_diversity = ham_text
+       get_trg_image()
    elif config.FITNESS_METRIC == 'y_deltas':
        calc_diversity = calc_y_deltas
    elif config.FITNESS_METRIC == 'Scores' or config.FITNESS_METRIC == 'ALP':
@@ -38,15 +40,17 @@ def diversity_calc(config):
        raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))
    return calc_diversity
 
-from PIL import Image, ImageDraw, ImageFont
-fnt = ImageFont.truetype('arial.ttf', 15)
-trg_image = Image.new(mode = "RGB", size=(50, 50))
-draw = ImageDraw.Draw(trg_image)
-draw.text((1,1), "Evo", font=fnt, fill=(255,0,0))
-draw.text((1,15), "NMMO", font=fnt, fill=(255,0,0))
-draw.text((1,32), "¯\_(ツ)_/¯", font=fnt, fill=(255,0,0))
-trg_image.save("trg_img.png")
-trg_image = (np.array(trg_image)[:, :, 0] / 255 * 8).astype(np.uint8)
+def get_trg_image():
+    from PIL import Image, ImageDraw, ImageFont
+    fnt = ImageFont.truetype('arial.ttf', 15)
+    global trg_image
+    trg_image = Image.new(mode = "RGB", size=(50, 50))
+    draw = ImageDraw.Draw(trg_image)
+    draw.text((1,1), "Evo", font=fnt, fill=(255,0,0))
+    draw.text((1,15), "NMMO", font=fnt, fill=(255,0,0))
+    draw.text((1,32), "¯\_(ツ)_/¯", font=fnt, fill=(255,0,0))
+    trg_image.save("trg_img.png")
+    trg_image = (np.array(trg_image)[:, :, 0] / 255 * 8).astype(np.uint8)
 
 def ham_text(individual):
     map_arr = individual.chromosome.map_arr[10:-10, 10:-10]
