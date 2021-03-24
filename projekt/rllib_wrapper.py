@@ -60,7 +60,6 @@ from forge.trinity import Env, evaluator
 from forge.trinity.dataframe import DataType
 from forge.trinity.overlay import OverlayRegistry
 from forge.blade.io import action
-from griddly_nmmo.env import NMMO
 
 from evolution.diversity import DIV_CALCS, diversity_calc
 
@@ -70,7 +69,6 @@ from ray.rllib.evaluation.worker_set import WorkerSet
 from ray.rllib.execution.rollout_ops import ParallelRollouts, ConcatBatches
 from ray.rllib.execution.train_ops import TrainOneStep
 
-from griddly import GymWrapperFactory, gd
 from ray.rllib.utils.typing import EnvConfigDict, EnvType, ResultDict, TrainerConfigDict, PartialTrainerConfigDict
 
 
@@ -103,6 +101,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       self.config = config['config']
       if self.config.GRIDDLY:
          from griddly_nmmo.env import NMMO
+         from griddly import GymWrapperFactory, gd
       self.headers = self.config.SKILLS
       self.agent_skills = []
       self.lifetimes = []
