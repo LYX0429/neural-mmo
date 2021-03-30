@@ -96,7 +96,6 @@ from forge.trinity.overlay import Overlay, OverlayRegistry
 ###############################################################################
 ### RLlib Env Wrapper
 class RLlibEnv(Env, rllib.MultiAgentEnv):
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    def __init__(self, config):
       self.config = config['config']
       if self.config.GRIDDLY:
@@ -125,7 +124,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
 
    def step(self, decisions, omitDead=False, preprocessActions=True):
-#<<<<<<< HEAD
 #     print('decisions keys', decisions.keys())
 #     print('ent keys', self.ents.keys())
       obs, rewards, dones, infos = super().step(decisions,
@@ -151,8 +149,8 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
          self.evo_dones = None
 #     print('obs keys', obs.keys())
 
-      return obs, rewards, dones, infos
 
+      return obs, rewards, dones, infos
 
 
    def send_agent_stats(self):
@@ -250,7 +248,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
 
 #Neural MMO observation space
-#=======
 #      obs, rewards, dones, infos = super().step(
 #            decisions, omitDead, preprocessActions)
 #
@@ -262,7 +259,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 #
 #      return obs, rewards, dones, infos
 #
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 def observationSpace(config):
    if config.GRIDDLY:
       #TODO: this, not manually!
@@ -296,16 +292,12 @@ def observationSpace(config):
 
    return obs
 
-#<<<<<<< HEAD
 #Neural MMO action space
 def actionSpace(config, n_act_i=3, n_act_j=5):
    if config.GRIDDLY:
       print('WARNING: Are you sure the griddly env action space is {} {}?'.format(n_act_i, n_act_j))
       atns = gym.spaces.MultiDiscrete((n_act_i, n_act_j))
       return atns
-#=======
-#def actionSpace(config):
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    atns = FlexDict(defaultdict(FlexDict))
 
    for atn in sorted(Action.edges):
@@ -315,7 +307,6 @@ def actionSpace(config, n_act_i=3, n_act_j=5):
 
    return atns
 
-#<<<<<<< HEAD
 def plot_diversity(x, y, div_names, exp_name, render=False):
    colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
             'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
@@ -634,11 +625,9 @@ class RLlibEvaluator(evaluator.Base):
       self.env.reset()
 
 #class RLlibPolicy(RecurrentNetwork, nn.Module):
-#=======
 ###############################################################################
 ### RLlib Policy, Evaluator, and Trainer wrappers
 class RLlibPolicy(RecurrentNetwork, nn.Module):
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    '''Wrapper class for using our baseline models with RLlib'''
    def __init__(self, *args, **kwargs):
       self.config = kwargs.pop('config')
@@ -694,7 +683,6 @@ class RLlibPolicy(RecurrentNetwork, nn.Module):
 #      self.env      = RLlibEnv({'config': config})
 #      self.state    = {}
 #
-###<<<<<<< HEAD
 ###      env = base_env.envs[0]
 ##
 ##      for key in RLlibLogCallbacks.STEP_KEYS:
@@ -710,7 +698,6 @@ class RLlibPolicy(RecurrentNetwork, nn.Module):
 ##         if not hasattr(env, key):
 ##            continue
 ##         episode.hist_data[key].append(getattr(env, key))
-##=======
 #   def render(self):
 #      self.obs = self.env.reset(idx=1)
 #      self.registry = RLlibOverlayRegistry(
@@ -719,7 +706,6 @@ class RLlibPolicy(RecurrentNetwork, nn.Module):
 #
 #   def tick(self, pos, cmd):
 #      '''Simulate a single timestep
-##>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 #
 #      Args:
 #          pos: Camera position (r, c) from the server)
@@ -1088,7 +1074,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
    def save(self):
       '''Save model to file. Note: RLlib does not let us chose save paths'''
-#<<<<<<< HEAD
       savedir = super().save(self.saveDir)
       with open('experiment/path.txt', 'w') as f:
          f.write(savedir)
@@ -1145,7 +1130,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
 #     else:
 #        path = 'experiment/{}/checkpoint'.format(model)
-#=======
 #     config   = self.envConfig
 #     saveFile = super().save(config.PATH_CHECKPOINTS)
 #     saveDir  = os.path.dirname(saveFile)
@@ -1172,7 +1156,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
 #        trainPath = config.PATH_TRAINING_DATA.format('current')
 #        np.save(trainPath, {})
 #        return
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
     # modelPath = config.PATH_MODEL.format(config.MODEL)
     # print('Loading from: {}'.format(modelPath))
@@ -1248,7 +1231,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
              if track not in training_logs:
                 training_logs[track] = {}
 
-#<<<<<<< HEAD
 #          epoch += 1
 #
 #          block = []
@@ -1264,10 +1246,8 @@ class SanePPOTrainer(ppo.PPOTrainer):
 #
 #             if not self.envConfig.v:
 #                continue
-#=======
              if stat not in training_logs[track]:
                 training_logs[track][stat] = []
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
              training_logs[track][stat] += vals
 
@@ -1281,7 +1261,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
                 mmean = np.mean(vals[-config.TRAIN_SUMMARY_ENVS:])
                 cli[track][stat] = mmean
 
-#<<<<<<< HEAD
 #          if len(block) > 0:
 #             mmax = max(len(l) for l in block) + 1
 #
@@ -1303,7 +1282,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
 #          lines.append(' ' + top*len(line))
 #          lines.append(' ' + line)
 #          lines.append(' ' + bot*len(line))
-#=======
           lines = formatting.precomputed_stats(cli)
           if config.v:
              lines += formatting.timings(timings)
@@ -1317,7 +1295,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
           
           #Assemble Summary Bar Title
           lines = logo.copy() + list(chain.from_iterable(blocks)) + summary
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
           #Cross-platform clear screen
           os.system('cls' if os.name == 'nt' else 'clear')

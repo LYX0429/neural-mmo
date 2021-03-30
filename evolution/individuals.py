@@ -524,8 +524,10 @@ class EvoIndividual(Individual):
         self.SPAWN_IDX = evolver.SPAWN_IDX
         self.FOOD_IDX = evolver.mats.FOREST.value.index
         self.WATER_IDX = evolver.mats.WATER.value.index
+        self.EMPTY_IDX = evolver.mats.GRASS.value.index
         self.NENT = evolver.config.NENT
         self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
+        self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
         if evolver.ALL_GENOMES:
             rnd = np.random.random()
             if rnd < 1/5:
@@ -568,20 +570,10 @@ class EvoIndividual(Individual):
 
     def clone(self, evolver):
         child = copy.deepcopy(self)
-#       child = EvoIndividual(self.iterable[:], self.rank, evolver)
-#       assert child is not self
-#       child.fitness.delValues()
-#       child.features.delValues()
-#       child.fitness.values = None
-#       child.fitness.valid = False
         child.score_hists = []
 #       child.feature_hists = {}
         child.age = -1
-#       child_chrom = self.chromosome.clone()
-#       assert child_chrom is not self.chromosome
         child.idx = None
-#       child.chromosome = child_chrom
-#       assert child is not self
         child.ALPs = []
 
         return child
@@ -607,31 +599,24 @@ class EvoIndividual(Individual):
         n_spawns = len(spawn_points)
         n_food = (1 * food_idxs).sum()
         n_water = (1 * water_idxs).sum()
-        if n_spawns < self.NENT or n_food < self.NENT or n_water < self.NENT:
-            self.valid_map = False
+        if not self.SINGLE_SPAWN:
+            if n_spawns < self.NENT or n_food < self.NENT or n_water < self.NENT:
+                self.valid_map = False
+            else:
+                self.valid_map = True
         else:
-            self.valid_map = True
-
-#       if n_spawns >= self.NENT:
-#           return map_arr
-#       n_new_spawns = self.NENT - n_spawns
-
-#       #     if multi_hot is not None:
-#       #        spawn_idxs = k_largest_index_argsort(
-#       #              multi_hot[enums.Material.SPAWN.value.index, :, :],
-#       #              n_new_spawns)
-#       #    #   map_arr[spawn_idxs[:, 0], spawn_idxs[:, 1]] = enums.Material.SPAWN.value.index
-#       #     else:
-#       border = self.TERRAIN_BORDER
-#       #     spawn_idxs = np.random.randint(border, self.map_width - border, (2, n_new_spawns))
-#       #     map_arr[spawn_idxs[0], spawn_idxs[1]] = self.SPAWN_IDX
-#       b = self.TERRAIN_BORDER
-#       all_idxs = np.vstack(np.where(map_arr[b:-b,b:-b]!=-1)).T
-#       spawn_idxs = all_idxs[np.random.choice(all_idxs.shape[0], n_new_spawns + 1, replace=False)] + b
-#       map_arr[spawn_idxs[:,0], spawn_idxs[:,1]] = self.SPAWN_IDX
-#       while not (map_arr == self.SPAWN_IDX).sum() >= self.NENT:
-#           print('Insufficient spawn points')
-#           map_arr[np.random.choice(all_idxs[all_idxs.shape[0]], 1)] = self.SPAWN_IDX
+            if n_spawns < 1 or n_food < self.NENT or n_water < self.NENT:
+                self.valid_map = False
+            else:
+                self.valid_map = True
+            # In single-spawn mode, remove duplicate spawn tiles
+            sp = spawn_points[:-1]
+            np.random.shuffle(sp)
+            sp = sp.T
+            map_arr[sp[0], sp[1]] = self.EMPTY_IDX
+#           for i in range(n_spawns - 1):
+#               sp = spawn_points[i]
+#               map_arr[sp[0], sp[1]] = self.EMPTY_IDX
 
 
     def add_border(self, map_arr, multi_hot=None):

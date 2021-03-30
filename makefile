@@ -787,12 +787,15 @@ render_div_pair_prims_ES:
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
 
+
+### MARCH 24, 2021 ############################################################
+
 div_xplor_pair_prims_ES:
 	python ForgeEvo.py\
 		--NENT 8\
 		--EVO_DIR div_xplor_pair_prims_ES_0\
 		--N_PROC 12\
-		--N_EVO_MAPS 24\
+		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
 		--GENOME Pattern\
 		--FITNESS_METRIC L2\
@@ -816,13 +819,12 @@ render_xplor_pair_prims_ES:
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
 
-
 div_harvest_pair_prims_ES:
 	python ForgeEvo.py\
 		--NENT 8\
 		--EVO_DIR div_harvest_pair_prims_ES_0\
 		--N_PROC 12\
-		--N_EVO_MAPS 24\
+		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
 		--GENOME Pattern\
 		--FITNESS_METRIC L2\
@@ -852,7 +854,7 @@ div_all_pair_prims_ES:
 		--NENT 8\
 		--EVO_DIR div_all_pair_prims_ES_0\
 		--N_PROC 12\
-		--N_EVO_MAPS 24\
+		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
 		--GENOME Pattern\
 		--FITNESS_METRIC L2\
@@ -877,6 +879,51 @@ render_all_pair_prims_ES:
 		--INFER_IDX "(0,0,0)"
 
 
+### SINGLE-SPAWN
+
+onespawn_div_xplor_pair_prims_ES:
+	python ForgeEvo.py\
+		--NENT 8\
+		--EVO_DIR onespawn_div_xplor_pair_prims_ES_0\
+		--N_PROC 6\
+		--N_EVO_MAPS 12\
+		--EVO_ALGO MAP-Elites\
+		--GENOME Pattern\
+		--FITNESS_METRIC L2\
+		--SKILLS="['exploration']"\
+		--TERRAIN_RENDER False\
+		--ITEMS_PER_BIN=12\
+		--ME_BIN_SIZES=[1,1]\
+		--ME_BOUNDS="[(0,100),(0,100)]" \
+		--EVO_SAVE_INTERVAL 100\
+		--TERRAIN_SIZE 70\
+		--FEATURE_CALC=None\
+		--SINGLE_SPAWN=True
+
+render_onespawn_xplor_pair_prims_ES:
+	cd ../neural-mmo-client &&\
+	./UnityClient/neural-mmo-resources.x86_64 &\
+    python Forge.py render --config TreeOrerock\
+        --EVO_DIR onespawn_div_xplor_pair_prims_ES_0\
+        --MAP onespawn_div_xplor_pair_prims_ES_0\
+		--MODEL onespawn_div_xplor_pair_prims_ES_0\
+		--NENT 8\
+		--TERRAIN_SIZE 70\
+		--INFER_IDX "(0,0,0)"
+
+### PRETRAIN
+
+pretrain_vanilla:
+	python Forge.py train\
+		--config TreeOrerock\
+
+pretrain_diversity:
+	python Forge.py train\
+		--config TreeOrerock\
+		--MODEL None\
+		--REWARD_DIVERSITY=True
+
+################################################################################
 
 
 
@@ -990,6 +1037,3 @@ compare:
 		--compare_models all_random_l2_2 all_random_disc_1 all_pattern_l2_5 all_ME_harvest_l2_0 all_cppn_l2_11 current \
 		--infer_idx 37 \
 		--map all_random_l2_2
-
-kill_nmmo_client:
-	\

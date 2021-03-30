@@ -175,7 +175,10 @@ class TreeOrerock(SmallMaps):
    EVO_VERBOSE          = True
    EVO_SAVE_INTERVAL    = 5
    GRIDDLY = False
-   EVO_DIR=None
+   EVO_DIR = None
+   PRETRAIN = False
+   # reward agents for collective skill-diversity rather than the usual survival reward?
+   REWARD_DIVERSITY = False
 
 
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
@@ -230,6 +233,7 @@ class EvoNMMO(TreeOrerock):
    TEST = False
    ITEMS_PER_BIN = 1
    FROZEN = False
+   SINGLE_SPAWN = False
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS
