@@ -76,6 +76,9 @@ class Env:
       Returns:
          observations, as documented by step()
       '''
+
+      # ad hoc reset of player indexing
+      self.realm.players.idx = 1
 #     self.quill = log.Quill(self.realm.identify)
 #
 #     if idx is None:
@@ -95,9 +98,9 @@ class Env:
 
 #     self.env_reset = time.time()
 
-      self.agent_skills = []
-      self.lifetimes = []
-      self.actions_matched = []
+      self.agent_skills = {}
+      self.lifetimes = {}
+      self.actions_matched = {}
 
       # if idx is None:
       if self.config.EVO_MAP and not self.config.FIXED_MAPS:
@@ -267,6 +270,14 @@ class Env:
 
       for entID, ent in dead.items():
          self.log(ent)
+
+         for entID, ent in dead.items():
+            lifetime = ent.history.timeAlive.val
+            self.lifetimes[entID] = lifetime
+            self.agent_skills[entID] = self.get_agent_stats(ent)
+            if hasattr(self, 'actions_matched'):
+               actions_matched = ent.actions_matched
+               self.actions_matched[entID] = actions_matched
 
       #Postprocess dead agents
       if omitDead:
@@ -478,14 +489,6 @@ class Env:
          rewards[entID] = self.reward(entID)
          dones[entID]   = False
          self.dummi_ob = ob
-
-      for entID, ent in dead.items():
-         lifetime = ent.history.timeAlive.val
-         self.lifetimes.append(lifetime)
-         self.agent_skills.append(self.get_agent_stats(ent))
-         if hasattr(self, 'actions_matched'):
-            actions_matched = ent.actions_matched
-            self.actions_matched.append(actions_matched)
 
       if omitDead:
          return obs, rewards, dones

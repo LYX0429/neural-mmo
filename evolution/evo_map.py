@@ -134,36 +134,6 @@ class LogCallbacks(DefaultCallbacks):
       # result['something'] = True
 
 
-# Map agentID to policyID -- requires config global
-def mapPolicy(agentID,
-        #config
-        ):
-
-   return 'policy_{}'.format(agentID % 1)
-
-
-# Generate RLlib policies
-def createPolicies(config):
-#   if config.GRIDDLY:
-#      return
-    obs =  observationSpace(config)
-    atns = actionSpace(config)
-    policies = {}
-
-    for i in range(config.NPOLICIES):
-        params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
-
-        if config.GRIDDLY and False:
-           key = mapPolicy('default_policy')
-          #key = 'default_policy'
-        else:
-           key = mapPolicy(i
-                   #, config
-                   )
-        policies[key] = (None, obs, atns, params)
-
-    return policies
-
 
 
 def calc_mean_agent(individual):
@@ -193,11 +163,7 @@ def dummi_features(individual):
 
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None):
-      if map_policy is None:
-         self.mapPolicy = mapPolicy
-      else:
-         self.mapPolicy = map_policy
-      assert self.mapPolicy is not None
+      self.config = config
       if config.FEATURE_CALC == "map entropy":
          config.ME_DIMS = 'map entropy'
          self.calc_features = calc_map_entropies
@@ -208,7 +174,7 @@ class EvolverNMMO(LambdaMuEvolver):
          self.calc_features = calc_mean_lifetime
       elif config.FEATURE_CALC is None:
           self.calc_features = dummi_features
-      self.config = config
+      self.policy_to_agent = {i: [] for i in range(config.NPOLICIES)}
 #     self.gen_mults = gen_atk_mults
 #     self.mutate_mults = mutate_atk_mults
 #     self.mate_mults = mate_atk_mults
@@ -316,6 +282,27 @@ class EvolverNMMO(LambdaMuEvolver):
       else:
          pass
 
+   # Map agentID to policyID -- requires config global
+   def mapPolicy(self, agentID):
+
+      policy_id = agentID % self.config.NPOLICIES
+      self.policy_to_agent[policy_id].append(agentID)
+      return 'policy_{}'.format(policy_id)
+
+   # Generate RLlib policies
+   def createPolicies(self):
+      config = self.config
+      obs = observationSpace(config)
+      atns = actionSpace(config)
+      policies = {}
+
+      for i in range(config.NPOLICIES):
+         params = {"agent_id": i, "obs_space_dict": obs, "act_space_dict": atns}
+
+         key = self.mapPolicy(i)
+         policies[key] = (None, obs, atns, params)
+
+      return policies
 
    def update_fitness(self, individual, ALP):
       if not self.MAP_TEST:
@@ -841,8 +828,8 @@ class EvolverNMMO(LambdaMuEvolver):
          del(self.trainer)
 
          # Create policies
-#        if self.config.GRIDDLY:
-         policies = createPolicies(self.config)
+#        policies = createPolicies(self.config)
+         policies = self.createPolicies()
          multiagent_config['policies'] = policies
 
          conf = self.config

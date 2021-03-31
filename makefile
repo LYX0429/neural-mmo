@@ -931,7 +931,7 @@ onespawn_div_combat_pair_prims_ES:
 		--FEATURE_CALC=None\
 		--SINGLE_SPAWN=True
 
-render_onespawn_xplor_pair_prims_ES:
+render_onespawn_div_combat_pair_prims_ES:
 	cd ../neural-mmo-client &&\
 	./UnityClient/neural-mmo-resources.x86_64 &\
     python Forge.py render --config TreeOrerock\
@@ -941,6 +941,39 @@ render_onespawn_xplor_pair_prims_ES:
 		--NENT 8\
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
+
+# PAIRED type algorithm because why not
+paired_ES:
+	python ForgeEvo.py\
+		--NENT 8\
+		--EVO_DIR paired_ES_0\
+		--N_PROC 12\
+		--N_EVO_MAPS 12\
+		--EVO_ALGO MAP-Elites\
+		--GENOME Pattern\
+		--FITNESS_METRIC Lifespans\
+		--TERRAIN_RENDER False\
+		--ITEMS_PER_BIN=12\
+		--ME_BIN_SIZES=[1,1]\
+		--ME_BOUNDS="[(0,100),(0,100)]" \
+		--EVO_SAVE_INTERVAL 100\
+		--TERRAIN_SIZE 70\
+		--FEATURE_CALC=None\
+		--NPOLICIES=2\
+		--PAIRED=True
+
+render_paired_ES:
+	cd ../neural-mmo-client &&\
+	./UnityClient/neural-mmo-resources.x86_64 &\
+    python Forge.py render --config TreeOrerock\
+        --EVO_DIR paired_ES_1\
+        --MAP paired_ES_1\
+		--MODEL paired_ES_1\
+		--NPOLICIES=2\
+		--NENT 8\
+		--TERRAIN_SIZE 70\
+		--INFER_IDX "(0,0,0)"
+
 ### PRETRAIN
 
 pretrain_vanilla:

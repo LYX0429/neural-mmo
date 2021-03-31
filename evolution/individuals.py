@@ -525,6 +525,7 @@ class EvoIndividual(Individual):
         self.FOOD_IDX = evolver.mats.FOREST.value.index
         self.WATER_IDX = evolver.mats.WATER.value.index
         self.EMPTY_IDX = evolver.mats.GRASS.value.index
+        self.SCRUB_IDX = evolver.mats.SCRUB.value.index
         self.NENT = evolver.config.NENT
         self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
         self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
@@ -596,11 +597,13 @@ class EvoIndividual(Individual):
         food_idxs = map_arr == self.FOOD_IDX
         water_idxs = map_arr == self.WATER_IDX
         spawn_points = np.vstack(np.where(spawn_idxs)).transpose()
+        # ad hoc replace shitty scrub
+        map_arr = np.where(map_arr == self.SCRUB_IDX, self.EMPTY_IDX, map_arr)
         n_spawns = len(spawn_points)
         n_food = (1 * food_idxs).sum()
         n_water = (1 * water_idxs).sum()
         if not self.SINGLE_SPAWN:
-            if n_spawns < self.NENT or n_food < self.NENT or n_water < self.NENT:
+            if n_spawns < 1 or n_food < self.NENT or n_water < self.NENT:
                 self.valid_map = False
             else:
                 self.valid_map = True
@@ -617,6 +620,7 @@ class EvoIndividual(Individual):
 #           for i in range(n_spawns - 1):
 #               sp = spawn_points[i]
 #               map_arr[sp[0], sp[1]] = self.EMPTY_IDX
+        self.chromosome.map_arr = map_arr
 
 
     def add_border(self, map_arr, multi_hot=None):

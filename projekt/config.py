@@ -234,6 +234,7 @@ class EvoNMMO(TreeOrerock):
    ITEMS_PER_BIN = 1
    FROZEN = False
    SINGLE_SPAWN = False
+   PAIRED = False
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS

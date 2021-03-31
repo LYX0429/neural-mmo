@@ -109,11 +109,17 @@ def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False):
 
     return mean_lifetime
 
-def sum_lifespans(agent_stats, skill_headers=None, verbose=False):
-   lifespans = np.hstack(agent_stats['lifespans'])
+def sum_lifespans(agent_stats, skill_headers=None, n_policies=1, verbose=False):
+#  lifespans = np.hstack(agent_stats['lifespans'])
 #  lifetimes = np.hstack(agent_stats['lifetimes'])
-   return lifespans.mean()
-#  return lifetimes.mean()
+   lifespans = np.hstack(agent_stats['lifespans'])
+   if n_policies == 1:
+       return lifespans.mean()
+   elif n_policies == 2:
+       idx_0 = [i*2 for i in range(np.ceil(len(lifespans)/2))]
+       idx_1 = [i*2+1 for i in range(np.floor(len(lifespans)/2))]
+       # ad hoc PAIRED reward function (regret)
+       return lifespans[idx_0].mean() - lifespans[idx_1].mean()
    
 
 def sum_experience(agent_stats, skill_headers=None, verbose=False):

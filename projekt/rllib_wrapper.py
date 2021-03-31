@@ -102,8 +102,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
          from griddly_nmmo.env import NMMO
          from griddly import GymWrapperFactory, gd
       self.headers = self.config.SKILLS
-      self.agent_skills = []
-      self.lifetimes = []
       super().__init__(self.config)
       self.evo_dones = None
       if config['config'].FITNESS_METRIC == 'Actions':
@@ -129,7 +127,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       obs, rewards, dones, infos = super().step(decisions,
             omitDead=omitDead, preprocessActions=preprocessActions)
 
-      t, mmean = len(self.lifetimes), np.mean(self.lifetimes)
+      t, mmean = len(self.lifetimes), np.mean(list(self.lifetimes.values()))
 
       # We don't need this, set_map does it for us?
 
@@ -197,15 +195,15 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
       # Get stats of dead (note the order here)
       l = 0
-      for skill_vals in self.agent_skills:
-         skills[l] = self.agent_skills[l]
+      for player_id, skill_vals in self.agent_skills.items():
+         skills[player_id] = skill_vals
          l += 1
 
       # Get stats of living
       d = 0
-      for _, player in self.realm.players.items():
+      for player_id, player in self.realm.players.items():
          a_skill_vals = self.get_agent_stats(player)
-         skills[d+l] = a_skill_vals
+         skills[player_id] = a_skill_vals
          d += 1
 
 
@@ -216,21 +214,20 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       if self.ACTION_MATCHING:
          actions_matched = np.zeros((len(skills)))
 
-      for i, a_skills in enumerate(skills.values()):
+      for player_id, a_skills in skills.items():
          # over agents
 
          for j, k in enumerate(self.headers):
             # over skills
             if k not in ['level', 'cooking', 'smithing']:
 #             if k in ['exploration']:
-               stats[i, j] = a_skills[k]
+               stats[player_id - 1, j] = a_skills[k]
                j += 1
-         lifespans[i] = a_skills['time_alive']
+         lifespans[player_id - 1] = a_skills['time_alive']
          if self.ACTION_MATCHING:
-            actions_matched[i] = a_skills['actions_matched']
+            actions_matched[player_id - 1] = a_skills['actions_matched']
 
       # Add lifespans of the living to those of the dead
-      lifespans = np.hstack((self.lifetimes, lifespans))
       stats = {
             'skills': [stats],
             'lifespans': [lifespans],

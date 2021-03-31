@@ -102,6 +102,7 @@ if __name__ == '__main__':
       evolver.config.ROOT = config.ROOT
       evolver.config.N_EVO_MAPS = config.N_EVO_MAPS
       evolver.config.N_PROC = config.N_PROC
+      evolver.config.EVO_SAVE_INTERVAL = config.EVO_SAVE_INTERVAL
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
       evolver.restore(trash_trainer=True)
