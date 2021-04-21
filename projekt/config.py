@@ -179,6 +179,7 @@ class TreeOrerock(SmallMaps):
    PRETRAIN = False
    # reward agents for collective skill-diversity rather than the usual survival reward?
    REWARD_DIVERSITY = False
+   PAIRED = False
 
 
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
@@ -234,7 +235,6 @@ class EvoNMMO(TreeOrerock):
    ITEMS_PER_BIN = 1
    FROZEN = False
    SINGLE_SPAWN = False
-   PAIRED = False
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS

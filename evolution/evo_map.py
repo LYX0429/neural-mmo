@@ -164,6 +164,9 @@ def dummi_features(individual):
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None):
       self.config = config
+      if config.PAIRED:
+         config.NPOLICIES = 2
+         config.NPOP = 2
       if config.FEATURE_CALC == "map entropy":
          config.ME_DIMS = 'map entropy'
          self.calc_features = calc_map_entropies

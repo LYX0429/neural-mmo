@@ -878,6 +878,67 @@ render_all_pair_prims_ES:
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
 
+div_all_pair_cppn_ES:
+	python ForgeEvo.py\
+		--NENT 8\
+		--EVO_DIR div_all_pair_cppn_ES_0\
+		--N_PROC 12\
+		--N_EVO_MAPS 12\
+		--EVO_ALGO MAP-Elites\
+		--GENOME CPPN\
+		--FITNESS_METRIC L2\
+		--SKILLS="['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']"\
+		--TERRAIN_RENDER False\
+		--ITEMS_PER_BIN=12\
+		--ME_BIN_SIZES=[1,1]\
+		--ME_BOUNDS="[(0,100),(0,100)]" \
+		--EVO_SAVE_INTERVAL 100\
+		--TERRAIN_SIZE 70\
+		--FEATURE_CALC=None
+
+render_all_pair_cppn_ES:
+	cd ../neural-mmo-client &&\
+	./UnityClient/neural-mmo-resources.x86_64 &\
+    python Forge.py render --config TreeOrerock\
+        --EVO_DIR div_all_pair_cppn_ES_0\
+        --MAP div_all_pair_cppn_ES_0\
+		--MODEL div_all_pair_cppn_ES_0\
+		--NENT 8\
+		--TERRAIN_SIZE 70\
+		--INFER_IDX "(0,0,0)"
+
+div_all_pair_tile_ES:
+	python ForgeEvo.py\
+		--NENT 8\
+		--EVO_DIR div_all_pair_tile_ES_0\
+		--N_PROC 12\
+		--N_EVO_MAPS 12\
+		--EVO_ALGO MAP-Elites\
+		--GENOME Random\
+		--FITNESS_METRIC L2\
+		--SKILLS="['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']"\
+		--TERRAIN_RENDER False\
+		--ITEMS_PER_BIN=12\
+		--ME_BIN_SIZES=[1,1]\
+		--ME_BOUNDS="[(0,100),(0,100)]" \
+		--EVO_SAVE_INTERVAL 100\
+		--TERRAIN_SIZE 70\
+		--FEATURE_CALC=None
+
+render_all_pair_cppn_ES:
+	cd ../neural-mmo-client &&\
+	./UnityClient/neural-mmo-resources.x86_64 &\
+    python Forge.py render --config TreeOrerock\
+        --EVO_DIR div_all_pair_tile_ES_0\
+        --MAP div_all_pair_tile_ES_0\
+		--MODEL div_all_pair_tile_ES_0\
+		--NENT 8\
+		--TERRAIN_SIZE 70\
+		--INFER_IDX "(0,0,0)"
+
+
+
+
 
 ### SINGLE-SPAWN
 
@@ -946,7 +1007,7 @@ render_onespawn_div_combat_pair_prims_ES:
 paired_ES:
 	python ForgeEvo.py\
 		--NENT 8\
-		--EVO_DIR paired_ES_0\
+		--EVO_DIR paired_ES_1\
 		--N_PROC 12\
 		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
@@ -970,6 +1031,7 @@ render_paired_ES:
         --MAP paired_ES_1\
 		--MODEL paired_ES_1\
 		--NPOLICIES=2\
+		--PAIRED=True\
 		--NENT 8\
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
@@ -993,7 +1055,7 @@ pretrain_diversity:
 div_pair_CPPN_ES:
 	python ForgeEvo.py\
 		--NENT 3\
-		--EVO_DIR div_pair_CPPN_ES_0\
+		--EVO_DIR div_pair_CPPN_ES_1\
 		--N_PROC 0\
 		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
