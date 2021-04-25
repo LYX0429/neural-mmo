@@ -304,7 +304,7 @@ def actionSpace(config, n_act_i=3, n_act_j=5):
 
    return atns
 
-def plot_diversity(x, y, div_names, exp_name, render=False):
+def plot_diversity(x, y, div_names, exp_name, config, render=False):
    colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
             'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
             'fuchsia', 'deeppink', 'olive', 'orange', 'maroon', 'lightcoral', 'firebrick', 'black', 'dimgrey', 'tomato',
@@ -340,7 +340,7 @@ def plot_diversity(x, y, div_names, exp_name, render=False):
   #ax.text(10, 0, '{:.2}'.format(y[:,i+1,:].mean()))
   #plt.ylabel('lifespans')
    ax.set_ylabel('lifespans')
-   ax.set_ylim(0, 1000)
+   ax.set_ylim(0, config.EVALUATION_HORIZON)
    plt.text(0.8, 0.8-(i+1)*0.162, '{:.2}'.format(y[:,i+1,:].mean()), fontsize=12, transform=plt.gcf().transFigure)
    plt.xlabel('tick')
    plt.tight_layout()
@@ -436,14 +436,14 @@ class RLlibEvaluator(evaluator.Base):
 #      super().tick(self.obs, actions, pos, cmd)
 
 
-   def test(self):
+   def evaluate(self, generalize=False):
 
       model_name = self.config.MODEL.split('/')[-1]
       map_name = self.config.MAP.split('/')[-1] 
       map_idx = self.config.INFER_IDX
       exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
       # Render the map in case we hadn't already
-      map_arr = self.env.realm.map.np()
+      map_arr = self.env.realm.map.inds()
       map_generator = MapGenerator(self.config)
       t_start = self.config.TERRAIN_BORDER
       t_end = self.config.TERRAIN_SIZE - self.config.TERRAIN_BORDER
@@ -464,28 +464,30 @@ class RLlibEvaluator(evaluator.Base):
             self.env.reset(idx=self.config.INFER_IDX)
             self.obs = self.env.step({})[0]
             self.state = {}
-            self.registry = OverlayRegistry(self.env, self.model, self.trainer, self.config)
+            self.registry = OverlayRegistry(self.config, self.env)
             # array of data: diversity scores, lifespans...
             divs = np.zeros((len(DIV_CALCS) + 1, self.config.EVALUATION_HORIZON))
             for t in tqdm(range(self.config.EVALUATION_HORIZON)):
                self.tick(None, None)
    #           print(len(self.env.realm.players.entities))
-               div_stats = self.env.get_agent_stats()
+               div_stats = self.env.get_all_agent_stats()
                for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
                   diversity = calc_diversity(div_stats, verbose=False)
                   divs[j, t] = diversity
                lifespans = div_stats['lifespans']
                divs[j + 1, t] = np.mean(lifespans)
                div_mat[i] = divs
+               # This is a crazy bit where we construct heatmaps but should we not just use get_agent_stats()?
                for _, ent in self.env.realm.players.entities.items():
                   r, c = ent.pos
                   for si, skill in enumerate(self.config.SKILLS):
                      if skill == 'exploration':
-                        xp = ent.exploration_grid.sum()
+                        xp = len(ent.explored) * 20
                      else:
                         xp = getattr(ent.skills, skill).exp
 #                    heatmaps[i, t, si, r, c] = xp
                      heatmaps[i, si, r, c] += xp
+                  # What is this doing?
                   heatmaps[i, si+1, r, c] += 1
             final_stats.append(div_stats)
          with open(data_path, 'wb') as f:
@@ -499,7 +501,7 @@ class RLlibEvaluator(evaluator.Base):
             heatmaps = np.load(f)
 
       plot_name = 'diversity {}'.format(exp_name)
-      plot_diversity(ts, div_mat, [d[1] for d in DIV_CALCS], exp_name)
+      plot_diversity(ts, div_mat, [d[1] for d in DIV_CALCS], exp_name, self.config)
       plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
       plt.close()
 #     heat_out = heatmaps.mean(axis=0).mean(axis=0)
@@ -508,7 +510,8 @@ class RLlibEvaluator(evaluator.Base):
       for s_heat, s_name in zip(heat_out, self.config.SKILLS + ['visited']):
          fig, ax = plt.subplots()
          ax.title.set_text('{} heatmap'.format(s_name))
-         mask = (self.env.realm.map.np() == Water.index ) + (self.env.realm.map.np() == Lava.index) + (self.env.realm.map.np() == Stone.index)
+         map_arr = self.env.realm.map.inds()
+         mask = (map_arr == Water.index ) + (map_arr == Lava.index) + (map_arr == Stone.index)
          s_heat = np.ma.masked_where((mask==True), s_heat)
          s_heat = np.flip(s_heat, 0)
 #        s_heat = np.log(s_heat + 1)
@@ -1071,10 +1074,9 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
    def save(self):
       '''Save model to file. Note: RLlib does not let us chose save paths'''
-      savedir = super().save(self.saveDir)
-      with open('experiment/path.txt', 'w') as f:
-         f.write(savedir)
-      print('Saved to: {}'.format(savedir))
+#     savedir = super().save(self.saveDir)
+#     with open('experiment/path.txt', 'w') as f:
+#        f.write(savedir)
 
       config   = self.envConfig
       saveFile = super().save(config.PATH_CHECKPOINTS)
@@ -1098,10 +1100,13 @@ class SanePPOTrainer(ppo.PPOTrainer):
    def restore(self, model):
       '''Restore model from path'''
 
+      config   = self.envConfig
       if model is None:
-         print('Training from scratch...')
-
+         print('Initializing new model...')
+         trainPath = config.PATH_TRAINING_DATA.format('current')
+         np.save(trainPath, {})
          return
+
 
       if model == 'current':
          with open('experiment/path.txt') as f:
@@ -1127,7 +1132,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
 #     else:
 #        path = 'experiment/{}/checkpoint'.format(model)
-#     config   = self.envConfig
 #     saveFile = super().save(config.PATH_CHECKPOINTS)
 #     saveDir  = os.path.dirname(saveFile)
 #
@@ -1148,11 +1152,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
 #     '''Restore model from path'''
       config    = self.envConfig
 
-#     if model is None:
-#        print('Initializing new model...')
-#        trainPath = config.PATH_TRAINING_DATA.format('current')
-#        np.save(trainPath, {})
-#        return
+
 
     # modelPath = config.PATH_MODEL.format(config.MODEL)
     # print('Loading from: {}'.format(modelPath))

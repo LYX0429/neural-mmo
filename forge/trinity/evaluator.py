@@ -13,6 +13,8 @@ from forge.trinity.overlay import OverlayRegistry
 
 from forge.blade.io.action import static as Action
 from forge.blade.lib.log import InkWell
+from evolution.diversity import diversity_calc
+import plot_diversity
 
 from matplotlib import pyplot as plt
 
@@ -43,24 +45,26 @@ class Base:
          self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
 
       ts = np.arange(self.config.EVALUATION_HORIZON)
-      n_evals = 20
+      n_evals = 2
       div_mat = np.zeros((n_evals, self.config.EVALUATION_HORIZON))
+      calc_diversity = diversity_calc(self.config)
 
       for i in range(n_evals):
          self.env.reset(idx=self.config.INFER_IDX)
          self.obs = self.env.step({})[0]
          self.state = {}
-         self.registry = OverlayRegistry(self.env, self.model, self.trainer, self.config)
+         self.registry = OverlayRegistry(self.config, self.env)
          divs = np.zeros((self.config.EVALUATION_HORIZON))
          for t in tqdm(range(self.config.EVALUATION_HORIZON)):
             self.tick(None, None)
 #           print(len(self.env.realm.players.entities))
-            div_stats = self.env.get_agent_stats()
-            calc_diversity = diversity_calc(self.config)
+            div_stats = self.env.get_all_agent_stats()
             diversity = calc_diversity(div_stats, verbose=False)
             divs[t] = diversity
          div_mat[i] = divs
-      plot_diversity(ts, div_mat, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
+
+      plot_div_2d(ts, div_mat, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
+
       print('Diversity: {}'.format(diversity))
 #=======
 #   def evaluate(self, generalize=True):

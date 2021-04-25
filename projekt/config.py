@@ -143,6 +143,7 @@ EXPLORE_SKILLS = ['exploration']
 HARVEST_SKILLS = ['woodcutting', 'mining']
 
 class TreeOrerock(SmallMaps):
+   NMAPS = SmallMaps.N_TRAIN_MAPS
    NTILE = 9
    NEW_EVAL = False
    EVO_MAP = True

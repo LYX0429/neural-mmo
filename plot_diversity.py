@@ -11,6 +11,7 @@ n_agents = 16
 max_skill = 20000
 
 def plot_div_2d(stats, title, path):
+   ''' Plot a bunch of shit including histograms of diversity measures and reward over time'''
    fig, ax = plt.subplots()
    agent_skills = stats['skills']
    x = agent_skills[:, 0]

@@ -925,7 +925,7 @@ div_all_pair_tile_ES:
 		--TERRAIN_SIZE 70\
 		--FEATURE_CALC=None
 
-render_all_pair_cppn_ES:
+render_all_pair_tile_ES:
 	cd ../neural-mmo-client &&\
 	./UnityClient/neural-mmo-resources.x86_64 &\
     python Forge.py render --config TreeOrerock\
@@ -1041,12 +1041,17 @@ render_paired_ES:
 pretrain_vanilla:
 	python Forge.py train\
 		--config TreeOrerock\
+		--MODEL None\
+		--TRAIN_HORIZON 100\
+		--NUM_WORKERS 12
 
 pretrain_diversity:
 	python Forge.py train\
 		--config TreeOrerock\
 		--MODEL None\
-		--REWARD_DIVERSITY=True
+		--REWARD_DIVERSITY=True\
+		--TRAIN_HORIZON 100\
+		--NUM_WORKERS 12
 
 ################################################################################
 
