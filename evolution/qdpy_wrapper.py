@@ -240,25 +240,25 @@ class meNMMO(EvolverNMMO):
 #        offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
 #        if self.CPPN:
 #           [self.gen_cppn_map(o.chromosome) for o in offspring]
-         offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
-     #   offspring = []
-     #   mutated = []
-     #   maps = {}
-     #   for (i, o) in enumerate(batch):
-#    #      newO = self.clone(o)
-     #      rnd = np.random.random()
-     #      if rnd < 0.01:
-     #          newO = EvoIndividual([], i, self)
-     #      else:
-     #          newO = self.clone(o)
-     #          new_chrom = newO.chromosome
-     #          newO.mutate()
-     #         #newO, = self.mutate(newO)
-     #      newO.idx = i
-     #      offspring.append(newO)
-#    #      self.gen_cppn_map(newO.chromosome)
-     #      self.maps[i] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
-     #      mutated.append(i)
+     #   offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
+         offspring = []
+         mutated = []
+         maps = {}
+         for (i, o) in enumerate(batch):
+#           newO = self.clone(o)
+            rnd = np.random.random()
+            if rnd < 0.01:
+                newO = EvoIndividual([], i, self)
+            else:
+                newO = self.clone(o)
+                new_chrom = newO.chromosome
+                newO.mutate()
+               #newO, = self.mutate(newO)
+            newO.idx = i
+            offspring.append(newO)
+#           self.gen_cppn_map(newO.chromosome)
+            self.maps[i] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
+            mutated.append(i)
 #        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
 
 
@@ -330,7 +330,7 @@ class meNMMO(EvolverNMMO):
       else:
           recent_mean_updates = np.nanmean(self.archive_update_hist)
 #     if self.n_epoch > 0 and len(container) > 0 and not self.MAP_TEST:
-      if self.n_epoch > self.config.ARCHIVE_UPDATE_WINDOW and recent_mean_updates < 0.01 and not self.MAP_TEST:
+      if len(container) > 0 and recent_mean_updates < 0.01 and not self.MAP_TEST:
      #    try:
           disrupted_elites = [container[i] for i in np.random.choice(len(container), min(max(1, len(container)-1), self.config.N_EVO_MAPS), replace=False)]
      #    except Exception:
@@ -349,8 +349,8 @@ class meNMMO(EvolverNMMO):
      #           TT()
      #       #FIXME: iterate through diff. features
           self.train_individuals(disrupted_elites)
-     #    nb_updated = container.update(disrupted_elites, issue_warning=True)
-     #    print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(elite_idxs)))
+          nb_updated = container.update(disrupted_elites, issue_warning=True)
+          print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(disrupted_elites)))
       #nb_el_updated = container.update()
 
 

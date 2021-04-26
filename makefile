@@ -852,7 +852,7 @@ render_harvest_pair_prims_ES:
 div_all_pair_prims_ES:
 	python ForgeEvo.py\
 		--NENT 8\
-		--EVO_DIR div_all_pair_prims_ES_0\
+		--EVO_DIR div_all_pair_prims_ES_1\
 		--N_PROC 12\
 		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
@@ -871,7 +871,7 @@ render_all_pair_prims_ES:
 	cd ../neural-mmo-client &&\
 	./UnityClient/neural-mmo-resources.x86_64 &\
     python Forge.py render --config TreeOrerock\
-        --EVO_DIR div_all_pair_prims_ES_0\
+        --EVO_DIR div_all_pair_prims_ES_1\
         --MAP div_all_pair_prims_ES_0\
 		--MODEL div_all_pair_prims_ES_0\
 		--NENT 8\
@@ -881,7 +881,7 @@ render_all_pair_prims_ES:
 div_all_pair_cppn_ES:
 	python ForgeEvo.py\
 		--NENT 8\
-		--EVO_DIR div_all_pair_cppn_ES_0\
+		--EVO_DIR div_all_pair_cppn_ES_1\
 		--N_PROC 12\
 		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
@@ -910,7 +910,7 @@ render_all_pair_cppn_ES:
 div_all_pair_tile_ES:
 	python ForgeEvo.py\
 		--NENT 8\
-		--EVO_DIR div_all_pair_tile_ES_0\
+		--EVO_DIR div_all_pair_tile_ES_1\
 		--N_PROC 12\
 		--N_EVO_MAPS 12\
 		--EVO_ALGO MAP-Elites\
@@ -935,9 +935,6 @@ render_all_pair_tile_ES:
 		--NENT 8\
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
-
-
-
 
 
 ### SINGLE-SPAWN
