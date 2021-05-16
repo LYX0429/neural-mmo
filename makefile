@@ -477,7 +477,7 @@ render_gdy_life_tileFlip_ES:
 
 gdy_life_CPPN_ES:
 	python nmmo_evo.py\
-		--EVO_DIR gdy_life_CPPN_ES_6\
+		--EVO_DIR gdy_life_CPPN_ES_7\
 		--N_PROC 0\
 		--N_EVO_MAPS 24\
 		--EVO_ALGO MAP-Elites\
@@ -872,8 +872,8 @@ render_all_pair_prims_ES:
 	./UnityClient/neural-mmo-resources.x86_64 &\
     python Forge.py render --config TreeOrerock\
         --EVO_DIR div_all_pair_prims_ES_1\
-        --MAP div_all_pair_prims_ES_0\
-		--MODEL div_all_pair_prims_ES_0\
+        --MAP div_all_pair_prims_ES_1\
+		--MODEL div_all_pair_prims_ES_1\
 		--NENT 8\
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
@@ -900,9 +900,9 @@ render_all_pair_cppn_ES:
 	cd ../neural-mmo-client &&\
 	./UnityClient/neural-mmo-resources.x86_64 &\
     python Forge.py render --config TreeOrerock\
-        --EVO_DIR div_all_pair_cppn_ES_0\
-        --MAP div_all_pair_cppn_ES_0\
-		--MODEL div_all_pair_cppn_ES_0\
+        --EVO_DIR div_all_pair_cppn_ES_1\
+        --MAP div_all_pair_cppn_ES_1\
+		--MODEL div_all_pair_cppn_ES_1\
 		--NENT 8\
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
@@ -929,9 +929,9 @@ render_all_pair_tile_ES:
 	cd ../neural-mmo-client &&\
 	./UnityClient/neural-mmo-resources.x86_64 &\
     python Forge.py render --config TreeOrerock\
-        --EVO_DIR div_all_pair_tile_ES_0\
-        --MAP div_all_pair_tile_ES_0\
-		--MODEL div_all_pair_tile_ES_0\
+        --EVO_DIR div_all_pair_tile_ES_1\
+        --MAP div_all_pair_tile_ES_1\
+		--MODEL div_all_pair_tile_ES_1\
 		--NENT 8\
 		--TERRAIN_SIZE 70\
 		--INFER_IDX "(0,0,0)"
