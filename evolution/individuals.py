@@ -525,7 +525,9 @@ class EvoIndividual(Individual):
         self.FOOD_IDX = evolver.mats.FOREST.value.index
         self.WATER_IDX = evolver.mats.WATER.value.index
         self.EMPTY_IDX = evolver.mats.GRASS.value.index
-        self.SCRUB_IDX = evolver.mats.SCRUB.value.index
+        self.GRIDDLY = evolver.config.GRIDDLY
+        if not self.GRIDDLY:
+            self.SCRUB_IDX = evolver.mats.SCRUB.value.index
         self.NENT = evolver.config.NENT
         self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
         self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
@@ -598,7 +600,10 @@ class EvoIndividual(Individual):
         water_idxs = map_arr == self.WATER_IDX
         spawn_points = np.vstack(np.where(spawn_idxs)).transpose()
         # ad hoc replace shitty scrub
+
+#       if not self.GRIDDLY:
         map_arr = np.where(map_arr == self.SCRUB_IDX, self.EMPTY_IDX, map_arr)
+
         n_spawns = len(spawn_points)
         n_food = (1 * food_idxs).sum()
         n_water = (1 * water_idxs).sum()

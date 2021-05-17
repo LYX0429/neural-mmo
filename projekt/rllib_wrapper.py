@@ -257,7 +257,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 #      return obs, rewards, dones, infos
 #
 def observationSpace(config):
-   if config.GRIDDLY:
+   if hasattr(config, 'GRIDDLY') and config.GRIDDLY:
       #TODO: this, not manually!
       obs = gym.spaces.Box(0, 1, (7, 7, 10))
       return obs
@@ -535,7 +535,7 @@ class RLlibEvaluator(evaluator.Base):
 
       from sklearn.manifold import TSNE
       tsne = TSNE(n_components=2, random_state=0)
-      final_agent_skills = np.vstack([stats['skills'] for stats in final_stats])
+      final_agent_skills = np.vstack([stats['skills'][0] for stats in final_stats])
       X_2d = tsne.fit_transform(final_agent_skills)
       plt.close()
       plt.figure()

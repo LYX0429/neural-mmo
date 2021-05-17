@@ -60,6 +60,7 @@ class NMMOGrid(Grid):
        self.save_path = save_path
        self.map_generator = map_generator
        self._nb_items_per_bin = self._nb_items_per_bin.astype(np.uint8)
+       self.config = config
 
    def add(self, individual):
       border = self.border
@@ -70,7 +71,7 @@ class NMMOGrid(Grid):
       if index is not None:
          # if it has been added
          chromosome = individual.chromosome
-         bin_idxs = set(range(12))
+         bin_idxs = set(range(self.config.N_EVO_MAPS))
          for s in self.solutions[idx]:
              if s is not individual:
                  bin_idxs.remove(s.bin_idx)
@@ -247,6 +248,7 @@ class meNMMO(EvolverNMMO):
          for (i, o) in enumerate(batch):
 #           newO = self.clone(o)
             rnd = np.random.random()
+            # For every 99 individuals we mutate, we inject a new random one
             if rnd < 0.01:
                 newO = EvoIndividual([], i, self)
             else:
