@@ -191,7 +191,7 @@ class meNMMO(EvolverNMMO):
       self.train_individuals(invalid_ind)
       if self.LEARNING_PROGRESS:
          self.train_individuals(invalid_ind)
- 
+
 #     [self.evaluate(ind) for ind in invalid_ind]
       fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
 
@@ -215,7 +215,7 @@ class meNMMO(EvolverNMMO):
       if nb_updated == 0:
          #NOTE: For reloading.
          print('Warning: empty container/grid')
-   #     raise 
+   #     raise
    #     raise ValueError("No individual could be added to the container !")
 
       else:
@@ -253,9 +253,11 @@ class meNMMO(EvolverNMMO):
                 newO = EvoIndividual([], i, self)
             else:
                 newO = self.clone(o)
-                new_chrom = newO.chromosome
                 newO.mutate()
                #newO, = self.mutate(newO)
+
+
+            new_chrom = newO.chromosome
             newO.idx = i
             offspring.append(newO)
 #           self.gen_cppn_map(newO.chromosome)
@@ -515,7 +517,7 @@ class meNMMO(EvolverNMMO):
            return left / right
        except ZeroDivisionError:
            return 1
-   
+
    def select_max_lifetime(self, container, k):
       return sorted(container, key=lambda ind: ind.features[0], reverse=True)[:k]
 
