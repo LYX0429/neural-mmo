@@ -1109,8 +1109,12 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
 
       if model == 'current':
-         with open('experiment/path.txt') as f:
-            path = f.read().splitlines()[0]
+         modelPath = config.PATH_MODEL.format(config.MODEL)
+         print('Loading from: {}'.format(modelPath))
+         path     = os.path.join(modelPath, 'checkpoint')
+         super().restore(path)
+#        with open('experiment/path.txt') as f:
+#           path = f.read().splitlines()[0]
       elif model.startswith('evo_experiment'):
 #        path = '/'.join(model.split('/')[1:])
          path = os.path.join(model, 'path.txt')
@@ -1154,10 +1158,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
 
 
-    # modelPath = config.PATH_MODEL.format(config.MODEL)
-    # print('Loading from: {}'.format(modelPath))
-    # path     = os.path.join(modelPath, 'checkpoint')
-      super().restore(path)
+
 
    def policyID(self, idx):
       return 'policy_{}'.format(idx)

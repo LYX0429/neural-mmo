@@ -133,10 +133,7 @@ class LogCallbacks(DefaultCallbacks):
       # you can mutate the result dict to add new fields to return
       # result['something'] = True
 
-
-
-
-def calc_mean_agent(individual):
+def calc_mean_agent(individual, config):
    skill_arrays = []
    ind_stats = individual.stats
 
@@ -148,41 +145,40 @@ def calc_mean_agent(individual):
 
    return mean_agent
 
-
-
-
-def calc_mean_lifetime(individual):
+def calc_mean_lifetime(individual, config):
    ind_stats = individual.stats
    mean_lifetime = [np.hstack(ind_stats['lifetimes']).mean()]
 
    return mean_lifetime
 
-def dummi_features(individual):
+def dummi_features(individual, config):
     return (50, 50)
 
 
 class EvolverNMMO(LambdaMuEvolver):
-   def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None):
+   def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None, n_epochs=10000):
       self.config = config
       if config.PAIRED:
          config.NPOLICIES = 2
          config.NPOP = 2
-      if config.FEATURE_CALC == "map entropy":
-         config.ME_DIMS = 'map entropy'
+      if config.FEATURE_CALC == "map_entropy":
+         config.ME_DIMS = 'map_entropy'
          self.calc_features = calc_map_entropies
 #        self.calc_features = calc_global_map_entropy
       elif config.FEATURE_CALC == 'skill':
          self.calc_features = calc_mean_agent
-      elif config.FEATURE_CALC == 'agent lifetime':
+      elif config.FEATURE_CALC == 'agent_lifetime':
          self.calc_features = calc_mean_lifetime
       elif config.FEATURE_CALC is None:
           self.calc_features = dummi_features
+      else:
+         raise NotImplementedError('Provided feature calculation function: {} is invalid. In case of BCs (provide "None" if not applicable).'.format(config.FEATURE_CALC))
       self.policy_to_agent = {i: [] for i in range(config.NPOLICIES)}
 #     self.gen_mults = gen_atk_mults
 #     self.mutate_mults = mutate_atk_mults
 #     self.mate_mults = mate_atk_mults
       config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', config.EVO_DIR, 'maps', 'map')
-      super().__init__(save_path, n_proc=n_proc, n_pop=n_pop)
+      super().__init__(save_path, n_proc=n_proc, n_pop=n_pop, n_epochs=n_epochs)
       self.lam = 1/4
       self.mu = 1/4
       self.make_env = make_env
@@ -342,10 +338,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #        # assume features are fixed w.r.t. map: no need to recalculate except after mutation/mating
 #        return
 
-      if self.config.FEATURE_CALC == 'map entropy':
-         features = self.calc_features(individual, self.config)
-      else:
-         features = self.calc_features(individual)
+      features = self.calc_features(individual, self.config)
 
       individual.features = features
       #     features = [features[i] for i in self.me.feature_idxs]

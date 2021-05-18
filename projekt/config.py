@@ -143,6 +143,7 @@ EXPLORE_SKILLS = ['exploration']
 HARVEST_SKILLS = ['woodcutting', 'mining']
 
 class TreeOrerock(SmallMaps):
+   load_arguments = -1  # load a settings json with a particular index (or not if -1)
    NMAPS = SmallMaps.N_TRAIN_MAPS
    NTILE = 9
    NEW_EVAL = False
@@ -168,7 +169,7 @@ class TreeOrerock(SmallMaps):
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.85
    GRIDDLY = False
-   SKILLS               = ALL_SKILLS
+   SKILLS               = ['ALL']
    FITNESS_METRIC       = 'L2'
    MAP = 'PCG'
    INFER_IDX = 0
@@ -189,7 +190,7 @@ EXPLORE_SKILLS = ['exploration']
 HARVEST_SKILLS = ['woodcutting', 'mining']
 
 class EvoNMMO(TreeOrerock):
-
+   N_GENERATIONS = 10000
    FIXED_MAPS = False
    EVALUATE = False
  # INFER_IDX = 79766
@@ -204,12 +205,12 @@ class EvoNMMO(TreeOrerock):
    MODEL = 'current'
    NENT = 16  # Maximum population size
    TERRAIN_SIZE = 70
-   EVO_DIR = 'all_random_l2_1'
+   EVO_DIR = '0'
    ROOT = os.path.join(os.getcwd(), 'evo_experiment', EVO_DIR, 'maps', 'map')
    N_EVO_MAPS = 48
    MAX_STEPS = 100
    MATURE_AGE = 3
-   ROLLING_FITNESS = 25  # Size of window to use while calculating mean rolling fitness
+   ROLLING_FITNESS = 25  # Size of window to use while calculating mean rolling fitness in cases where elite maps are re-evaluated after insertion into archive
    TERRAIN_RENDER = False
    TERRAIN_WATER        = 0.15
    TERRAIN_GRASS        = 0.35
@@ -222,7 +223,6 @@ class EvoNMMO(TreeOrerock):
 #  SKILLS = ['exploration']
 #  SKILLS = ['woodcutting', 'mining']
 #  SKILLS = ['range', 'mage', 'melee']
-   SKILLS = ALL_SKILLS
    EVO_ALGO = 'Simple'  # Simple, MAP-Elites, NEAT
    N_PROC = 6
    PRETRAINED = False

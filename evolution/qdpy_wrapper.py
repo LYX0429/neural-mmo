@@ -123,8 +123,8 @@ class EvoDEAPQD(DEAPQDAlgorithm):
 
 
 class meNMMO(EvolverNMMO):
-   def __init__(self, save_path, make_env, trainer, config, n_proc, n_pop, map_policy):
-      super().__init__(save_path, make_env, trainer, config, n_proc, n_pop, map_policy)
+   def __init__(self, save_path, make_env, trainer, config, n_proc, n_pop, map_policy, n_epochs=10000):
+      super().__init__(save_path, make_env, trainer, config, n_proc, n_pop, map_policy, n_epochs=n_epochs)
       # Track how many new elites have been added so that we can force population drift if necessary
       self.archive_update_hist = np.empty((self.config.ARCHIVE_UPDATE_WINDOW))
       self.archive_update_hist[:] = np.NaN

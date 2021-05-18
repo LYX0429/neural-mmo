@@ -11,6 +11,7 @@ import numpy as np
 import torch
 
 from fire import Fire
+import json
 
 import ray
 from ray import rllib
@@ -43,6 +44,11 @@ def createPolicies(config, mapPolicy):
 
 def loadTrainer(config):
    '''Create monolithic RLlib trainer object'''
+   if config.load_arguments != -1:
+      load_args = json.load(
+         open('configs/settings_{}.json'.format(config.load_arguments), 'r'))
+      [config.set(k, v) for (k, v) in load_args.items()]
+
    torch.set_num_threads(1)
    ray.init(local_mode=config.LOCAL_MODE)
 
@@ -131,6 +137,7 @@ class Anvil():
    def __init__(self, **kwargs):
       if 'help' in kwargs:
          kwargs.pop('help')
+
       if 'config' in kwargs:
          config = kwargs.pop('config')
          config = getattr(projekt.config, config)()

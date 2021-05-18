@@ -1,8 +1,12 @@
 import os
+import json
 import pickle
 import sys
 # My favorite debugging macro
+from pdb import set_trace as TT
 
+import re
+import numpy as np
 import ray
 import torch
 from fire import Fire
@@ -69,6 +73,11 @@ if __name__ == '__main__':
        sys.argv.insert(1, 'override')
        Fire(config)
 
+   # Load config from json
+   if config.load_arguments != -1:
+      load_args = json.load(
+         open('configs/settings_{}.json'.format(config.load_arguments), 'r'))
+      [config.set(k, v) for (k, v) in load_args.items()]
 
    # on the driver
    counter = Counter.options(name="global_counter").remote(config)
@@ -83,10 +92,47 @@ if __name__ == '__main__':
  # save_path = 'evo_experiment/scratch'
  # save_path = 'evo_experiment/skill_ent_0'
 
-   save_path = os.path.join('evo_experiment', '{}'.format(config.EVO_DIR))
+#  assert len(config.SKILLS) == 1
+   experiment_name = 'fit-{}_skills-{}_gene-{}_algo-{}'.format(
+       config.FITNESS_METRIC,
+       config.SKILLS,
+       config.GENOME,
+       config.EVO_ALGO,
+   )
 
+   if config.EVO_ALGO == 'MAP-Elites':
+#     experiment_name += '_BCs-{}'.format(config.ME_DIMS)
+      if (np.array(config.ME_BIN_SIZES) == 1).all():
+         experiment_name += '_noBCs'
+
+   if config.SINGLE_SPAWN:
+      experiment_name += '_uniSpawn'
+   experiment_name += '_' + config.EVO_DIR
+   config.set('ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
+                                                   #) config.ROOT.replace('evo_experiment/{}'.format(config.EVO_DIR), 'evo_experiment/{}'.format(experiment_name)))
+#  config.set('EVO_DIR', experiment_name)
+   save_path = os.path.join('evo_experiment', '{}'.format(experiment_name))
    if not os.path.isdir(save_path):
        os.mkdir(save_path)
+
+   with open(os.path.join(save_path, 'settings.json'), 'w') as f:
+      json.dump(config.data, f, indent=4)
+
+   # TODO: put this in a dictionary that provides alternative skills for the griddly environment, or maybe just use strings that map to different skillsets for each environment?
+   if config.SKILLS == 'ALL':
+      SKILLS = ['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']
+   elif config.SKILLS == 'HARVEST':
+      SKILLS = ['woodcutting','mining']
+   elif config.SKILLS == 'EXPLORATION':
+      SKILLS = ['exploration']
+   elif config.SKILLS == 'COMBAT':
+      SKILLS = ['mage','range','melee']
+   elif config.SKILLS == 'NONE':
+      config.SKILLS = []
+   else:
+      raise Exception
+
+   config.set('SKILLS', SKILLS)
 
    try:
       evolver_path = os.path.join(save_path, 'evolver')
@@ -121,6 +167,7 @@ if __name__ == '__main__':
                             config,
                             n_proc=   config.N_PROC,
                             n_pop=    config.N_EVO_MAPS,
+                            n_epochs= config.N_GENERATIONS,
                             )
 #  print(torch.__version__)
 

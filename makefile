@@ -1092,7 +1092,7 @@ div_CPPN_ME:
 		--EVO_ALGO MAP-Elites\
 		--GENOME CPPN\
 		--FITNESS_METRIC Differential\
-		--SKILLS="['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']"
+		--SKILLS="['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']"\
 		--TERRAIN_RENDER False\
 		--ITEMS_PER_BIN=12\
 		--ME_BIN_SIZES=[1,1]\
@@ -1121,7 +1121,7 @@ sum_xplor_CPPN_ES:
 		--EVO_ALGO MAP-Elites\
 		--GENOME CPPN\
 		--FITNESS_METRIC Sum\
-		--SKILLS=['exploration']
+		--SKILLS=['exploration']\
 		--TERRAIN_RENDER False\
 		--ITEMS_PER_BIN=12\
 		--ME_BIN_SIZES=[1,1]\
