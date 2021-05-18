@@ -5,10 +5,10 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time=120:00:00
 #SBATCH --mem=50GB
-#SBATCH --job-name=nmmo4
+#SBATCH --job-name=nmmo00
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=sam.earle@nyu.edu
-#SBATCH --output=nmmo4%j.out
+#SBATCH --output=nmmo00%j.out
 
 cd /scratch/se2161/neural-mmo || exit
 
@@ -16,7 +16,7 @@ cd /scratch/se2161/neural-mmo || exit
 source activate
 
 export TUNE_RESULT_DIR='./evo_experiment/'
-python ForgeEvo.py --load_arguments 4
+python Forge.py train --config TreeOrerock --MODEL None --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 --TERRAIN_SIZE 70
 
 #make onespawn_div_combat_pair_prims_ES
 #make paired_ES

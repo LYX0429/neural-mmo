@@ -11,9 +11,9 @@ import argparse
 from pdb import set_trace as TT
 
 genomes = [
-    'Random',
+#   'Random',
     'CPPN',
-    'Pattern',
+#   'Pattern',
 #   'CA',
 #   'LSystem',
 #   'All',
@@ -48,7 +48,7 @@ me_bin_sizes = [
 ]
 
 def launch_batch(exp_name):
-   if TEST:
+   if LOCAL:
        print('Testing locally.')
    else:
        print('Launching batch of experiments on SLURM.')
@@ -56,7 +56,7 @@ def launch_batch(exp_name):
        default_config = json.load(f)
    print('Loaded default config:\n{}'.format(default_config))
 
-   if TEST:
+   if LOCAL:
        default_config['n_generations'] = 1
    i = 0
 
@@ -121,41 +121,42 @@ def launch_batch(exp_name):
                         'N_EVAL': 1,
                         'NEW_EVAL': True,
                      })
-                  if TEST:
+                  if LOCAL:
                      exp_config.update({
                         'N_GENERATIONS': 2,
+                        'N_PROC': 4,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
                   with open('configs/settings_{}.json'.format(i), 'w') as f:
                      json.dump(exp_config, f, ensure_ascii=False, indent=4)
                   # Launch the experiment. It should load the saved settings
 
-                  if TEST:
+                  if LOCAL:
                      os.system('python ForgeEvo.py --load_arguments {}'.format(i))
                      os.system('ray stop')
                   else:
                      os.system('sbatch evo_train.sh')
                   i += 1
 
+   if TRAIN_BASELINE:
+      # Finally, launch a baseline
+      with open('evo_train.sh', 'r') as f:
+         content = f.read()
+         if not EVALUATE:
+            new_cmd = 'python Forge.py train --config TreeOrerock --MODEL None --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 --TERRAIN_SIZE 70'
+         else:
+            new_cmd = 'python Forge.py evaluate -la {}'.format(i)
+         content = re.sub('nmmo\d*', 'nmmo00', content)
+         new_content = re.sub('python Forge.*', new_cmd, content)
 
-   # Finally, launch a baseline
-   with open('evo_train.sh', 'r') as f:
-      content = f.read()
-      if not EVALUATE:
-         new_cmd = 'python Forge.py train --config TreeOrerock --MODEL None --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 --TERRAIN_SIZE 70'
+      with open('evo_train.sh', 'w') as f:
+         f.write(new_content)
+
+      if LOCAL:
+         os.system(new_cmd)
+         os.system('ray stop')
       else:
-         new_cmd = 'python Forge.py evaluate -la {}'.format(i)
-      content = re.sub('nmmo\d*', 'nmmo00', content)
-      new_content = re.sub('python Forge.*', new_cmd, content)
-
-   with open('evo_train.sh', 'w') as f:
-      f.write(new_content)
-
-   if TEST:
-      os.system(new_cmd)
-      os.system('ray stop')
-   else:
-      os.system('sbatch evo_train.sh')
+         os.system('sbatch evo_train.sh')
 
 if __name__ == '__main__':
    opts = argparse.ArgumentParser(
@@ -175,13 +176,20 @@ if __name__ == '__main__':
    )
    opts.add_argument(
        '-t',
-       '--test',
+       '--local',
        help='Test the batch script, i.e. run it on a local machine and evolve for minimal number of generations.',
        action='store_true',
+   )
+   opts.add_argument(
+      '-bl',
+      '--train_baseline',
+      help='Train a baseline on Perlin noise-generated maps.',
+      action='store_true',
    )
    opts = opts.parse_args()
    EXP_NAME = opts.experiment_name
    EVALUATE = opts.evaluate
-   TEST = opts.test
+   LOCAL = opts.local
+   TRAIN_BASELINE = opts.train_baseline
 
    launch_batch(EXP_NAME)
