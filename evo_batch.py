@@ -114,10 +114,10 @@ def launch_batch(exp_name):
                         'ME_BOUNDS': [(0,100),(0,100)],
                         'FEATURE_CALC': feature_calc,
                         'ITEMS_PER_BIN': items_per_bin,
-                        'N_EVO_MAPS': 12,
-                        'N_PROC': 12,
+                        'N_EVO_MAPS': 48,
+                        'N_PROC': 48,
                         'TERRAIN_RENDER': False,
-                        'EVO_SAVE_INTERVAL': 100,
+                        'EVO_SAVE_INTERVAL': 300,
                      })
                   if EVALUATE:
                      # TODO: use function to get experiment names based on parameters so that we can cross-evaluate among the batch (all models on all maps)
@@ -126,6 +126,12 @@ def launch_batch(exp_name):
                         'N_EVAL': 1,
                         'NEW_EVAL': True,
                      })
+                  if CUDA:
+                     exp_config.update({
+                        'N_EVO_MAPS': 12,
+                        'N_PROC': 12,
+                     })
+
                   if LOCAL:
                      exp_config.update({
                         'N_GENERATIONS': 100,
