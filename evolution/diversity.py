@@ -56,9 +56,11 @@ def ham_text(individual):
     map_arr = individual.chromosome.map_arr[10:-10, 10:-10]
     return -(trg_image != map_arr).sum()
 
-def calc_map_entropies(individual, config):
+def calc_map_entropies(individual, config, verbose=False):
     glob_ent = calc_global_map_entropy(individual, config)
     loc_ent = calc_local_map_entropy(individual, config)
+    if verbose:
+       print('global entropy: {}\nlocal entropy: {}'.format(glob_ent, loc_ent))
 
     return [glob_ent[0], loc_ent]
 

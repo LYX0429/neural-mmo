@@ -8,30 +8,31 @@ import copy
 import json
 import re
 import argparse
+import numpy as np
 from pdb import set_trace as TT
 
 genomes = [
-#   'Random',
+    'Random',
     'CPPN',
-#   'Pattern',
+    'Pattern',
 #   'CA',
 #   'LSystem',
 #   'All',
 ]
 fitness_funcs = [
 #   'Lifespans',
-    'L2',
+#   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
     ]
 
 skills = [
     'ALL',
-#   'HARVEST',
-#   'COMBAT',
-#   'EXPLORATION',
+    'HARVEST',
+    'COMBAT',
+    'EXPLORATION',
 ]
 
 algos = [
@@ -43,11 +44,15 @@ algos = [
 ]
 
 me_bin_sizes = [
-#   [1,1],
+    [1,1],
     [20,20],
 ]
 
 def launch_batch(exp_name):
+   if CUDA:
+      sbatch_file = 'evo_train.sh'
+   else:
+      sbatch_file = 'evo_train_cpu.sh'
    if LOCAL:
        print('Testing locally.')
    else:
@@ -70,9 +75,9 @@ def launch_batch(exp_name):
 
             for algo in algos:
                for me_bins in me_bin_sizes:
-                  if algo != 'MAP-Elites' and me_bins == [10,10]:
+                  if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
                      continue
-                  if me_bins == [1, 1]:
+                  if (np.array(me_bins) == 1).all():
                      items_per_bin = 12
                      feature_calc = None
                   else:
@@ -81,7 +86,7 @@ def launch_batch(exp_name):
 
 
                   # Edit the sbatch file to load the correct config file
-                  with open('evo_train.sh', 'r') as f:
+                  with open(sbatch_file, 'r') as f:
                      content = f.read()
                      if not EVALUATE:
                         new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
@@ -90,7 +95,7 @@ def launch_batch(exp_name):
                      content_0 = re.sub('nmmo\d*', 'nmmo{}'.format(i), content)
                      new_content = re.sub('python Forge.*', new_cmd, content_0)
 
-                  with open('evo_train.sh', 'w') as f:
+                  with open(sbatch_file, 'w') as f:
                      f.write(new_content)
                   # Write the config file with the desired settings
                   exp_config = copy.deepcopy(default_config)
@@ -123,7 +128,7 @@ def launch_batch(exp_name):
                      })
                   if LOCAL:
                      exp_config.update({
-                        'N_GENERATIONS': 2,
+                        'N_GENERATIONS': 100,
                         'N_PROC': 4,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
@@ -135,12 +140,12 @@ def launch_batch(exp_name):
                      os.system('python ForgeEvo.py --load_arguments {}'.format(i))
                      os.system('ray stop')
                   else:
-                     os.system('sbatch evo_train.sh')
+                     os.system('sbatch {}'.format(sbatch_file))
                   i += 1
 
    if TRAIN_BASELINE:
       # Finally, launch a baseline
-      with open('evo_train.sh', 'r') as f:
+      with open(sbatch_file, 'r') as f:
          content = f.read()
          if not EVALUATE:
             new_cmd = 'python Forge.py train --config TreeOrerock --MODEL None --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 --TERRAIN_SIZE 70'
@@ -149,14 +154,14 @@ def launch_batch(exp_name):
          content = re.sub('nmmo\d*', 'nmmo00', content)
          new_content = re.sub('python Forge.*', new_cmd, content)
 
-      with open('evo_train.sh', 'w') as f:
+      with open(sbatch_file, 'w') as f:
          f.write(new_content)
 
       if LOCAL:
          os.system(new_cmd)
          os.system('ray stop')
       else:
-         os.system('sbatch evo_train.sh')
+         os.system('sbatch {}'.format(sbatch_file))
 
 if __name__ == '__main__':
    opts = argparse.ArgumentParser(
@@ -186,10 +191,16 @@ if __name__ == '__main__':
       help='Train a baseline on Perlin noise-generated maps.',
       action='store_true',
    )
+   opts.add_argument(
+      '--gpu',
+      help='Use GPU (only applies to SLURM).',
+      action='store_true',
+   )
    opts = opts.parse_args()
    EXP_NAME = opts.experiment_name
    EVALUATE = opts.evaluate
    LOCAL = opts.local
    TRAIN_BASELINE = opts.train_baseline
+   CUDA = opts.gpu
 
    launch_batch(EXP_NAME)
