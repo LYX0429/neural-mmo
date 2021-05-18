@@ -110,13 +110,13 @@ if __name__ == '__main__':
    experiment_name += '_' + config.EVO_DIR
    config.set('ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
                                                    #) config.ROOT.replace('evo_experiment/{}'.format(config.EVO_DIR), 'evo_experiment/{}'.format(experiment_name)))
-#  config.set('EVO_DIR', experiment_name)
    save_path = os.path.join('evo_experiment', '{}'.format(experiment_name))
    if not os.path.isdir(save_path):
        os.mkdir(save_path)
 
    with open(os.path.join(save_path, 'settings.json'), 'w') as f:
       json.dump(config.data, f, indent=4)
+   config.set('EVO_DIR', experiment_name)
 
    # TODO: put this in a dictionary that provides alternative skills for the griddly environment, or maybe just use strings that map to different skillsets for each environment?
    if config.SKILLS == 'ALL':

@@ -130,6 +130,7 @@ def launch_batch(exp_name):
                      exp_config.update({
                         'N_GENERATIONS': 100,
                         'N_PROC': 4,
+                        'EVO_SAVE_INTERVAL': 1,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
                   with open('configs/settings_{}.json'.format(i), 'w') as f:
