@@ -49,9 +49,6 @@ from evolution.cmaes import EvoCMAES
 
 mpl.use('Agg')
 
-
-
-
 class NMMOGrid(Grid):
    def __init__(self, evolver, save_path, config, map_generator, *args, **kwargs):
        super().__init__(*args, **kwargs)
@@ -306,7 +303,7 @@ class meNMMO(EvolverNMMO):
          logbook.record(iteration=i, containersize=container.size_str(), evals=len(invalid_ind), nbupdated=nb_updated, elapsed=timer()-start_time, **record)
 
          if verbose:
-             print(logbook.stream)
+            print(logbook.stream)
          # Call callback function
 
          if iteration_callback != None:

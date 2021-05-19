@@ -425,7 +425,6 @@ class RLlibEvaluator(evaluator.Base):
 
 #   def tick(self, pos, cmd):
 #      '''Simulate a single timestep
-##>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 #
 #      Args:
 #          pos: Camera position (r, c) from the server)

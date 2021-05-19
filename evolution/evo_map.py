@@ -839,12 +839,16 @@ class EvolverNMMO(LambdaMuEvolver):
             num_workers = 0
             self.config.N_EVO_MAPS = 0
             sgd_minibatch_size = 0
+#           train_batch_size = 256 * num_workers
          elif self.config.N_EVO_MAPS == 1:
             num_workers = self.config.N_PROC
             sgd_minibatch_size = 100
+#           train_batch_size = 256 * num_workers
          else:
             num_workers = self.config.N_PROC
             sgd_minibatch_size = 128
+#           train_batch_size = 256 * num_workers
+#        sgd_minibatch_size = min(512, train_batch_size)
       # EvoPPOTrainer = build_trainer(
        #     name="EvoPPO",
        #    #name="PPO",
@@ -881,13 +885,15 @@ class EvolverNMMO(LambdaMuEvolver):
            #'num_gpus_per_worker': 0.083,  # hack fix
             'num_gpus_per_worker': 0,
             'num_gpus': 1,
-            'num_envs_per_worker': int(conf.N_EVO_MAPS / max(1, num_workers)),
-           #'num_envs_per_worker': 1,
+           #'num_envs_per_worker': int(conf.N_EVO_MAPS / max(1, num_workers)),
+            'num_envs_per_worker': 1,
             # batch size is n_env_steps * maps per generation
             # plus 1 to actually reset the last env
-            'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
-           #'train_batch_size': 5000,
+#           'train_batch_size': conf.MAX_STEPS * conf.N_EVO_MAPS, # normally: 4000
+            'train_batch_size': 1200,
+           #'train_batch_size': train_batch_size,
             'rollout_fragment_length': 100,
+           #'lstm_bptt_horizon': 16,
             'sgd_minibatch_size': sgd_minibatch_size,  # normally: 128
             'num_sgd_iter': 1,
             'monitor': False,

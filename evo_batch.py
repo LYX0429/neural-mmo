@@ -13,26 +13,26 @@ from pdb import set_trace as TT
 
 genomes = [
     'Random',
-    'CPPN',
-    'Pattern',
+#   'CPPN',
+#   'Pattern',
 #   'CA',
 #   'LSystem',
 #   'All',
 ]
 fitness_funcs = [
 #   'Lifespans',
-#   'L2',
+    'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
     ]
 
 skills = [
     'ALL',
-    'HARVEST',
-    'COMBAT',
-    'EXPLORATION',
+#   'HARVEST',
+#   'COMBAT',
+#   'EXPLORATION',
 ]
 
 algos = [
@@ -44,7 +44,7 @@ algos = [
 ]
 
 me_bin_sizes = [
-    [1,1],
+#   [1,1],
     [20,20],
 ]
 
@@ -135,8 +135,9 @@ def launch_batch(exp_name):
                   if LOCAL:
                      exp_config.update({
                         'N_GENERATIONS': 100,
-                        'N_PROC': 4,
-                        'EVO_SAVE_INTERVAL': 1,
+                        'N_EVO_MAPS': 8,
+                        'N_PROC': 8,
+                        'EVO_SAVE_INTERVAL': 10,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
                   with open('configs/settings_{}.json'.format(i), 'w') as f:
