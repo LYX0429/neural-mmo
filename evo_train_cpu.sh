@@ -5,10 +5,10 @@
 ##SBATCH --gres=gpu:1
 #SBATCH --time=120:00:00
 #SBATCH --mem=50GB
-#SBATCH --job-name=nmmo23
+#SBATCH --job-name=nmmo0
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=sam.earle@nyu.edu
-#SBATCH --output=nmmo23%j.out
+#SBATCH --output=nmmo0%j.out
 
 cd /scratch/se2161/neural-mmo || exit
 
@@ -16,7 +16,7 @@ cd /scratch/se2161/neural-mmo || exit
 source activate
 
 export TUNE_RESULT_DIR='./evo_experiment/'
-python ForgeEvo.py --load_arguments 23
+python Forge.py evaluate --config TreeOrerock --MODEL fit-L2_skills-ALL_gene-Random_algo-MAP-Elites_0 --MAP fit-L2_skills-ALL_gene-Random_algo-MAP-Elites_0 --INFER_IDX "(18, 17, 0)" --EVALUATION_HORIZON 100 --N_EVAL 1 --NEW_EVAL --SKILLS "['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]"
 
 #make onespawn_div_combat_pair_prims_ES
 #make paired_ES

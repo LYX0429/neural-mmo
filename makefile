@@ -98,11 +98,12 @@ mapText_tileFlip_ME:
 		--GENOME Random\
 		--FITNESS_METRIC MapTestText\
 		--TERRAIN_RENDER False\
-		--ME_BIN_SIZES=[10,10]\
+		--ME_BIN_SIZES=[20,20]\
 		--ME_BOUNDS="[(0,100),(0,100)]"\
 		--EVO_SAVE_INTERVAL 1000\
 		--TERRAIN_SIZE 70\
-		--FEATURE_CALC='map entropy'
+		--SKILLS NONE\
+		--FEATURE_CALC='map_entropy'
 
 mapText_prims_ME:
 	python ForgeEvo.py\
