@@ -13,8 +13,8 @@ from pdb import set_trace as TT
 
 genomes = [
     'Random',
-#   'CPPN',
-#   'Pattern',
+    'CPPN',
+    'Pattern',
 #   'CA',
 #   'LSystem',
 #   'All',
@@ -71,7 +71,7 @@ def launch_batch(exp_name):
             if fit_func in ['Lifespans', 'Sum']:
                if skillset != 'ALL':
                   continue
-               skillset = ['NONE']
+               skillset = 'NONE'
 
             for algo in algos:
                for me_bins in me_bin_sizes:
@@ -114,8 +114,8 @@ def launch_batch(exp_name):
                         'ME_BOUNDS': [(0,100),(0,100)],
                         'FEATURE_CALC': feature_calc,
                         'ITEMS_PER_BIN': items_per_bin,
-                        'N_EVO_MAPS': 48,
-                        'N_PROC': 48,
+                        'N_EVO_MAPS': 12,
+                        'N_PROC': 12,
                         'TERRAIN_RENDER': False,
                         'EVO_SAVE_INTERVAL': 300,
                      })
@@ -135,8 +135,8 @@ def launch_batch(exp_name):
                   if LOCAL:
                      exp_config.update({
                         'N_GENERATIONS': 100,
-                        'N_EVO_MAPS': 8,
-                        'N_PROC': 8,
+#                       'N_EVO_MAPS': 8,
+#                       'N_PROC': 8,
                         'EVO_SAVE_INTERVAL': 10,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
@@ -156,7 +156,7 @@ def launch_batch(exp_name):
       with open(sbatch_file, 'r') as f:
          content = f.read()
          if not EVALUATE:
-            new_cmd = 'python Forge.py train --config TreeOrerock --MODEL None --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 --TERRAIN_SIZE 70'
+            new_cmd = 'python Forge.py train --config TreeOrerock --MODEL current --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 --TERRAIN_SIZE 70'
          else:
             new_cmd = 'python Forge.py evaluate -la {}'.format(i)
          content = re.sub('nmmo\d*', 'nmmo00', content)
