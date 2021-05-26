@@ -169,7 +169,8 @@ class TreeOrerock(SmallMaps):
    TERRAIN_TREE         = 0.8
    TERRAIN_OREROCK      = 0.85
    GRIDDLY = False
-   SKILLS               = ['ALL']
+#  SKILLS               = 'ALL'
+   SKILLS               = ALL_SKILLS
    FITNESS_METRIC       = 'L2'
    MAP = 'PCG'
    INFER_IDX = 0

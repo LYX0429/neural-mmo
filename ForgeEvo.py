@@ -55,6 +55,48 @@ def createPolicies(config):
 
     return policies
 
+def get_experiment_name(config):
+   #  assert len(config.SKILLS) == 1
+   experiment_name = 'fit-{}_skills-{}_gene-{}_algo-{}'.format(
+      config.FITNESS_METRIC,
+      config.SKILLS,
+      config.GENOME,
+      config.EVO_ALGO,
+   )
+
+   if config.EVO_ALGO == 'MAP-Elites':
+      #     experiment_name += '_BCs-{}'.format(config.ME_DIMS)
+      if (np.array(config.ME_BIN_SIZES) == 1).all():
+         experiment_name += '_noBCs'
+
+   if config.SINGLE_SPAWN:
+      experiment_name += '_uniSpawn'
+   experiment_name += '_' + config.EVO_DIR
+
+
+   return experiment_name
+
+def process_config(config):
+
+   config.set('EVO_DIR', experiment_name)
+
+   # TODO: put this in a dictionary that provides alternative skills for the griddly environment, or maybe just use strings that map to different skillsets for each environment?
+   if config.SKILLS == 'ALL':
+      SKILLS = ['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']
+   elif config.SKILLS == 'HARVEST':
+      SKILLS = ['woodcutting','mining']
+   elif config.SKILLS == 'EXPLORATION':
+      SKILLS = ['exploration']
+   elif config.SKILLS == 'COMBAT':
+      SKILLS = ['mage','range','melee']
+   elif config.SKILLS == 'NONE':
+      SKILLS = []
+   else:
+      raise Exception
+
+   config.set('SKILLS', SKILLS)
+
+   return config
 
 if __name__ == '__main__':
    # Setup ray
@@ -92,47 +134,19 @@ if __name__ == '__main__':
  # save_path = 'evo_experiment/scratch'
  # save_path = 'evo_experiment/skill_ent_0'
 
-#  assert len(config.SKILLS) == 1
-   experiment_name = 'fit-{}_skills-{}_gene-{}_algo-{}'.format(
-       config.FITNESS_METRIC,
-       config.SKILLS,
-       config.GENOME,
-       config.EVO_ALGO,
-   )
+   experiment_name = get_experiment_name(config)
 
-   if config.EVO_ALGO == 'MAP-Elites':
-#     experiment_name += '_BCs-{}'.format(config.ME_DIMS)
-      if (np.array(config.ME_BIN_SIZES) == 1).all():
-         experiment_name += '_noBCs'
-
-   if config.SINGLE_SPAWN:
-      experiment_name += '_uniSpawn'
-   experiment_name += '_' + config.EVO_DIR
    config.set('ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
-                                                   #) config.ROOT.replace('evo_experiment/{}'.format(config.EVO_DIR), 'evo_experiment/{}'.format(experiment_name)))
+   #) config.ROOT.replace('evo_experiment/{}'.format(config.EVO_DIR), 'evo_experiment/{}'.format(experiment_name)))
    save_path = os.path.join('evo_experiment', '{}'.format(experiment_name))
    if not os.path.isdir(save_path):
        os.mkdir(save_path)
 
    with open(os.path.join(save_path, 'settings.json'), 'w') as f:
       json.dump(config.data, f, indent=4)
-   config.set('EVO_DIR', experiment_name)
 
-   # TODO: put this in a dictionary that provides alternative skills for the griddly environment, or maybe just use strings that map to different skillsets for each environment?
-   if config.SKILLS == 'ALL':
-      SKILLS = ['constitution','fishing','hunting','range','mage','melee','defense','woodcutting','mining','exploration']
-   elif config.SKILLS == 'HARVEST':
-      SKILLS = ['woodcutting','mining']
-   elif config.SKILLS == 'EXPLORATION':
-      SKILLS = ['exploration']
-   elif config.SKILLS == 'COMBAT':
-      SKILLS = ['mage','range','melee']
-   elif config.SKILLS == 'NONE':
-      config.SKILLS = []
-   else:
-      raise Exception
+   config = process_config(config)
 
-   config.set('SKILLS', SKILLS)
 
    try:
       evolver_path = os.path.join(save_path, 'evolver')
