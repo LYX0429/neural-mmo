@@ -1,14 +1,14 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=48
+#SBATCH --cpus-per-task=12
 ##SBATCH --gres=gpu:1
 #SBATCH --time=120:00:00
 #SBATCH --mem=50GB
-#SBATCH --job-name=nmmo23
+#SBATCH --job-name=nmmo2
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=sam.earle@nyu.edu
-#SBATCH --output=nmmo23%j.out
+#SBATCH --output=nmmo2%j.out
 
 cd /scratch/se2161/neural-mmo || exit
 
@@ -16,7 +16,7 @@ cd /scratch/se2161/neural-mmo || exit
 source activate
 
 export TUNE_RESULT_DIR='./evo_experiment/'
-python ForgeEvo.py --load_arguments 23
+python Forge.py evaluate -la 2
 
 #make onespawn_div_combat_pair_prims_ES
 #make paired_ES
