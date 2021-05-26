@@ -11,6 +11,8 @@ import re
 import argparse
 import numpy as np
 from pdb import set_trace as TT
+import matplotlib
+from matplotlib import pyplot as plt
 
 import projekt
 from fire import Fire
@@ -53,7 +55,10 @@ me_bin_sizes = [
     [20,20],
 ]
 
-eval_args = "--EVALUATION_HORIZON 100 --N_EVAL 1 --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\""
+EVALUATION_HORIZON = 100
+# TODO: use this variable in the eval command string. Formatting might be weird.
+SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
+eval_args = "--EVALUATION_HORIZON {} --N_EVAL 1 --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\"".format(EVALUATION_HORIZON)
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
@@ -184,9 +189,13 @@ def launch_batch(exp_name, preeval=False):
 #        experiment_names.append(get_experiment_name(config))
 
 def launch_cross_eval(experiment_names, vis_only=False):
-   i = 0
-   for model_exp_name in experiment_names + ['current']:
-      for map_exp_name in experiment_names + ['PCG']:
+   n = 0
+   model_exp_names = experiment_names + ['current']
+   map_exp_names = experiment_names + ['PCG']
+   mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
+   mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
+   for (i, model_exp_name) in enumerate(model_exp_names):
+      for (j, map_exp_name) in enumerate(map_exp_names):
          # TODO: how to evaluate over an archive of maps?
          infer_idx = None
          if map_exp_name == 'PCG':
@@ -195,10 +204,188 @@ def launch_cross_eval(experiment_names, vis_only=False):
             infer_idx = "(18, 10, 0)"
          else:
             infer_idx = "(18, 17, 0)"
-         new_cmd = 'python Forge.py evaluate --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\" {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args)
-         print(new_cmd)
-         launch_cmd(new_cmd, i)
-         i += 1
+         if not vis_only:
+            new_cmd = 'python forge.py evaluate --config treeorerock --model {} --map {} --infer_idx \"{}\" {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args)
+            print(new_cmd)
+            launch_cmd(new_cmd, n)
+         eval_data_path = os.path.join(
+            'eval_experiment',
+            map_exp_name,
+            str(infer_idx),
+            model_exp_name,
+            'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
+               model_exp_name,
+               map_exp_name,
+               infer_idx,
+               EVALUATION_HORIZON
+            ),
+         )
+         data = np.load(eval_data_path, allow_pickle=True)
+         mean_lifespans[i, j] = np.mean(data[0]['lifespans'])
+         for k in range(len(SKILLS)):
+            mean_skill_arr = np.vstack(data[0]['skills'])
+            mean_skills[k, i, j] = np.mean(mean_skill_arr[:, k])
+         n += 1
+   # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" dimension exclusively.
+   # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
+   row_labels = []
+   col_labels = []
+   def get_genome_name(exp_name):
+      if 'CPPN' in exp_name:
+         return 'CPPN'
+      elif 'Pattern' in exp_name:
+         return 'Pattern'
+      elif 'Random' in exp_name:
+         return 'Random'
+      else:
+         return exp_name
+
+   for r in model_exp_names:
+      row_labels.append(get_genome_name(r))
+
+   for c in map_exp_names:
+      col_labels.append(get_genome_name(c))
+   cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]")
+   for (k, skill_name) in enumerate(SKILLS):
+      cross_eval_heatmap(mean_skills[k], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
+
+def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
+   fig, ax = plt.subplots()
+
+   im, cbar = heatmap(data, row_labels, col_labels, ax=ax,
+                      cmap="YlGn", cbarlabel=cbarlabel)
+   texts = annotate_heatmap(im, valfmt="{x:.1f}")
+   ax.set_title(title)
+
+#  fig.tight_layout(rect=[1,0,1,0])
+   fig.tight_layout(pad=3)
+#  plt.show()
+   ax.set_ylabel('model')
+   ax.set_xlabel('map')
+   plt.savefig(os.path.join(
+      'eval_experiment',
+      '{}.png'.format(title),
+   ))
+   plt.close()
+
+
+def heatmap(data, row_labels, col_labels, ax=None,
+            cbar_kw={}, cbarlabel="", **kwargs):
+   """
+   Create a heatmap from a numpy array and two lists of labels.
+
+   Parameters
+   ----------
+   data
+       A 2D numpy array of shape (N, M).
+   row_labels
+       A list or array of length N with the labels for the rows.
+   col_labels
+       A list or array of length M with the labels for the columns.
+   ax
+       A `matplotlib.axes.Axes` instance to which the heatmap is plotted.  If
+       not provided, use current axes or create a new one.  Optional.
+   cbar_kw
+       A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
+   cbarlabel
+       The label for the colorbar.  Optional.
+   **kwargs
+       All other arguments are forwarded to `imshow`.
+   """
+
+   if not ax:
+      ax = plt.gca()
+
+   # Plot the heatmap
+   im = ax.imshow(data, **kwargs)
+
+   # Create colorbar
+   cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+   cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+   # We want to show all ticks...
+   ax.set_xticks(np.arange(data.shape[1]))
+   ax.set_yticks(np.arange(data.shape[0]))
+   # ... and label them with the respective list entries.
+   ax.set_xticklabels(col_labels)
+   ax.set_yticklabels(row_labels)
+
+   # Let the horizontal axes labeling appear on top.
+   ax.tick_params(top=True, bottom=False,
+                  labeltop=True, labelbottom=False)
+
+   # Rotate the tick labels and set their alignment.
+   plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+            rotation_mode="anchor")
+
+   # Turn spines off and create white grid.
+  #ax.spines[:].set_visible(False)
+
+   ax.set_xticks(np.arange(data.shape[1] + 1) - .5, minor=True)
+   ax.set_yticks(np.arange(data.shape[0] + 1) - .5, minor=True)
+   ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+   ax.tick_params(which="minor", bottom=False, left=False)
+
+   return im, cbar
+
+
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+                     textcolors=("black", "white"),
+                     threshold=None, **textkw):
+   """
+   A function to annotate a heatmap.
+
+   Parameters
+   ----------
+   im
+       The AxesImage to be labeled.
+   data
+       Data used to annotate.  If None, the image's data is used.  Optional.
+   valfmt
+       The format of the annotations inside the heatmap.  This should either
+       use the string format method, e.g. "$ {x:.2f}", or be a
+       `matplotlib.ticker.Formatter`.  Optional.
+   textcolors
+       A pair of colors.  The first is used for values below a threshold,
+       the second for those above.  Optional.
+   threshold
+       Value in data units according to which the colors from textcolors are
+       applied.  If None (the default) uses the middle of the colormap as
+       separation.  Optional.
+   **kwargs
+       All other arguments are forwarded to each call to `text` used to create
+       the text labels.
+   """
+
+   if not isinstance(data, (list, np.ndarray)):
+      data = im.get_array()
+
+   # Normalize the threshold to the images color range.
+   if threshold is not None:
+      threshold = im.norm(threshold)
+   else:
+      threshold = im.norm(data.max()) / 2.
+
+   # Set default alignment to center, but allow it to be
+   # overwritten by textkw.
+   kw = dict(horizontalalignment="center",
+             verticalalignment="center")
+   kw.update(textkw)
+
+   # Get the formatter in case a string is supplied
+   if isinstance(valfmt, str):
+      valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+   # Loop over the data and create a `Text` for each "pixel".
+   # Change the text's color depending on the data.
+   texts = []
+   for i in range(data.shape[0]):
+      for j in range(data.shape[1]):
+         kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+         text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+         texts.append(text)
+
+   return texts
 
 if __name__ == '__main__':
    opts = argparse.ArgumentParser(
@@ -217,9 +404,9 @@ if __name__ == '__main__':
        action='store_true',
    )
    opts.add_argument(
-       '-t',
+       '-l',
        '--local',
-       help='Test the batch script, i.e. run it on a local machine and evolve for minimal number of generations.',
+       help='Run the batch script on a local machine (evolving for a minimal number of generations, or running full evaluations sequentially).',
        action='store_true',
    )
    opts.add_argument(
