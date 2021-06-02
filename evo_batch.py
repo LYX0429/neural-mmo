@@ -56,9 +56,13 @@ me_bin_sizes = [
 ]
 
 EVALUATION_HORIZON = 100
+if False:
+    N_EVALS = 1
+else:
+    N_EVALS = 20
 # TODO: use this variable in the eval command string. Formatting might be weird.
 SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
-eval_args = "--EVALUATION_HORIZON {} --N_EVAL 1 --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\"".format(EVALUATION_HORIZON)
+eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\"".format(EVALUATION_HORIZON, N_EVALS)
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
@@ -112,6 +116,7 @@ def launch_batch(exp_name, preeval=False):
                      'GENOME': gene,
                      'FITNESS_METRIC': fit_func,
                      'EVO_ALGO': algo,
+                     'EVO_DIR': exp_name,
                      'SKILLS': skillset,
                      'ME_BIN_SIZES': me_bins,
                      'ME_BOUNDS': [(0,100),(0,100)],
@@ -205,7 +210,7 @@ def launch_cross_eval(experiment_names, vis_only=False):
          else:
             infer_idx = "(18, 17, 0)"
          if not vis_only:
-            new_cmd = 'python forge.py evaluate --config treeorerock --model {} --map {} --infer_idx \"{}\" {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args)
+            new_cmd = 'python Forge.py evaluate --config treeorerock --model {} --map {} --infer_idx \"{}\" {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args)
             print(new_cmd)
             launch_cmd(new_cmd, n)
          eval_data_path = os.path.join(
