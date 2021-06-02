@@ -7,9 +7,10 @@ import copy
 import numpy as np
 from forge.blade.lib import enums
 from evolution.paint_terrain import Line, Rectangle, RectanglePerimeter, Circle, CirclePerimeter, Gaussian
-from pdb import set_trace as T
+from pdb import set_trace as TT
 from qdpy.phenotype import Individual, Fitness, Features
 from evolution.paint_terrain import PRIMITIVE_TYPES
+from opensimplex import OpenSimplex
 
 # Not using this
 class SpawnPoints():
@@ -233,7 +234,7 @@ class CAGenome():
         return np.hstack((self.nn.weights, [self.nn.n_passes]))
 
 
-class DefaultGenome(neat.genome.DefaultGenome, Genome):
+class CPPNGenome(neat.genome.DefaultGenome, Genome):
     ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
     beyond the map.'''
     def __init__(self, key, neat_config, n_tiles, map_width):
@@ -431,6 +432,70 @@ class TileFlipGenome(Genome):
         return self.map_arr.reshape(-1)
 
 
+class SimplexNoiseGenome(Genome):
+   def __init__(self, n_tiles, map_width):
+       super().__init__(n_tiles, map_width)
+       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
+       self.step_size = np.random.random() * 2
+       self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
+       n_bands = np.random.randint(n_tiles, n_tiles + 3)
+       threshes = np.random.random(n_bands)
+       # values between 0 and 1 that represent thresholds between tile types
+       self.threshes = np.array([t + i for (i, t) in enumerate(threshes)]) / n_bands
+       # the tile types to be thresholded
+       self.thresh_tiles = np.random.randint(0, n_tiles, size=n_bands+1)
+
+
+   def mutate(self):
+      n_actions = 4
+      actions = np.random.random(n_actions) < 0.3
+      full_threshes = np.concatenate((self.threshes, [1]))
+      if actions.sum() == 0:
+          actions[np.random.randint(0, n_actions)] = True
+      if actions[0]:
+         if np.random.random() < 0.5 and self.threshes.shape[0] > self.n_tiles:
+            j = np.random.randint(0, self.threshes.shape[0])
+            self.threshes = np.concatenate((self.threshes[:j], full_threshes[j+1:]))
+            # kinda weird that we'll never bonk off the last one
+            self.thresh_tiles = np.concatenate((self.thresh_tiles[:j], self.thresh_tiles[j+1:]))
+         elif self.threshes.shape[0] < 2 * self.n_tiles:
+            j = np.random.randint(0, self.threshes.shape[0])
+            self.threshes = np.concatenate((self.threshes[:j],
+                                           np.random.uniform(self.threshes[j], full_threshes[j+1], 1),
+                                            full_threshes[j+1:]))
+            self.thresh_tiles = np.concatenate((self.thresh_tiles[:j],
+                                               [np.random.randint(0, self.n_tiles)],
+                                               self.thresh_tiles[j+1:]))
+         else:
+             pass
+             # oops no-op
+      if actions[1]:
+         j = np.random.randint(0, self.threshes.shape[0])
+         self.threshes[j] = np.random.uniform(self.threshes[j-1], full_threshes[j+1], 1)
+      if actions[2]:
+          j = np.random.randint(0, self.threshes.shape[0])
+          self.thresh_tiles[j] = np.random.randint(0, self.n_tiles)
+      if actions[3]:
+          if np.random.random() < 0.5:
+              self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
+          else:
+              self.step_size = np.random.random() * 2
+
+
+      self.gen_map()
+
+   def gen_map(self):
+      map_width = self.map_width
+      map_arr = np.zeros((map_width, map_width))
+      for i in range(map_arr.shape[0]):
+         for j in range(map_arr.shape[1]):
+            map_arr[i, j] = self.thresh_tiles[
+               np.where(0.5 + self.noise.noise2d(
+                   self.x0 + i * self.step_size, self.y0 + j * self.step_size) / 2 < np.concatenate((self.threshes, [1])))[0][0]]
+      self.map_arr = map_arr.astype(np.uint8)
+
+
+
 class LSystemGenome(Genome):
     def __init__(self, n_tiles, map_width):
         super().__init__(n_tiles, map_width)
@@ -533,22 +598,25 @@ class EvoIndividual(Individual):
         self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
         if evolver.ALL_GENOMES:
             rnd = np.random.random()
-            if rnd < 1/5:
-                self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
-            elif rnd < 2/5:
+            n_genomes = 6
+            if rnd < 1/n_genomes:
+                self.chromosome = CPPNGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
+            elif rnd < 2/n_genomes:
                 self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
                                                 evolver.mats.MaterialEnum.GRASS.value.index)
-            elif rnd < 3/5:
+            elif rnd < 3/n_genomes:
                 self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
-            elif rnd < 4/5:
+            elif rnd < 4/n_genomes:
                 self.chromosome = TileFlipGenome(self.n_tiles, evolver.map_width)
+            elif rnd < 5 / n_genomes:
+                self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
             else:
 #               seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
                 seed = None
                 self.chromosome = CAGenome(self.n_tiles, evolver.map_width)
         if evolver.CPPN:
             #FIXME: yeesh
-            self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
+            self.chromosome = CPPNGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
 #           self.chromosome = evolver.chromosomes[self.idx]
         elif evolver.CA:
 #           seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
@@ -561,6 +629,8 @@ class EvoIndividual(Individual):
         elif evolver.PRIMITIVES:
             self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
                                             enums.MaterialEnum.GRASS.value.index)
+        elif evolver.SIMPLEX_NOISE:
+            self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
         self.chromosome.gen_map()
         self.validate_map()
         self.score_hists = []

@@ -32,7 +32,7 @@ from evolution.lambda_mu import LambdaMuEvolver
 import neat
 from evolution.individuals import EvoIndividual
 #from evolution.individuals import CPPNGenome as DefaultGenome
-from evolution.individuals import DefaultGenome
+from evolution.individuals import CPPNGenome
 from evolution.individuals import CAGenome
 from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
@@ -209,13 +209,15 @@ class EvolverNMMO(LambdaMuEvolver):
       self.epoch_reloaded = None
 #     self.global_stats = ray.get_actor("global_stats")
       self.global_counter = ray.get_actor("global_counter")
+      # FIXME: FUCK THIS, PROBABLY UNNECESSARY BY NOW???
       self.CPPN = config.GENOME == 'CPPN'
       self.CA = config.GENOME == 'CA'
       self.PRIMITIVES = config.GENOME == 'Pattern'
       self.TILE_FLIP = config.GENOME == 'Random'
       self.LSYSTEM = config.GENOME == 'LSystem'
+      self.SIMPLEX_NOISE = config.GENOME == 'Simplex'
       self.ALL_GENOMES = config.GENOME == 'All'
-      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.ALL_GENOMES):
+      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES):
          raise Exception('Invalid genome')
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
@@ -240,9 +242,9 @@ class EvolverNMMO(LambdaMuEvolver):
             neat_config_path = 'config_cppn_nmmo_griddly'
          else:
             neat_config_path = 'config_cppn_nmmo'
-         self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
-                            neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
-                            neat_config_path)
+         self.neat_config = neat.config.Config(CPPNGenome, neat.reproduction.DefaultReproduction,
+                                               neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
+                                               neat_config_path)
          self.neat_config.fitness_threshold = np.float('inf')
          self.neat_config.pop_size = self.config.N_EVO_MAPS
          self.neat_config.elitism = int(self.lam * self.config.N_EVO_MAPS)
