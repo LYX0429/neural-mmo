@@ -11,30 +11,34 @@ global trg_image
 
 
 def diversity_calc(config):
-   if config.FITNESS_METRIC == 'L2':
+   div_calc_name = config.FITNESS_METRIC
+   return get_div_calc(div_calc_name)
+
+def get_div_calc(div_calc_name):
+   if div_calc_name == 'L2':
       calc_diversity = calc_diversity_l2
-   elif config.FITNESS_METRIC == 'Differential':
+   elif div_calc_name == 'Differential':
       calc_diversity = calc_differential_entropy
-   elif config.FITNESS_METRIC == 'Discrete':
+   elif div_calc_name == 'Discrete':
       calc_diversity = calc_discrete_entropy_2
-   elif config.FITNESS_METRIC == 'Hull':
+   elif div_calc_name == 'Hull':
       calc_diversity = calc_convex_hull
-   elif config.FITNESS_METRIC == 'Sum':
+   elif div_calc_name == 'Sum':
       calc_diversity = sum_experience
-   elif config.FITNESS_METRIC == 'Lifespans':  # or config.FITNESS_METRIC == 'ALP':
+   elif div_calc_name == 'Lifespans':  # or config.FITNESS_METRIC == 'ALP':
       calc_diversity = sum_lifespans
-   elif config.FITNESS_METRIC == 'Lifetimes':
+   elif div_calc_name == 'Lifetimes':
        calc_diversity = calc_mean_lifetime
-   elif config.FITNESS_METRIC == 'Actions':
+   elif div_calc_name == 'Actions':
        calc_diversity = calc_mean_actions_matched
-   elif config.FITNESS_METRIC == 'MapTest':
+   elif div_calc_name == 'MapTest':
        calc_diversity = calc_local_map_entropy
-   elif config.FITNESS_METRIC == 'MapTestText':
+   elif div_calc_name == 'MapTestText':
        calc_diversity = ham_text
        get_trg_image()
-   elif config.FITNESS_METRIC == 'y_deltas':
+   elif div_calc_name == 'y_deltas':
        calc_diversity = calc_y_deltas
-   elif config.FITNESS_METRIC == 'Scores' or config.FITNESS_METRIC == 'ALP':
+   elif div_calc_name == 'Scores' or config.FITNESS_METRIC == 'ALP':
        calc_diversity = calc_scores
    else:
        raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))

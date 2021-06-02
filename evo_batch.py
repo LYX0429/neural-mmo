@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt
 import projekt
 from fire import Fire
 from ForgeEvo import get_experiment_name
+from evolution.diversity import get_div_calc
 
 genomes = [
     'Random',
@@ -59,6 +60,7 @@ EVALUATION_HORIZON = 100
 # TODO: use this variable in the eval command string. Formatting might be weird.
 SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 eval_args = "--EVALUATION_HORIZON {} --N_EVAL 1 --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\"".format(EVALUATION_HORIZON)
+DIV_CALCS = ['L2', 'Differential', 'Hull', 'Discrete', 'Sum']
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
@@ -194,6 +196,7 @@ def launch_cross_eval(experiment_names, vis_only=False):
    map_exp_names = experiment_names + ['PCG']
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
+   div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
    for (i, model_exp_name) in enumerate(model_exp_names):
       for (j, map_exp_name) in enumerate(map_exp_names):
          # TODO: how to evaluate over an archive of maps?
@@ -201,53 +204,64 @@ def launch_cross_eval(experiment_names, vis_only=False):
          if map_exp_name == 'PCG':
             infer_idx = 0
          elif 'Pattern' in map_exp_name:
-            infer_idx = "(18, 10, 0)"
-         else:
+            infer_idx = "(10, 6, 0)"
+         elif 'CPPN' in map_exp_name:
+            infer_idx = "(10, 8, 0)"
+         elif 'Random' in map_exp_name:
             infer_idx = "(18, 17, 0)"
          if not vis_only:
-            new_cmd = 'python forge.py evaluate --config treeorerock --model {} --map {} --infer_idx \"{}\" {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args)
+            new_cmd = 'python Forge.py evaluate --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\" {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args)
             print(new_cmd)
             launch_cmd(new_cmd, n)
-         eval_data_path = os.path.join(
-            'eval_experiment',
-            map_exp_name,
-            str(infer_idx),
-            model_exp_name,
-            'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
-               model_exp_name,
+         else:
+            eval_data_path = os.path.join(
+               'eval_experiment',
                map_exp_name,
-               infer_idx,
-               EVALUATION_HORIZON
-            ),
-         )
-         data = np.load(eval_data_path, allow_pickle=True)
-         mean_lifespans[i, j] = np.mean(data[0]['lifespans'])
-         for k in range(len(SKILLS)):
-            mean_skill_arr = np.vstack(data[0]['skills'])
-            mean_skills[k, i, j] = np.mean(mean_skill_arr[:, k])
-         n += 1
-   # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" dimension exclusively.
-   # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
-   row_labels = []
-   col_labels = []
-   def get_genome_name(exp_name):
-      if 'CPPN' in exp_name:
-         return 'CPPN'
-      elif 'Pattern' in exp_name:
-         return 'Pattern'
-      elif 'Random' in exp_name:
-         return 'Random'
-      else:
-         return exp_name
+               str(infer_idx),
+               model_exp_name,
+               'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
+                  model_exp_name,
+                  map_exp_name,
+                  infer_idx,
+                  EVALUATION_HORIZON
+               ),
+            )
+            data = np.load(eval_data_path, allow_pickle=True)
+            mean_lifespans[i, j] = np.mean(data[0]['lifespans'])
+            # TODO: will this work for more than one episode of evaluation??? No???
+            for k in range(len(SKILLS)):
+               mean_skill_arr = np.vstack(data[0]['skills'])
+               mean_skills[k, i, j] = np.mean(mean_skill_arr[:, k])
+            for (k, div_calc_name) in enumerate(DIV_CALCS):
+              #skill_arr = np.vstack(data[0]['skills'])
+              #div_scores[k, i, j] = get_div_calc(div_calc_name)(skill_arr)
+               div_scores[k, i, j] = get_div_calc(div_calc_name)(data[0])
+            n += 1
+   if vis_only:
+      # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" dimension exclusively.
+      # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
+      row_labels = []
+      col_labels = []
+      def get_genome_name(exp_name):
+         if 'CPPN' in exp_name:
+            return 'CPPN'
+         elif 'Pattern' in exp_name:
+            return 'Pattern'
+         elif 'Random' in exp_name:
+            return 'Random'
+         else:
+            return exp_name
 
-   for r in model_exp_names:
-      row_labels.append(get_genome_name(r))
+      for r in model_exp_names:
+         row_labels.append(get_genome_name(r))
 
-   for c in map_exp_names:
-      col_labels.append(get_genome_name(c))
-   cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]")
-   for (k, skill_name) in enumerate(SKILLS):
-      cross_eval_heatmap(mean_skills[k], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
+      for c in map_exp_names:
+         col_labels.append(get_genome_name(c))
+      cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]")
+      for (k, skill_name) in enumerate(SKILLS):
+         cross_eval_heatmap(mean_skills[k], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
+      for (k, div_calc_name) in enumerate(DIV_CALCS):
+         cross_eval_heatmap(div_scores[k], row_labels, col_labels, "{} diversity".format(div_calc_name), "{} diversity".format(div_calc_name))
 
 def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
    fig, ax = plt.subplots()
