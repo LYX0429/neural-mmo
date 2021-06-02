@@ -5,10 +5,10 @@
 ##SBATCH --gres=gpu:1
 #SBATCH --time=120:00:00
 #SBATCH --mem=50GB
-#SBATCH --job-name=nmmo2
+#SBATCH --job-name=nmmo0
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=sam.earle@nyu.edu
-#SBATCH --output=nmmo2%j.out
+#SBATCH --output=nmmo0%j.out
 
 cd /scratch/se2161/neural-mmo || exit
 
