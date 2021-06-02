@@ -455,7 +455,7 @@ class SimplexNoiseGenome(Genome):
       if actions[0]:
          if np.random.random() < 0.5 and self.threshes.shape[0] > self.n_tiles:
             j = np.random.randint(0, self.threshes.shape[0])
-            self.threshes = np.concatenate((self.threshes[:j], full_threshes[j+1:]))
+            self.threshes = np.concatenate((self.threshes[:j], self.threshes[j+1:]))
             # kinda weird that we'll never bonk off the last one
             self.thresh_tiles = np.concatenate((self.thresh_tiles[:j], self.thresh_tiles[j+1:]))
          elif self.threshes.shape[0] < 2 * self.n_tiles:
@@ -473,7 +473,7 @@ class SimplexNoiseGenome(Genome):
          j = np.random.randint(0, self.threshes.shape[0])
          self.threshes[j] = np.random.uniform(self.threshes[j-1], full_threshes[j+1], 1)
       if actions[2]:
-          j = np.random.randint(0, self.threshes.shape[0])
+          j = np.random.randint(0, self.thresh_tiles.shape[0])
           self.thresh_tiles[j] = np.random.randint(0, self.n_tiles)
       if actions[3]:
           if np.random.random() < 0.5:
@@ -488,12 +488,16 @@ class SimplexNoiseGenome(Genome):
       map_width = self.map_width
       map_arr = np.zeros((map_width, map_width))
       full_threshes = np.concatenate((self.threshes, [1]))
+      if full_threshes.shape[0] != self.thresh_tiles.shape[0]:
+         TT()
       for i in range(map_arr.shape[0]):
          for j in range(map_arr.shape[1]):
-            map_arr[i, j] = self.thresh_tiles[
-               np.where(0.5 + self.noise.noise2d(
-                   self.x0 + i * self.step_size, self.y0 + j * self.step_size) / 2 <= full_threshes)[0][0]]
-      self.map_arr = map_arr.astype(np.uint8)
+            t = np.where(0.5 + self.noise.noise2d(
+                   self.x0 + i * self.step_size, self.y0 + j * self.step_size) / 2 <= full_threshes)[0][0]
+            if t >= self.thresh_tiles.shape[0]:
+               TT()
+            map_arr[i, j] = self.thresh_tiles[t]
+         self.map_arr = map_arr.astype(np.uint8)
 
 
 
