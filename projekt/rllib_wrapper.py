@@ -1,23 +1,12 @@
-#<<<<<<< HEAD
-import os
 from pathlib import Path
-from collections import defaultdict
-from pdb import set_trace as T
-from typing import Dict
 import json
-#=======
-from pdb import set_trace as T
+from pdb import set_trace as TT
 
 from collections import defaultdict
 from itertools import chain
 import shutil
-import contextlib
 import os
 import re
-
-from tqdm import tqdm
-import numpy as np
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
 import gym
 from matplotlib import pyplot as plt
@@ -73,8 +62,6 @@ from ray.rllib.utils.typing import EnvConfigDict, EnvType, ResultDict, TrainerCo
 
 
 #Moved log to forge/trinity/env
-#class RLLibEnv(Env, rllib.MultiAgentEnv):
-#=======
 from torch import nn
 
 from ray import rllib
@@ -449,10 +436,13 @@ class RLlibEvaluator(evaluator.Base):
       Save.render(map_arr[t_start:t_end, t_start:t_end],
             map_generator.textures, os.path.join(self.eval_path_map, '{} map {}.png'.format(self.config.MAP.split('/')[-1], self.config.INFER_IDX)))
       ts = np.arange(self.config.EVALUATION_HORIZON)
+      n_stat_calcs = 1
+      assert self.config.EVALUATION_HORIZON % n_stat_calcs == 0
+      stat_interval = self.config.EVALUATION_HORIZON // n_stat_calcs
       n_evals = self.config.N_EVAL
       n_metrics = len(DIV_CALCS) + 1 
       n_skills = len(self.config.SKILLS)
-      div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON))
+      div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON // stat_interval))
 #     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
       heatmaps = np.zeros((n_evals, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
       final_stats = []
@@ -465,17 +455,20 @@ class RLlibEvaluator(evaluator.Base):
             self.state = {}
             self.registry = OverlayRegistry(self.config, self.env)
             # array of data: diversity scores, lifespans...
-            divs = np.zeros((len(DIV_CALCS) + 1, self.config.EVALUATION_HORIZON))
+            divs = np.zeros((len(DIV_CALCS) + 1, self.config.EVALUATION_HORIZON // stat_interval))
+            stat_i = 0
             for t in tqdm(range(self.config.EVALUATION_HORIZON)):
                self.tick(None, None)
    #           print(len(self.env.realm.players.entities))
                div_stats = self.env.get_all_agent_stats()
-               for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
-                  diversity = calc_diversity(div_stats, verbose=False)
-                  divs[j, t] = diversity
-               lifespans = div_stats['lifespans']
-               divs[j + 1, t] = np.mean(lifespans)
-               div_mat[i] = divs
+               if (t + 1) % stat_interval == 0:
+                  for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
+                     diversity = calc_diversity(div_stats, verbose=False)
+                     divs[j, stat_i] = diversity
+                  lifespans = div_stats['lifespans']
+                  divs[j + 1, stat_i] = np.mean(lifespans)
+                  div_mat[i] = divs
+                  stat_i += 1
                # This is a crazy bit where we construct heatmaps but should we not just use get_agent_stats()?
                for _, ent in self.env.realm.players.entities.items():
                   r, c = ent.pos
@@ -500,7 +493,7 @@ class RLlibEvaluator(evaluator.Base):
             heatmaps = np.load(f)
 
       plot_name = 'diversity {}'.format(exp_name)
-      plot_diversity(ts, div_mat, [d[1] for d in DIV_CALCS], exp_name, self.config)
+      plot_diversity(np.where(ts % stat_interval == 0)[0], div_mat, [d[1] for d in DIV_CALCS], exp_name, self.config)
       plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
       plt.close()
 #     heat_out = heatmaps.mean(axis=0).mean(axis=0)
@@ -522,8 +515,12 @@ class RLlibEvaluator(evaluator.Base):
          plt.savefig(os.path.join(self.eval_path_model, '{} heatmap {}.png'.format(s_name, exp_name)))
 
       mean_divs = {}
-      means_np = div_mat.mean(axis=-1).mean(axis=0)
-      stds_np = div_mat.mean(axis=-1).std(axis=0)
+      # Originally we were taking the mean of diversity and lifespan stats over various timesteps, then calculating mean
+      # and stddev over different episodes/trials. Instead, let's just look at the last step.
+#     means_np = div_mat.mean(axis=-1).mean(axis=0)
+#     stds_np = div_mat.mean(axis=-1).std(axis=0)
+      means_np = div_mat[:, :, -1].mean(axis=0)
+      stds_np = div_mat[:, :, -1].std(axis=0)
       for j, (_, div_name) in enumerate(DIV_CALCS):
          mean_divs[div_name] = {}
          mean_divs[div_name]['mean'] = means_np[j]
@@ -541,11 +538,12 @@ class RLlibEvaluator(evaluator.Base):
       plt.title('TSNE plot of agents')
       colors = np.hstack([stats['lifespans'] for stats in final_stats])
      #colors = lifespans
-      sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
-      cbar = plt.colorbar(sc)
-      cbar.ax.set_ylabel('lifespans')
-      plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
-      plt.close()
+      # FIXME: an issue here
+#     sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
+#     cbar = plt.colorbar(sc)
+#     cbar.ax.set_ylabel('lifespans')
+#     plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
+#     plt.close()
       plt.figure()
       p1 = plt.bar(np.arange(final_agent_skills.shape[0]), final_agent_skills.mean(axis=1), 5, yerr=final_agent_skills.std(axis=1))
       plt.title('agent bars {}'.format(exp_name))
@@ -577,7 +575,8 @@ class RLlibEvaluator(evaluator.Base):
       log = InkWell()
       log.update(self.env.terminal())
 
-      fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
+#     fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
+      fpath = os.path.join(self.eval_path_model, 'evaluation.npy')
       np.save(fpath, log.packet)
 
 
@@ -608,13 +607,13 @@ class RLlibEvaluator(evaluator.Base):
                self.reset_env()
 
       stats = self.env.get_all_agent_stats()
-      score = self.calc_diversity(stats, verbose=True)
+      score = self.calc_diversity(stats, verbose=False)
 
       self.i += 1
 
    def reset_env(self):
       stats = self.env.send_agent_stats()
-      score = self.calc_diversity(stats, verbose=True)
+      score = self.calc_diversity(stats, verbose=False)
       #     score = DIV_CALCS[1][0](stats, verbose=True)
       print(score)
       self. i = 0
@@ -1109,9 +1108,7 @@ class SanePPOTrainer(ppo.PPOTrainer):
 
       if model == 'current':
          modelPath = config.PATH_MODEL.format(config.MODEL)
-         print('Loading from: {}'.format(modelPath))
          path     = os.path.join(modelPath, 'checkpoint')
-         super().restore(path)
 #        with open('experiment/path.txt') as f:
 #           path = f.read().splitlines()[0]
       elif model.startswith('evo_experiment'):
@@ -1132,6 +1129,9 @@ class SanePPOTrainer(ppo.PPOTrainer):
             path = f.read().splitlines()[0]
          path = os.path.abspath(path)
          #FIXME dumb hack
+
+      print('Loading from: {}'.format(path))
+      super().restore(path)
 
 #     else:
 #        path = 'experiment/{}/checkpoint'.format(model)

@@ -32,7 +32,7 @@ from evolution.lambda_mu import LambdaMuEvolver
 import neat
 from evolution.individuals import EvoIndividual
 #from evolution.individuals import CPPNGenome as DefaultGenome
-from evolution.individuals import CPPNGenome
+from evolution.individuals import DefaultGenome
 from evolution.individuals import CAGenome
 from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
@@ -242,7 +242,7 @@ class EvolverNMMO(LambdaMuEvolver):
             neat_config_path = 'config_cppn_nmmo_griddly'
          else:
             neat_config_path = 'config_cppn_nmmo'
-         self.neat_config = neat.config.Config(CPPNGenome, neat.reproduction.DefaultReproduction,
+         self.neat_config = neat.config.Config(DefaultGenome, neat.reproduction.DefaultReproduction,
                                                neat.species.DefaultSpeciesSet, neat.stagnation.DefaultStagnation,
                                                neat_config_path)
          self.neat_config.fitness_threshold = np.float('inf')

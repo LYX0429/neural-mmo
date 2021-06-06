@@ -5,7 +5,7 @@ evaluate capable policies on Neural MMO as well as rendering,
 logging, and visualization tools.
 
 Associated docs and tutorials are hosted on jsuarez5341.github.io.'''
-from pdb import set_trace as T
+from pdb import set_trace as TT
 
 import numpy as np
 import torch

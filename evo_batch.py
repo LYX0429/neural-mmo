@@ -23,6 +23,7 @@ genomes = [
     'Random',
     'CPPN',
     'Pattern',
+    'Simplex',
 #   'CA',
 #   'LSystem',
 #   'All',
@@ -57,7 +58,7 @@ me_bin_sizes = [
 ]
 
 EVALUATION_HORIZON = 100
-if False:
+if True:
     N_EVALS = 1
 else:
     N_EVALS = 20
@@ -204,7 +205,7 @@ def launch_cross_eval(experiment_names, vis_only=False):
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
    for (i, model_exp_name) in enumerate(model_exp_names):
       for (j, map_exp_name) in enumerate(map_exp_names):
-         # TODO: how to evaluate over an archive of maps?
+         # TODO: select best map and from saved archive and evaluate on this one
          infer_idx = None
          if map_exp_name == 'PCG':
             infer_idx = 0
@@ -214,8 +215,10 @@ def launch_cross_eval(experiment_names, vis_only=False):
             infer_idx = "(10, 8, 0)"
          elif 'Random' in map_exp_name:
             infer_idx = "(18, 17, 0)"
+         elif 'Simplex' in map_exp_name:
+            infer_idx = "(10, 5, 0)"
          if not vis_only:
-            new_cmd = 'python Forge.py evaluate --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\" {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args)
+            new_cmd = 'python Forge.py evaluate --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\" {} --EVO_DIR'.format(model_exp_name, map_exp_name, infer_idx, eval_args, EXP_NAME)
             print(new_cmd)
             launch_cmd(new_cmd, n)
          else:
@@ -254,6 +257,8 @@ def launch_cross_eval(experiment_names, vis_only=False):
             return 'Pattern'
          elif 'Random' in exp_name:
             return 'Random'
+         elif 'Simplex' in exp_name:
+            return 'Simplex'
          else:
             return exp_name
 

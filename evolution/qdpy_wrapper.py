@@ -185,6 +185,9 @@ class meNMMO(EvolverNMMO):
       # Evaluate the individuals with an invalid fitness
       invalid_ind = [ind for ind in init_batch if not ind.fitness.valid]
       invalid_ind = cull_invalid(invalid_ind)
+      while len(invalid_ind) == 0:
+         print("No valid maps in initial batch. Re-generating initial batch.")
+         invalid_ind = cull_invalid([EvoIndividual([], i, self) for i in range(len(init_batch))])
       self.train_individuals(invalid_ind)
       if self.LEARNING_PROGRESS:
          self.train_individuals(invalid_ind)
@@ -205,7 +208,7 @@ class meNMMO(EvolverNMMO):
           halloffame.update(init_batch)
 
       # Store batch in container
-      nb_updated = container.update(init_batch, issue_warning=show_warnings)
+      nb_updated = container.update(invalid_ind, issue_warning=show_warnings)
       self.archive_update_hist = np.hstack((self.archive_update_hist[1:], [nb_updated]))
 
       # FIXME: we should warn about this when not reloading!

@@ -106,6 +106,8 @@ class Genome():
     def mutate(self):
         self.atk_mults = mutate_atk_mults(self.atk_mults)
 
+    def validate_map(self, *args):
+        pass
 
     def get_iterable(self):
         return []
@@ -113,14 +115,14 @@ class Genome():
 def init_weights(m):
     if type(m) == torch.nn.Linear:
         torch.nn.init.xavier_uniform(m.weight)
-        m.bias.data.fill_(-1.01)
+        m.bias.data.fill_(0.01)
 
-    if type(m) == torch.nn.Conv1d:
+    if type(m) == torch.nn.Conv2d:
         torch.nn.init.orthogonal_(m.weight)
 
 class NeuralCA(torch.nn.Module):
 
-    N_HIDDEN = 10
+    N_HIDDEN = 16
     N_CHAN = 9
     N_WEIGHTS = 2 * N_HIDDEN * N_CHAN * 3 * 3 + N_HIDDEN + 2 * N_HIDDEN + N_HIDDEN + N_HIDDEN * N_CHAN + N_CHAN + 1
     def __init__(self, n_chan):
@@ -129,23 +131,25 @@ class NeuralCA(torch.nn.Module):
         assert self.N_CHAN == n_chan
         super().__init__()
         m = self.N_HIDDEN
-        self.l0 = Conv2d(n_chan, 2 * m, 3, 1, 1, bias=True, padding_mode='circular')
+        self.l0 = Conv2d(n_chan, 2 * m, 3, 1, 1, bias=True)
         self.l1 = Conv2d(2 * m, m, 1, 1, 0, bias=True)
         self.l2 = Conv2d(m, n_chan, 1, 1, 0, bias=True)
         self.layers = [self.l0, self.l2, self.l2]
-        self.apply(init_weights)
-        self.n_passes = np.random.randint(1, 5)
-        self.weights = self.get_init_weights()
+#       self.apply(init_weights)
+        self.n_passes = np.random.randint(1, 10)
+        self.weights = self.get_weights()
 
     def forward(self, x):
         x = torch.Tensor(x).unsqueeze(0)
-        for _ in range(max(1, int(min(200, self.n_passes)))):
-            x = self.l0(x)
-            x = torch.nn.functional.relu(x)
-            x = self.l1(x)
-            x = torch.nn.functional.relu(x)
-            x = self.l2(x)
-            x = torch.sigmoid(x)
+        with torch.no_grad():
+           for _ in range(max(1, int(min(200, self.n_passes)))):
+               x = self.l0(x)
+               x = torch.nn.functional.relu(x)
+               x = self.l1(x)
+               x = torch.nn.functional.relu(x)
+               x = self.l2(x)
+               x = torch.sigmoid(x)
+
 
 #       for _ in range(max(1, int(self.n_passes/2))):
 
@@ -169,7 +173,7 @@ class NeuralCA(torch.nn.Module):
        #self.n_passes = max(1, weights[n_el])
 #       print('Neural CAL n_passes', self.n_passes)
 
-    def get_init_weights(self):
+    def get_weights(self):
         weights = []
         #   n_par = 0
         for lyr in self.layers:
@@ -181,7 +185,7 @@ class NeuralCA(torch.nn.Module):
 
         return init_weights
 
-class CAGenome():
+class CAGenome(Genome):
     def __init__(self, n_tiles, map_width, seed):
         self.nn = NeuralCA(n_tiles)
 #       self.seed = seed.reshape(1, *seed.shape)
@@ -199,13 +203,26 @@ class CAGenome():
         self.rng = default_rng()
 
     def gen_map(self):
-        self.multi_hot = self.nn(self.seed).squeeze(0).detach().numpy()
+        nn_out = self.nn(self.seed)
+        self.multi_hot = nn_out.squeeze(0).detach().numpy()
         self.map_arr = self.multi_hot.argmax(axis=0)
 
-    # def configure_crossover(self, parent0, parent2, config):
-    #    super().configure_crossover(parent0, parent2, config)
-    #    mults_0, mults_2 = parent1.atk_mults, parent2.atk_mults
-    #    self.atk_mults, _ = mate_atk_mults(mults_0, mults_2, single_offspring=True)
+
+    def validate_map(self, SPAWN_IDX, FOOD_IDX, WATER_IDX, N_ENT):
+        map_width = self.map_arr.shape[0]
+        spawn_idxs = np.where(self.map_arr == SPAWN_IDX)[0]
+        food_idxs = np.where(self.map_arr == FOOD_IDX)[0]
+        water_idxs = np.where(self.map_arr == WATER_IDX)[0]
+        n_spawns = spawn_idxs.shape[0]
+        if n_spawns < N_ENT:
+            self.map_arr[
+                np.random.randint(0, map_width, N_ENT), np.random.randint(0, map_width, N_ENT)] = SPAWN_IDX
+        if food_idxs.shape[0] < N_ENT:
+            self.map_arr[
+                np.random.randint(0, map_width, N_ENT), np.random.randint(0, map_width, N_ENT)] = FOOD_IDX
+        if water_idxs.shape[0] < N_ENT:
+            self.map_arr[
+                np.random.randint(0, map_width, N_ENT), np.random.randint(0, map_width, N_ENT)] = WATER_IDX
 
     def mutate(self):
 
@@ -214,12 +231,13 @@ class CAGenome():
         x = np.argwhere(noise)
         idxs = np.random.choice(x.shape[0], n_mut, replace=False)
         x = x[idxs]
-        weights = self.nn.weights
+        weights = self.nn.get_weights()
         weights[x] = noise[x]
 #       mask = (np.random.random(size=(self.nn.weights.shape)) < 5/noise.size) * 1
 #       mutation = np.multiply(mask, noise)
 #       weights = self.nn.weights + mutation
-        self.nn.n_passes += int(np.random.uniform(0, 2.5))
+        self.nn.n_passes += int(np.random.uniform(-2.5, 2.5, 1)[0])
+        self.nn.n_passes = int(max(1, max(self.nn.n_passes, 100)))
         self.nn.set_weights(weights)
         self.atk_mults = mutate_atk_mults(self.atk_mults)
         self.age = -1
@@ -234,7 +252,9 @@ class CAGenome():
         return np.hstack((self.nn.weights, [self.nn.n_passes]))
 
 
-class CPPNGenome(neat.genome.DefaultGenome, Genome):
+# Actually CPPNGenome, but needs to be named this way for neat-python to stomach it? Whack. Should hack out neat-python
+# and make it our own
+class DefaultGenome(neat.genome.DefaultGenome, Genome):
     ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
     beyond the map.'''
     def __init__(self, key, neat_config, n_tiles, map_width):
@@ -482,8 +502,6 @@ class SimplexNoiseGenome(Genome):
               self.step_size = np.random.random() * 2
 
 
-      self.gen_map()
-
    def gen_map(self):
       map_width = self.map_width
       map_arr = np.zeros((map_width, map_width))
@@ -605,10 +623,10 @@ class EvoIndividual(Individual):
             rnd = np.random.random()
             n_genomes = 6
             if rnd < 1/n_genomes:
-                self.chromosome = CPPNGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
+                self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
             elif rnd < 2/n_genomes:
                 self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
-                                                evolver.mats.MaterialEnum.GRASS.value.index)
+                                                self.EMPTY_IDX)
             elif rnd < 3/n_genomes:
                 self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
             elif rnd < 4/n_genomes:
@@ -618,10 +636,10 @@ class EvoIndividual(Individual):
             else:
 #               seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
                 seed = None
-                self.chromosome = CAGenome(self.n_tiles, evolver.map_width)
+                self.chromosome = CAGenome(self.n_tiles, evolver.map_width, seed=seed)
         if evolver.CPPN:
             #FIXME: yeesh
-            self.chromosome = CPPNGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
+            self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
 #           self.chromosome = evolver.chromosomes[self.idx]
         elif evolver.CA:
 #           seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
@@ -668,7 +686,9 @@ class EvoIndividual(Individual):
  #          multi_hot = None
  #      else:
  #          multi_hot = self.chromosome.multi_hot
+        # Let the chromosome sort itself out if applicable
         map_arr = self.chromosome.map_arr
+        self.chromosome.validate_map(self.SPAWN_IDX, self.FOOD_IDX, self.WATER_IDX, self.NENT)
         self.add_border(map_arr, None)
         spawn_idxs = map_arr == self.SPAWN_IDX
         food_idxs = map_arr == self.FOOD_IDX
