@@ -7,6 +7,7 @@ logging, and visualization tools.
 Associated docs and tutorials are hosted on jsuarez5341.github.io.'''
 from pdb import set_trace as TT
 
+print('shit1')
 import numpy as np
 import torch
 
@@ -16,6 +17,7 @@ import json
 import ray
 from ray import rllib
 
+print('shit2')
 from forge.ethyr.torch import utils
 from forge.blade.systems import ai
 

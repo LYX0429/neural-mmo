@@ -261,7 +261,7 @@ class Griddly(EvoNMMO):
    ME_BIN_SIZES = [100, 100]
    ME_BOUNDS = [(0, 50), (0, 50)]
    SKILLS = ['drink_skill', 'gather_skill', 'woodcut_skill', 'mine_skill']
-#=======
+
 class Debug(SmallMaps):
    '''Debug Neural MMO training setting
 
@@ -278,5 +278,3 @@ class Debug(SmallMaps):
    HIDDEN                  = 2
    EMBED                   = 2
 
-
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989

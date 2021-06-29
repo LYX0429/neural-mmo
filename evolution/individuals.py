@@ -453,20 +453,52 @@ class TileFlipGenome(Genome):
 
 
 class SimplexNoiseGenome(Genome):
-   def __init__(self, n_tiles, map_width):
-       super().__init__(n_tiles, map_width)
-       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
-       self.step_size = np.random.random() * 2
-       self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
-       n_bands = np.random.randint(n_tiles, n_tiles + 3)
-       threshes = np.random.random(n_bands)
-       # values between 0 and 1 that represent thresholds between tile types
-       self.threshes = np.array([t + i for (i, t) in enumerate(threshes)]) / n_bands
-       # the tile types to be thresholded
-       self.thresh_tiles = np.random.randint(0, n_tiles, size=n_bands+1)
+   def __init__(self, n_tiles, map_width, baseline=False):
+      super().__init__(n_tiles, map_width)
+      self.baseline = baseline
+      self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
+      self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
+      if baseline:
+         self.step_size = 1
+         # Following the parameters for the baseline simplex noise maps -- see projekt/config
+         self.n_bands = 10
+         self.threshes = [
+               0.25,
+               0.4,
+               0.45,
+               0.5,
+               0.75,
+               0.35,
+               0.775,
+               0.8,
+               0.85,
+            ]
+         self.thresh_tiles = [
+               enums.Material.WATER.value.index,
+               enums.Material.GRASS.value.index,
+               enums.Material.LAVA.value.index,
+               enums.Material.SPAWN.value.index,
+               enums.Material.GRASS.value.index,
+               enums.Material.FOREST.value.index,
+               enums.Material.FOREST.value.index,
+               enums.Material.TREE.value.index,
+               enums.Material.IRON_ORE.value.index,
+               enums.Material.STONE.value.index,
+            ]
+
+         return
+      self.step_size = np.random.random() * 2
+      n_bands = np.random.randint(n_tiles, n_tiles + 3)
+      threshes = np.random.random(n_bands)
+      # values between 0 and 1 that represent thresholds between tile types
+      self.threshes = np.array([t + i for (i, t) in enumerate(threshes)]) / n_bands
+      # the tile types to be thresholded
+      self.thresh_tiles = np.random.randint(0, n_tiles, size=n_bands+1)
 
 
    def mutate(self):
+      if self.baseline:
+         return
       n_actions = 4
       actions = np.random.random(n_actions) < 0.3
       full_threshes = np.concatenate((self.threshes, [1]))
@@ -503,6 +535,8 @@ class SimplexNoiseGenome(Genome):
 
 
    def gen_map(self):
+      if self.baseline:
+         return
       map_width = self.map_width
       map_arr = np.zeros((map_width, map_width))
       full_threshes = np.concatenate((self.threshes, [1]))
@@ -619,7 +653,10 @@ class EvoIndividual(Individual):
         self.NENT = evolver.config.NENT
         self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
         self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
-        if evolver.ALL_GENOMES:
+        if evolver.config.PRETRAIN:
+           # If we're training a baseline agent on frozen maps, iniialize our genomes to generate baseline maps
+           self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width, baseline=True)
+        elif evolver.ALL_GENOMES:
             rnd = np.random.random()
             n_genomes = 6
             if rnd < 1/n_genomes:
@@ -637,7 +674,7 @@ class EvoIndividual(Individual):
 #               seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
                 seed = None
                 self.chromosome = CAGenome(self.n_tiles, evolver.map_width, seed=seed)
-        if evolver.CPPN:
+        elif evolver.CPPN:
             #FIXME: yeesh
             self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
 #           self.chromosome = evolver.chromosomes[self.idx]
