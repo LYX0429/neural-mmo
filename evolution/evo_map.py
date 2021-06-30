@@ -155,7 +155,8 @@ def dummi_features(individual, config):
     return (50, 50)
 
 def rand_features(individual, config):
-    return [np.random.randint(*config.ME_BOUNDS[i]) for i in range(len(config.ME_BOUNDS))]
+    feats = [np.random.randint(*config.ME_BOUNDS[i]) for i in range(len(config.ME_BOUNDS))]
+    return feats
 
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None, n_epochs=10000):
@@ -163,7 +164,12 @@ class EvolverNMMO(LambdaMuEvolver):
       if config.PAIRED:
          config.NPOLICIES = 2
          config.NPOP = 2
-      if config.FEATURE_CALC == "map_entropy":
+      if config.PRETRAIN:
+          # assert self.BASELINE_SIMPLEX
+          assert config.GENOME == 'Baseline'
+          # This will allow the archive to be filled out quite rapidly, so that we cannot be accused of giving baseline models too few maps on which to train as compared to the jointly-optimized maps
+          self.calc_features = rand_features
+      elif config.FEATURE_CALC == "map_entropy":
          config.ME_DIMS = 'map_entropy'
          self.calc_features = calc_map_entropies
 #        self.calc_features = calc_global_map_entropy
@@ -173,10 +179,6 @@ class EvolverNMMO(LambdaMuEvolver):
          self.calc_features = calc_mean_lifetime
       elif config.FEATURE_CALC is None:
           self.calc_features = dummi_features
-      elif config.PRETRAIN:
-          assert self.BASELINE_SIMPLEX
-          # This will allow the archive to be filled out quite rapidly, so that we cannot be accused of giving baseline models too few maps on which to train as compared to the jointly-optimized maps
-          self.calc_features = rand_features
       else:
          raise NotImplementedError('Provided feature calculation function: {} is invalid. In case of BCs (provide "None" if not applicable).'.format(config.FEATURE_CALC))
       self.policy_to_agent = {i: [] for i in range(config.NPOLICIES)}
@@ -350,7 +352,6 @@ class EvolverNMMO(LambdaMuEvolver):
 #        return
 
       features = self.calc_features(individual, self.config)
-
       individual.features = features
       #     features = [features[i] for i in self.me.feature_idxs]
       # FIXME: nip this in the bud

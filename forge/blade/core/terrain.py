@@ -77,6 +77,7 @@ class MapGenerator:
 
    def material_evo(self, config, val, gamma=0):
 
+      T()
       if val <= config.TERRAIN_WATER:
          return Terrain.WATER
       if val <= config.TERRAIN_GRASS_0:
@@ -151,7 +152,6 @@ class MapGenerator:
       #Compute L1 and L2 distances
       x      = np.concatenate([np.arange(sz//2, 0, -1), np.arange(1, sz//2+1)])
       X, Y   = np.meshgrid(x, x)
-      print(X, Y)
       data   = np.stack((X, Y), -1)
       l1     = np.max(abs(data), -1)
       l2     = np.sqrt(np.sum(data**2, -1))
