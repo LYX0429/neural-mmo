@@ -459,7 +459,7 @@ class SimplexNoiseGenome(Genome):
       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
       self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
       if baseline:
-         self.step_size = 0.3
+         self.step_size = 0.2
          # Following the parameters for the baseline simplex noise maps -- see projekt/config
          self.n_bands = 9
          self.threshes = np.array([
@@ -468,7 +468,7 @@ class SimplexNoiseGenome(Genome):
                0.45,
                0.5,
                0.75,
-               0.35,
+#              0.35,
                0.775,
                0.8,
                0.85,
@@ -479,7 +479,7 @@ class SimplexNoiseGenome(Genome):
                enums.MaterialEnum.LAVA.value.index,
                enums.MaterialEnum.SPAWN.value.index,
                enums.MaterialEnum.GRASS.value.index,
-               enums.MaterialEnum.FOREST.value.index,
+#              enums.MaterialEnum.FOREST.value.index,
                enums.MaterialEnum.FOREST.value.index,
                enums.MaterialEnum.TREE.value.index,
                enums.MaterialEnum.OREROCK.value.index,

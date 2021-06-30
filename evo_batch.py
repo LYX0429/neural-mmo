@@ -30,13 +30,13 @@ genomes = [
     'Baseline',
 ]
 fitness_funcs = [
-#   'Lifespans',
-    'L2',
+    'Lifespans',
+#   'L2',
 #   'Hull',
 #   'Differential',
 #   'Sum',
 #   'Discrete',
-    ]
+]
 
 skills = [
     'ALL',
@@ -59,7 +59,7 @@ me_bin_sizes = [
 ]
 
 EVALUATION_HORIZON = 100
-if True:
+if False:
     N_EVALS = 1
 else:
     N_EVALS = 20
@@ -67,6 +67,7 @@ else:
 SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\"".format(EVALUATION_HORIZON, N_EVALS)
 DIV_CALCS = ['L2', 'Differential', 'Hull', 'Discrete', 'Sum']
+
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
@@ -88,6 +89,7 @@ def launch_batch(exp_name, preeval=False):
 
    if LOCAL:
       default_config['n_generations'] = 1
+   launched_baseline = False
    i = 0
 
    for gene in genomes:
@@ -100,9 +102,11 @@ def launch_batch(exp_name, preeval=False):
 
             for algo in algos:
                for me_bins in me_bin_sizes:
-                  if gene == 'Baseline' and fit_func != 'L2' and skillset != 'ALL' and algo != 'MAP-Elites' and me_bins != [100, 100]:
-                     # If we're training a baseline, these other settings are irrelevant (right?)
+                  if gene == 'Baseline' and launched_baseline:
+                     # Only launch one baseline, these other settings are irrelevant
                      continue
+                  else:
+                     launched_baseline = True
                   if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
                      # If using MAP-Elites, ME bin sizes are irrelevant
                      continue
@@ -119,7 +123,7 @@ def launch_batch(exp_name, preeval=False):
                   # Write the config file with the desired settings
                   exp_config = copy.deepcopy(default_config)
                   exp_config.update({
-                     'N_GENERATIONS': 100000,
+                     'N_GENERATIONS': 10000,
                      'TERRAIN_SIZE': 70,
                      'NENT': 16,
                      'GENOME': gene,
@@ -150,8 +154,8 @@ def launch_batch(exp_name, preeval=False):
                   if LOCAL:
                      exp_config.update({
                         'N_GENERATIONS': 100,
-#                       'N_EVO_MAPS': 8,
-#                       'N_PROC': 8,
+                        'N_EVO_MAPS': 12,
+                        'N_PROC': 12,
                         'EVO_SAVE_INTERVAL': 10,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
@@ -434,7 +438,8 @@ if __name__ == '__main__':
    opts.add_argument(
        '-ev',
        '--evaluate',
-       help='Evaluate a batch of evolution experiments.',
+       help='Cross-evaluate a batch of joint map-evolution, agent-learning experiments, looking at the behavior of all '
+            'agent models on all ("best") maps.',
        action='store_true',
    )
    opts.add_argument(
