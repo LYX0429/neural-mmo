@@ -20,13 +20,14 @@ from ForgeEvo import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
-    'Random',
-    'CPPN',
-    'Pattern',
-    'Simplex',
+#   'Random',
+#   'CPPN',
+#   'Pattern',
+#   'Simplex',
 #   'CA',
 #   'LSystem',
 #   'All',
+    'Baseline',
 ]
 fitness_funcs = [
 #   'Lifespans',
@@ -54,7 +55,7 @@ algos = [
 
 me_bin_sizes = [
 #   [1,1],
-    [20,20],
+    [100,100],
 ]
 
 EVALUATION_HORIZON = 100
@@ -99,9 +100,14 @@ def launch_batch(exp_name, preeval=False):
 
             for algo in algos:
                for me_bins in me_bin_sizes:
+                  if gene == 'Baseline' and fit_func != 'L2' and skillset != 'ALL' and algo != 'MAP-Elites' and me_bins != [100, 100]:
+                     # If we're training a baseline, these other settings are irrelevant (right?)
+                     continue
                   if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
+                     # If using MAP-Elites, ME bin sizes are irrelevant
                      continue
                   if (np.array(me_bins) == 1).all():
+                     # If we're doing a simple evolutionary strategy (lazily, through qdpy ME, then set 12 individuals per bin
                      items_per_bin = 12
                      feature_calc = None
                   else:
@@ -129,6 +135,10 @@ def launch_batch(exp_name, preeval=False):
                      'N_PROC': 48,
                      'TERRAIN_RENDER': False,
                      'EVO_SAVE_INTERVAL': 300,
+                     })
+                  if gene == 'Baseline':
+                     exp_config.update({
+                         'PRETRAIN': True,
                      })
 
                   if CUDA:

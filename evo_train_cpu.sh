@@ -16,7 +16,7 @@ cd /scratch/se2161/neural-mmo || exit
 source activate
 
 export TUNE_RESULT_DIR='./evo_experiment/'
-python Forge.py evaluate --config TreeOrerock --MODEL current --MAP PCG --INFER_IDX "0" --EVALUATION_HORIZON 100 --N_EVAL 1 --NEW_EVAL --SKILLS "['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]" --EVO_DIR
+python ForgeEvo.py --load_arguments 0
 
 #make onespawn_div_combat_pair_prims_ES
 #make paired_ES

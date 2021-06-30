@@ -459,10 +459,10 @@ class SimplexNoiseGenome(Genome):
       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
       self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
       if baseline:
-         self.step_size = 1
+         self.step_size = 0.3
          # Following the parameters for the baseline simplex noise maps -- see projekt/config
-         self.n_bands = 10
-         self.threshes = [
+         self.n_bands = 9
+         self.threshes = np.array([
                0.25,
                0.4,
                0.45,
@@ -472,19 +472,19 @@ class SimplexNoiseGenome(Genome):
                0.775,
                0.8,
                0.85,
-            ]
-         self.thresh_tiles = [
-               enums.Material.WATER.value.index,
-               enums.Material.GRASS.value.index,
-               enums.Material.LAVA.value.index,
-               enums.Material.SPAWN.value.index,
-               enums.Material.GRASS.value.index,
-               enums.Material.FOREST.value.index,
-               enums.Material.FOREST.value.index,
-               enums.Material.TREE.value.index,
-               enums.Material.IRON_ORE.value.index,
-               enums.Material.STONE.value.index,
-            ]
+            ])
+         self.thresh_tiles = np.array([
+               enums.MaterialEnum.WATER.value.index,
+               enums.MaterialEnum.GRASS.value.index,
+               enums.MaterialEnum.LAVA.value.index,
+               enums.MaterialEnum.SPAWN.value.index,
+               enums.MaterialEnum.GRASS.value.index,
+               enums.MaterialEnum.FOREST.value.index,
+               enums.MaterialEnum.FOREST.value.index,
+               enums.MaterialEnum.TREE.value.index,
+               enums.MaterialEnum.OREROCK.value.index,
+               enums.MaterialEnum.STONE.value.index,
+            ])
 
          return
       self.step_size = np.random.random() * 2
@@ -535,12 +535,14 @@ class SimplexNoiseGenome(Genome):
 
 
    def gen_map(self):
-      if self.baseline:
+      if self.baseline and self.map_arr is not None:
+         # No need to re-generate map if this is baseline
          return
       map_width = self.map_width
       map_arr = np.zeros((map_width, map_width))
       full_threshes = np.concatenate((self.threshes, [1]))
       if full_threshes.shape[0] != self.thresh_tiles.shape[0]:
+         raise Exception('Number of thresholds ({}) does not match number of tile "bands" ({}).'.format(full_threshes.shape[0], self.thresh_tiles.shape[0]))
          TT()
       for i in range(map_arr.shape[0]):
          for j in range(map_arr.shape[1]):
@@ -653,7 +655,7 @@ class EvoIndividual(Individual):
         self.NENT = evolver.config.NENT
         self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
         self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
-        if evolver.config.PRETRAIN:
+        if evolver.BASELINE_SIMPLEX or evolver.config.PRETRAIN:
            # If we're training a baseline agent on frozen maps, iniialize our genomes to generate baseline maps
            self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width, baseline=True)
         elif evolver.ALL_GENOMES:

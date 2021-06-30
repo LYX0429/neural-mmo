@@ -154,6 +154,8 @@ def calc_mean_lifetime(individual, config):
 def dummi_features(individual, config):
     return (50, 50)
 
+def rand_features(individual, config):
+    return [np.random.randint(*config.ME_BOUNDS[i]) for i in range(len(config.ME_BOUNDS))]
 
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None, n_epochs=10000):
@@ -171,6 +173,10 @@ class EvolverNMMO(LambdaMuEvolver):
          self.calc_features = calc_mean_lifetime
       elif config.FEATURE_CALC is None:
           self.calc_features = dummi_features
+      elif config.PRETRAIN:
+          assert self.BASELINE_SIMPLEX
+          # This will allow the archive to be filled out quite rapidly, so that we cannot be accused of giving baseline models too few maps on which to train as compared to the jointly-optimized maps
+          self.calc_features = rand_features
       else:
          raise NotImplementedError('Provided feature calculation function: {} is invalid. In case of BCs (provide "None" if not applicable).'.format(config.FEATURE_CALC))
       self.policy_to_agent = {i: [] for i in range(config.NPOLICIES)}
@@ -216,9 +222,12 @@ class EvolverNMMO(LambdaMuEvolver):
       self.TILE_FLIP = config.GENOME == 'Random'
       self.LSYSTEM = config.GENOME == 'LSystem'
       self.SIMPLEX_NOISE = config.GENOME == 'Simplex'
+      self.BASELINE_SIMPLEX = config.GENOME == 'Baseline'
       self.ALL_GENOMES = config.GENOME == 'All'
-      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES):
+      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES or self.BASELINE_SIMPLEX):
          raise Exception('Invalid genome')
+      if self.BASELINE_SIMPLEX:
+          assert config.PRETRAIN
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
       self.MAP_TEST = 'MapTest' in config.FITNESS_METRIC
