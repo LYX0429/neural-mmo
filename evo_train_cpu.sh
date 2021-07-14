@@ -8,7 +8,7 @@
 #SBATCH --job-name=nmmo0
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=sam.earle@nyu.edu
-#SBATCH --output=nmmo0%j.out
+#SBATCH --output=nmmo0_%j.out
 
 cd /scratch/se2161/neural-mmo || exit
 

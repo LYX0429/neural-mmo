@@ -3,8 +3,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:1
-#SBATCH --time=120:00:00
-#SBATCH --mem=70GB
+#SBATCH --time=24:00:00
+#SBATCH --mem=50GB
 #SBATCH --job-name=nmmo0
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=sam.earle@nyu.edu

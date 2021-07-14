@@ -30,8 +30,8 @@ genomes = [
     'Baseline',
 ]
 fitness_funcs = [
-    'Lifespans',
-#   'L2',
+#   'Lifespans',
+    'L2',
 #   'Hull',
 #   'Differential',
 #   'Sum',
@@ -135,8 +135,8 @@ def launch_batch(exp_name, preeval=False):
                      'ME_BOUNDS': [(0,100),(0,100)],
                      'FEATURE_CALC': feature_calc,
                      'ITEMS_PER_BIN': items_per_bin,
-                     'N_EVO_MAPS': 48,
-                     'N_PROC': 48,
+                     'N_EVO_MAPS': 12,
+                     'N_PROC': 12,
                      'TERRAIN_RENDER': False,
                      'EVO_SAVE_INTERVAL': 300,
                      })
