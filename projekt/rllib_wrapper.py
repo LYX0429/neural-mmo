@@ -911,22 +911,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 
       return ckp_file
 
-#     config   = self.envConfig
-#     saveFile = super().save(config.PATH_CHECKPOINTS)
-#     saveDir  = os.path.dirname(saveFile)
-
-#     #Clear current save dir
-#     shutil.rmtree(config.PATH_CURRENT, ignore_errors=True)
-#     os.mkdir(config.PATH_CURRENT)
-
-#     #Copy checkpoints
-#     for f in os.listdir(saveDir):
-#        stripped = re.sub('-\d+', '', f)
-#        src      = os.path.join(saveDir, f)
-#        dst      = os.path.join(config.PATH_CURRENT, stripped)
-#        shutil.copy(src, dst)
-
-#     print('Saved to: {}'.format(saveDir))
 
    def restore(self, model):
       '''Restore model from path'''

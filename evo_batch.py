@@ -20,12 +20,12 @@ from ForgeEvo import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
-    'Baseline',
-    'Random',
-    'CPPN',
-    'Pattern',
-    'Simplex',
-#   'CA',
+#   'Baseline',
+#   'Random',
+#   'CPPN',
+#   'Pattern',
+#   'Simplex',
+    'CA',
 #   'LSystem',
 #   'All',
 ]

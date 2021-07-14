@@ -112,7 +112,7 @@ class Genome():
     def get_iterable(self):
         return []
 
-def init_weights(m):
+def initialize_weights(m):
     if type(m) == torch.nn.Linear:
         torch.nn.init.xavier_uniform(m.weight)
         m.bias.data.fill_(0.01)
@@ -122,9 +122,9 @@ def init_weights(m):
 
 class NeuralCA(torch.nn.Module):
 
-    N_HIDDEN = 16
+    N_HIDDEN = 32
     N_CHAN = 9
-    N_WEIGHTS = 2 * N_HIDDEN * N_CHAN * 3 * 3 + N_HIDDEN + 2 * N_HIDDEN + N_HIDDEN + N_HIDDEN * N_CHAN + N_CHAN + 1
+#   N_WEIGHTS = 2 * N_HIDDEN * N_CHAN * 3 * 3 + N_HIDDEN + 2 * N_HIDDEN + N_HIDDEN + N_HIDDEN * N_CHAN + N_CHAN + 1
     def __init__(self, n_chan):
         #FIXME
 #       print('NeuralCA has {} input channels'.format(n_chan))
@@ -134,26 +134,26 @@ class NeuralCA(torch.nn.Module):
         self.l0 = Conv2d(n_chan, 2 * m, 3, 1, 1, bias=True)
         self.l1 = Conv2d(2 * m, m, 1, 1, 0, bias=True)
         self.l2 = Conv2d(m, n_chan, 1, 1, 0, bias=True)
-        self.layers = [self.l0, self.l2, self.l2]
-#       self.apply(init_weights)
-        self.n_passes = np.random.randint(1, 10)
+        self.layers = [self.l0, self.l1, self.l2]
+        self.n_passes = np.random.randint(10, 100)
         self.weights = self.get_weights()
+        self.apply(initialize_weights)
 
     def forward(self, x):
-        x = torch.Tensor(x).unsqueeze(0)
-        with torch.no_grad():
-           for _ in range(max(1, int(min(200, self.n_passes)))):
-               x = self.l0(x)
-               x = torch.nn.functional.relu(x)
-               x = self.l1(x)
-               x = torch.nn.functional.relu(x)
-               x = self.l2(x)
-               x = torch.sigmoid(x)
+       x = torch.Tensor(x).unsqueeze(0)
+       with torch.no_grad():
+          for _ in range(max(1, int(min(200, self.n_passes)))):
+             x = self.l0(x)
+             x = torch.nn.functional.relu(x)
+             x = self.l1(x)
+             x = torch.nn.functional.relu(x)
+             x = self.l2(x)
+             x = torch.sigmoid(x)
+             tile_idxs = x.argmax(axis=1).unsqueeze(1)
+             x = torch.FloatTensor(x).zero_()
+             x.scatter_(1, tile_idxs, 1)
 
-
-#       for _ in range(max(1, int(self.n_passes/2))):
-
-        return x
+       return x
 
     def set_weights(self, weights):
         n_el = 0
@@ -187,25 +187,25 @@ class NeuralCA(torch.nn.Module):
 
 class CAGenome(Genome):
     def __init__(self, n_tiles, map_width, seed):
-        self.nn = NeuralCA(n_tiles)
-#       self.seed = seed.reshape(1, *seed.shape)
-        if seed is None:
-            seed = np.zeros((n_tiles, map_width, map_width))
-            x = map_width // 2
-            y = map_width // 2
-            seed[1, x - 5: x + 5, y - 5:y + 5] = 1
-           #seed = np.random.randint(0, 1, (n_tiles, map_width, map_width))
-           #seed = np.random.randint(0, 1, (n_tiles, map_width, map_width))
-        self.seed = seed
-        self.atk_mults = gen_atk_mults()
-        self.age = -1
-        self.epsilon = 0.05
-        self.rng = default_rng()
+       self.nn = NeuralCA(n_tiles)
+#      self.seed = seed.reshape(1, *seed.shape)
+       if seed is None:
+          seed = np.zeros((n_tiles, map_width, map_width))
+          x = map_width // 2
+          y = map_width // 2
+          seed[1, x - 5: x + 5, y - 5:y + 5] = 1
+         #seed = np.random.randint(0, 1, (n_tiles, map_width, map_width))
+         #seed = np.random.randint(0, 1, (n_tiles, map_width, map_width))
+       self.seed = seed
+       self.atk_mults = gen_atk_mults()
+       self.age = -1
+       self.epsilon = 0.05
+       self.rng = default_rng()
 
     def gen_map(self):
-        nn_out = self.nn(self.seed)
-        self.multi_hot = nn_out.squeeze(0).detach().numpy()
-        self.map_arr = self.multi_hot.argmax(axis=0)
+       nn_out = self.nn(self.seed)
+       self.multi_hot = nn_out.squeeze(0).detach().numpy()
+       self.map_arr = self.multi_hot.argmax(axis=0)
 
 
     def validate_map(self, SPAWN_IDX, FOOD_IDX, WATER_IDX, N_ENT):
