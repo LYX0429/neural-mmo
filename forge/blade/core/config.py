@@ -147,7 +147,7 @@ class Config(Template):
    '''Flag used by evaluation mode'''
 
    RENDER               = False
-   '''Flag used by rener mode'''
+   '''Flag used by render mode'''
 
    EVAL_MAPS            = 5
    '''Number of evaluation maps'''
