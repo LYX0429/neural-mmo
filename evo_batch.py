@@ -20,14 +20,14 @@ from ForgeEvo import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
-#   'Random',
-#   'CPPN',
-#   'Pattern',
-#   'Simplex',
+    'Baseline',
+    'Random',
+    'CPPN',
+    'Pattern',
+    'Simplex',
 #   'CA',
 #   'LSystem',
 #   'All',
-    'Baseline',
 ]
 fitness_funcs = [
     'Lifespans',
@@ -89,6 +89,9 @@ def launch_batch(exp_name, preeval=False):
 
    if LOCAL:
       default_config['n_generations'] = 1
+      NENT = 3
+   else:
+      NENT = 16
    launched_baseline = False
    i = 0
 
@@ -125,7 +128,7 @@ def launch_batch(exp_name, preeval=False):
                   exp_config.update({
                      'N_GENERATIONS': 10000,
                      'TERRAIN_SIZE': 70,
-                     'NENT': 16,
+                     'NENT': NENT,
                      'GENOME': gene,
                      'FITNESS_METRIC': fit_func,
                      'EVO_ALGO': algo,
@@ -138,7 +141,7 @@ def launch_batch(exp_name, preeval=False):
                      'N_EVO_MAPS': 48,
                      'N_PROC': 48,
                      'TERRAIN_RENDER': False,
-                     'EVO_SAVE_INTERVAL': 300,
+                     'EVO_SAVE_INTERVAL': 250,
                      })
                   if gene == 'Baseline':
                      exp_config.update({

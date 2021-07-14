@@ -743,7 +743,7 @@ class EvolverNMMO(LambdaMuEvolver):
 #     if self.n_epoch % 100 == 0:
       checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
       checkpoint_dir_created = False
-      checkpointing = True
+      checkpointing = False
 #     else:
 #        checkpointing = False
 
@@ -763,9 +763,9 @@ class EvolverNMMO(LambdaMuEvolver):
 #           raise Exception
          Save.np(map_arr, path)
 
-         if self.config.TERRAIN_RENDER or checkpointing:
-            png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
-            Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
+#        if self.config.TERRAIN_RENDER or checkpointing:
+         png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
+         Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
 
 
          if checkpointing:
@@ -1287,7 +1287,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
        for g_hash in self.population:
            game, score, age= self.population[g_hash]
-           # FIXME: omething weird is happening after reload. Not the maps though.
+           # FIXME: something weird is happening after reload. Not the maps though.
            # so for now, trash score history and re-calculate after reload
            self.population[g_hash]= None, score, age
           #self.population[g_hash]= None, score, age

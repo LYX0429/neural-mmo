@@ -80,6 +80,8 @@ from forge.trinity import Env, evaluator, formatting
 from forge.trinity.dataframe import DataType
 from forge.trinity.overlay import Overlay, OverlayRegistry
 
+CKP_LATEST_ONLY = True
+
 ###############################################################################
 ### RLlib Env Wrapper
 class RLlibEnv(Env, rllib.MultiAgentEnv):
@@ -891,14 +893,40 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #     raise Exception
 
    def save(self):
-      '''Save model to file. Note: RLlib does not let us chose save paths'''
-      savedir = super().save(self.saveDir)
-     #with open('evo_experiment/path.txt', 'w') as f:
+      '''Save model to file. Note: RLlib does not let us choose save paths'''
+      ckp_file = super().save(self.saveDir)
+      ckp_path = Path(ckp_file)
+      ckp_filename = os.path.basename(os.path.normpath(ckp_path))
+      ckp_dir = ckp_path.parent.absolute()
+      ckp_dir_trg = os.path.join(self.saveDir, 'latest')
+      ckp_file_trg = os.path.join(ckp_dir_trg, ckp_filename)
+      if os.path.isdir(ckp_dir_trg):
+         shutil.rmtree(ckp_dir_trg)
+      shutil.copytree(ckp_dir, ckp_dir_trg)
+      if CKP_LATEST_ONLY:
+         shutil.rmtree(ckp_dir)
       with open(os.path.join(self.pathDir, 'path.txt'), 'w') as f:
-         f.write(savedir)
-      print('Saved to: {}'.format(savedir))
+         f.write(ckp_file_trg)
+      print('Saved to: {}'.format(ckp_dir_trg))
 
-      return savedir
+      return ckp_file
+
+#     config   = self.envConfig
+#     saveFile = super().save(config.PATH_CHECKPOINTS)
+#     saveDir  = os.path.dirname(saveFile)
+
+#     #Clear current save dir
+#     shutil.rmtree(config.PATH_CURRENT, ignore_errors=True)
+#     os.mkdir(config.PATH_CURRENT)
+
+#     #Copy checkpoints
+#     for f in os.listdir(saveDir):
+#        stripped = re.sub('-\d+', '', f)
+#        src      = os.path.join(saveDir, f)
+#        dst      = os.path.join(config.PATH_CURRENT, stripped)
+#        shutil.copy(src, dst)
+
+#     print('Saved to: {}'.format(saveDir))
 
    def restore(self, model):
       '''Restore model from path'''
