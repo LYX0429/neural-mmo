@@ -7,6 +7,7 @@ from itertools import chain
 import shutil
 import os
 import re
+import csv
 
 import gym
 from matplotlib import pyplot as plt
@@ -448,7 +449,6 @@ class RLlibEvaluator(evaluator.Base):
 #     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
       heatmaps = np.zeros((n_evals, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
       final_stats = []
-
       data_path = os.path.join(self.eval_path_model, '{} eval.npy'.format(exp_name))
       if self.config.NEW_EVAL:
          for i in range(n_evals):
@@ -523,11 +523,10 @@ class RLlibEvaluator(evaluator.Base):
 #     stds_np = div_mat.mean(axis=-1).std(axis=0)
       means_np = div_mat[:, :, -1].mean(axis=0)
       stds_np = div_mat[:, :, -1].std(axis=0)
-      for j, (_, div_name) in enumerate(DIV_CALCS):
+      for j, (_, div_name) in enumerate(DIV_CALCS + [(None, 'lifespans')]):
          mean_divs[div_name] = {}
          mean_divs[div_name]['mean'] = means_np[j]
          mean_divs[div_name]['std'] = stds_np[j]
-      mean_divs['lifespans'] = means_np[j+1]
       with open(os.path.join(self.eval_path_model, 'stats.json'), 'w') as outfile:
          json.dump(mean_divs, outfile, indent=2)
 

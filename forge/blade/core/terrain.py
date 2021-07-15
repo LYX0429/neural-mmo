@@ -1,4 +1,4 @@
-from pdb import set_trace as T
+from pdb import set_trace as TT
 import numpy as np
 
 import os
@@ -77,7 +77,6 @@ class MapGenerator:
 
    def material_evo(self, config, val, gamma=0):
 
-      T()
       if val <= config.TERRAIN_WATER:
          return Terrain.WATER
       if val <= config.TERRAIN_GRASS_0:

@@ -7,8 +7,10 @@ import os
 import sys
 import copy
 import json
+import csv
 import re
 import argparse
+import pickle
 import numpy as np
 from pdb import set_trace as TT
 import matplotlib
@@ -20,14 +22,14 @@ from ForgeEvo import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
-#   'Baseline',
+    'Baseline',
 #   'Random',
 #   'CPPN',
 #   'Pattern',
 #   'Simplex',
 #   'CA',
     'LSystem',
-    'All',
+#   'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
@@ -60,15 +62,10 @@ me_bin_sizes = [
 ]
 
 EVALUATION_HORIZON = 100
-if False:
-    N_EVALS = 1
-else:
-    N_EVALS = 20
 # TODO: use this variable in the eval command string. Formatting might be weird.
 SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
-eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\"".format(EVALUATION_HORIZON, N_EVALS)
 DIV_CALCS = ['L2', 'Differential', 'Hull', 'Discrete', 'Sum']
-
+global eval_args
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
@@ -90,11 +87,19 @@ def launch_batch(exp_name, preeval=False):
 
    if LOCAL:
       default_config['n_generations'] = 1
-      NENT = 3
+      if EVALUATE:
+         NENT = 16
+      else:
+         NENT = 3
+      N_EVALS = 2
    else:
       NENT = 16
+      N_EVALS = 20
    launched_baseline = False
    i = 0
+   global eval_args
+   eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\" --NENT {}".format(
+      EVALUATION_HORIZON, N_EVALS, NENT)
 
    for gene in genomes:
       for fit_func in fitness_funcs:
@@ -199,54 +204,89 @@ def launch_batch(exp_name, preeval=False):
 
                     #config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
 
-   if TRAIN_BASELINE:
-      # Finally, launch a baseline
-      with open(sbatch_file, 'r') as f:
-         content = f.read()
-         if not EVALUATE:
-            new_cmd = 'python Forge.py train --config TreeOrerock --MODEL current --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 --TERRAIN_SIZE 70'
-         else:
-            assert preeval
-            new_cmd = 'python Forge.py evaluate -la {}'.format(i)
-         content = re.sub('nmmo\d*', 'nmmo00', content)
-         new_content = re.sub('python Forge.*', new_cmd, content)
+#   if TRAIN_BASELINE:
+#      # Finally, launch a baseline
+#      with open(sbatch_file, 'r') as f:
+#         content = f.read()
+#         if not EVALUATE:
+#            new_cmd = 'python Forge.py train --config TreeOrerock --MODEL current --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 #--TERRAIN_SIZE 70'
+#         else:
+#            assert preeval
+#            new_cmd = 'python Forge.py evaluate -la {}'.format(i)
+#         content = re.sub('nmmo\d*', 'nmmo00', content)
+#         new_content = re.sub('python Forge.*', new_cmd, content)
+#
+#      with open(sbatch_file, 'w') as f:
+#         f.write(new_content)
+#
+#      if not preeval:
+#         if LOCAL:
+#            os.system(new_cmd)
+#            os.system('ray stop')
+#         else:
+#            os.system('sbatch {}'.format(sbatch_file))
+#      else:
+#         config = projekt.config.EvoNMMO
+##        experiment_names.append(get_experiment_name(config))
 
-      with open(sbatch_file, 'w') as f:
-         f.write(new_content)
+def reversed_lines(file):
+   "Generate the lines of file in reverse order."
+   part = ''
+   for block in reversed_blocks(file):
+      for c in reversed(block):
+         if c == '\n' and part:
+            yield part[::-1]
+            part = ''
+         part += c
+   if part: yield part[::-1]
 
-      if not preeval:
-         if LOCAL:
-            os.system(new_cmd)
-            os.system('ray stop')
-         else:
-            os.system('sbatch {}'.format(sbatch_file))
-      else:
-         config = projekt.config.EvoNMMO
-#        experiment_names.append(get_experiment_name(config))
+def reversed_blocks(file, blocksize=4096):
+   "Generate blocks of file's contents in reverse order."
+   file.seek(0, os.SEEK_END)
+   here = file.tell()
+   while 0 < here:
+      delta = min(blocksize, here)
+      here -= delta
+      file.seek(here, os.SEEK_SET)
+      yield file.read(delta)
 
-def launch_cross_eval(experiment_names, vis_only=False):
+def launch_cross_eval(experiment_names, vis_only=False, render=False):
    n = 0
-   model_exp_names = experiment_names + ['current']
-   map_exp_names = experiment_names + ['PCG']
+   model_exp_names = experiment_names
+   map_exp_names = experiment_names
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
    for (i, model_exp_name) in enumerate(model_exp_names):
       for (j, map_exp_name) in enumerate(map_exp_names):
          # TODO: select best map and from saved archive and evaluate on this one
-         infer_idx = None
-         if map_exp_name == 'PCG':
-            infer_idx = 0
-         elif 'Pattern' in map_exp_name:
-            infer_idx = "(10, 6, 0)"
-         elif 'CPPN' in map_exp_name:
-            infer_idx = "(10, 8, 0)"
-         elif 'Random' in map_exp_name:
-            infer_idx = "(18, 17, 0)"
-         elif 'Simplex' in map_exp_name:
-            infer_idx = "(10, 5, 0)"
-         if not vis_only:
-            new_cmd = 'python Forge.py evaluate --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\" {} --EVO_DIR'.format(model_exp_name, map_exp_name, infer_idx, eval_args, EXP_NAME)
+#        infer_idx = None
+#        if map_exp_name == 'PCG':
+#           infer_idx = 0
+#        elif 'Pattern' in map_exp_name:
+#           infer_idx = "(10, 6, 0)"
+#        elif 'CPPN' in map_exp_name:
+#           infer_idx = "(10, 8, 0)"
+#        elif 'Random' in map_exp_name:
+#           infer_idx = "(18, 17, 0)"
+#        elif 'Simplex' in map_exp_name:
+#           infer_idx = "(10, 5, 0)"
+         # get index of most fit map
+         with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
+            archive = pickle.load(f)
+            best_ind = archive['container'].best
+            infer_idx, best_fitness = best_ind.idx, best_ind.fitness
+            print('Inferring on map {}, with fitness {}, and age {}.'.format(infer_idx, best_fitness, best_ind.age))
+         if render:
+            assert LOCAL  # cannot render on SLURM
+            assert not vis_only
+            client_cmd = 'cd ../neural-mmo-client && ./UnityClient/neural-mmo-resources.x86_64&'
+            new_cmd = 'python Forge.py render --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\"'.format(model_exp_name, map_exp_name, infer_idx)
+            os.system(client_cmd)
+            print(new_cmd)
+            os.system(new_cmd)
+         elif not vis_only:
+            new_cmd = 'python Forge.py evaluate --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\" {} --EVO_DIR {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args, EXP_NAME)
             print(new_cmd)
             launch_cmd(new_cmd, n)
          else:
@@ -287,6 +327,10 @@ def launch_cross_eval(experiment_names, vis_only=False):
             return 'Random'
          elif 'Simplex' in exp_name:
             return 'Simplex'
+         elif 'Baseline' in exp_name:
+            return 'Baseline'
+         elif 'gene-CA' in exp_name:
+            return 'NCA'
          else:
             return exp_name
 
@@ -469,8 +513,8 @@ if __name__ == '__main__':
       action='store_true',
    )
    opts.add_argument(
-      '--gpu',
-      help='Use GPU (only applies to SLURM).',
+      '--cpu',
+      help='Do not use GPU (only applies to SLURM, not recommended for default, big neural networks).',
       action='store_true',
    )
    opts.add_argument(
@@ -478,13 +522,19 @@ if __name__ == '__main__':
       help='Visualize the results of cross-evaluation. (No new evaluations.)',
       action='store_true',
    )
+   opts.add_argument(
+      '--render',
+      help='Render an episode in unity.',
+      action='store_true'
+   )
    opts = opts.parse_args()
    EXP_NAME = opts.experiment_name
    EVALUATE = opts.evaluate
    LOCAL = opts.local
    TRAIN_BASELINE = opts.train_baseline
-   CUDA = opts.gpu
+   CUDA = not opts.cpu
    VIS_CROSS_EVAL = opts.vis_cross_eval
+   RENDER = opts.render
 
    if CUDA:
       sbatch_file = 'evo_train.sh'
@@ -502,8 +552,11 @@ if __name__ == '__main__':
       experiment_names = []
       # just get the names of experiments in which we are interested (no actual evaluations are run)
       launch_batch(EXP_NAME, preeval=True)
-      print('cross evaluating experiments: {}'.format(experiment_names))
-      if not VIS_CROSS_EVAL:
+      if RENDER:
+         print('rendering experiments: {}\n KeyboardInterrupt (Ctrl+c) to render next.'.format(experiment_names))
+         launch_cross_eval(experiment_names, vis_only=False, render=True)
+      elif not VIS_CROSS_EVAL:
+         print('cross evaluating experiments: {}'.format(experiment_names))
          # only launch these cross evaluations if we need to
          launch_cross_eval(experiment_names, vis_only=False)
       # otherwise just load up old data to visualize results

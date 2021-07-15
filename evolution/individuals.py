@@ -10,6 +10,7 @@ from pdb import set_trace as TT
 from qdpy.phenotype import Individual, Fitness, Features
 from evolution.paint_terrain import PRIMITIVE_TYPES
 from opensimplex import OpenSimplex
+import vec_noise
 from typing import Any
 
 # Not using this
@@ -491,7 +492,7 @@ class SimplexNoiseGenome(Genome):
       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
       self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
       if baseline:
-         self.step_size = 0.2
+         self.step_size = 0.125
          # Following the parameters for the baseline simplex noise maps -- see projekt/config
          self.n_bands = 9
          self.threshes = np.array([
@@ -569,14 +570,17 @@ class SimplexNoiseGenome(Genome):
          # No need to re-generate map if this is baseline
          return
       map_width = self.map_width
-      map_arr = np.zeros((map_width, map_width))
+      s = np.arange(map_width)
+      X, Y = np.meshgrid(s, s)
+      val = np.zeros((map_width, map_width), dtype=float)
+      map_arr = np.zeros((map_width, map_width), dtype=np.uint8)
+      val = vec_noise.snoise2(self.x0 + X * self.step_size, self.y0 + Y * self.step_size)
       full_threshes = np.concatenate((self.threshes, [1]))
       if full_threshes.shape[0] != self.thresh_tiles.shape[0]:
          raise Exception('Number of thresholds ({}) does not match number of tile "bands" ({}).'.format(full_threshes.shape[0], self.thresh_tiles.shape[0]))
       for i in range(map_arr.shape[0]):
          for j in range(map_arr.shape[1]):
-            t = np.where(0.5 + self.noise.noise2d(
-                   self.x0 + i * self.step_size, self.y0 + j * self.step_size) / 2 <= full_threshes)[0][0]
+            t = np.where(0.5 + 0.5 * val[i, j] <= full_threshes)[0][0]
             if t >= self.thresh_tiles.shape[0]:
                raise Exception("Selected tile is out of bounds in list of tiles for simplex genome.")
             map_arr[i, j] = self.thresh_tiles[t]

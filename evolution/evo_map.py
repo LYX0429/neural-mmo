@@ -155,8 +155,12 @@ def dummi_features(individual, config):
     return (50, 50)
 
 def rand_features(individual, config):
-    feats = [np.random.randint(*config.ME_BOUNDS[i]) for i in range(len(config.ME_BOUNDS))]
-    return feats
+    # Assuming the experiments we're comparing against measure map entropy, make feat_1 <= feat_0, since mean local map
+    # entropy cannot be greater than global map entropy.
+    feat_0 = np.random.randint(*config.ME_BOUNDS[0])
+    feat_1 = np.random.randint(feat_0 + 1)
+#   feats = [np.random.randint(*config.ME_BOUNDS[i]) for i in range(len(config.ME_BOUNDS))]
+    return [feat_0, feat_1]
 
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None, n_epochs=10000):
