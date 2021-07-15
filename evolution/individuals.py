@@ -6,11 +6,11 @@ from torch.nn import Conv2d
 import copy
 import numpy as np
 from forge.blade.lib import enums
-from evolution.paint_terrain import Line, Rectangle, RectanglePerimeter, Circle, CirclePerimeter, Gaussian
 from pdb import set_trace as TT
 from qdpy.phenotype import Individual, Fitness, Features
 from evolution.paint_terrain import PRIMITIVE_TYPES
 from opensimplex import OpenSimplex
+from typing import Any
 
 # Not using this
 class SpawnPoints():
@@ -32,6 +32,32 @@ MAGE_MAX = 1.6
 RANGE_MIN = 0.2
 RANGE_MAX = 1
 
+# This is busted do not use! Maybe this tie-breaking happens elsewhere in qdpy anyway?
+#class EvoFitness(Fitness):
+#   ''' Slight modification to allow for random drift.'''
+#   def __init__(self, *args, **kwargs):
+#      super().__init__(*args, **kwargs)
+#
+#   def dominates(self, other: Any, obj: Any = slice(None)) -> bool:
+#      # FROM DEAP
+#      def dominates(self, other: Any, obj: Any = slice(None)) -> bool:
+#         """Return true if each objective of ``self`` is not strictly worse than
+#         the corresponding objective of ``other`` and at least one objective is
+#         strictly better.
+#         """
+#         #    :param obj: Slice indicating on which objectives the domination is
+#         #                tested. The default value is `slice(None)`, representing
+#         #                every objectives.  """
+#         not_equal: bool = False
+#         for self_wvalue, other_wvalue in zip(self.wvalues[obj], other.wvalues[obj]):
+#            if self_wvalue > other_wvalue:
+#               not_equal = True
+#            elif self_wvalue < other_wvalue:
+#               return False
+#         # Here we randomly pick a winner if the two are otherwise tied
+#         if not_equal:
+#            return not_equal
+#         return np.random.random() < 0.5
 
 #NOTE: had to move this multiplier stuff outside of the evolver so the CPPN genome could incorporate them
 # without pickling error.
@@ -187,6 +213,7 @@ class NeuralCA(torch.nn.Module):
 
 class CAGenome(Genome):
     def __init__(self, n_tiles, map_width, seed):
+       self.map_width = map_width
        self.nn = NeuralCA(n_tiles)
 #      self.seed = seed.reshape(1, *seed.shape)
        if seed is None:
@@ -388,9 +415,9 @@ class PatternGenome(Genome):
     def mutate(self):
         super().mutate()
         n_patterns = len(self.patterns)
-        n_add = max(0, int(self.rng.exponential(scale=1.0, size=1)))
+        n_add = int(self.rng.exponential(scale=1.0, size=1))
         n_add = min(self.max_patterns - n_patterns, n_add)
-        n_del = max(0, int(self.rng.exponential(scale=1.0, size=1)))
+        n_del = int(self.rng.exponential(scale=1.0, size=1))
         n_del = min(n_patterns - 1, int(self.rng.exponential(scale=1.0, size=1)))
         n_mut = max(1, int(self.rng.exponential(scale=1.0, size=1)))
 #       print('n_add: {}, n_mut: {}, n_del: {}'.format(n_add, n_mut, n_del))
@@ -431,12 +458,17 @@ class TileFlipGenome(Genome):
         self.rng = default_rng()
 
     def mutate(self):
+        #TODO: uncomment and tweak this newer/smarter stuff
         map_width = self.map_width
-        n_muts = max(1, int(self.rng.exponential(scale=1.0, size=1)))
+#       mut_scale = map_width ** 2 * 0.002
+        mut_scale = 1
+        n_muts = max(1, int(self.rng.exponential(scale=mut_scale, size=1)))
+#       new = np.random.randint(1, self.n_tiles, (n_muts))
         new = np.random.randint(0, self.n_tiles, (n_muts))
         idxs = np.argwhere(np.zeros((map_width, map_width)) == 0)
         pos_idxs = np.random.choice(idxs.shape[0], n_muts, replace=False)
         mut_idxs = idxs[pos_idxs]
+#       self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = (self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] + new) % self.n_tiles
         self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = new
 
     def gen_map(self):
@@ -495,7 +527,6 @@ class SimplexNoiseGenome(Genome):
       # the tile types to be thresholded
       self.thresh_tiles = np.random.randint(0, n_tiles, size=n_bands+1)
 
-
    def mutate(self):
       if self.baseline:
          return
@@ -533,7 +564,6 @@ class SimplexNoiseGenome(Genome):
           else:
               self.step_size = np.random.random() * 2
 
-
    def gen_map(self):
       if self.baseline and self.map_arr is not None:
          # No need to re-generate map if this is baseline
@@ -543,235 +573,233 @@ class SimplexNoiseGenome(Genome):
       full_threshes = np.concatenate((self.threshes, [1]))
       if full_threshes.shape[0] != self.thresh_tiles.shape[0]:
          raise Exception('Number of thresholds ({}) does not match number of tile "bands" ({}).'.format(full_threshes.shape[0], self.thresh_tiles.shape[0]))
-         TT()
       for i in range(map_arr.shape[0]):
          for j in range(map_arr.shape[1]):
             t = np.where(0.5 + self.noise.noise2d(
                    self.x0 + i * self.step_size, self.y0 + j * self.step_size) / 2 <= full_threshes)[0][0]
             if t >= self.thresh_tiles.shape[0]:
-               TT()
+               raise Exception("Selected tile is out of bounds in list of tiles for simplex genome.")
             map_arr[i, j] = self.thresh_tiles[t]
          self.map_arr = map_arr.astype(np.uint8)
 
 
-
 class LSystemGenome(Genome):
-    def __init__(self, n_tiles, map_width):
-        super().__init__(n_tiles, map_width)
-        self.map_width = map_width
-        self.n_tiles = n_tiles
-        self.axiom_width = axiom_width = 2
-        self.n_expansions = 5  # how many (stochastic) expansion rules per tile type
-        self.axiom = np.random.randint(0, n_tiles, (axiom_width, axiom_width), dtype=np.uint8)
-        #FIXME: not currently guaranteeing mutation will have an effect, since we may change only one expansion rule,
-        # which then may not be used when expanding.
-        self.expansions = dict([
-            (i, np.repeat(np.random.randint(0, n_tiles, (1, 2, 2)), self.n_expansions, axis=0)) for i in range(n_tiles)
-        ])
+   def __init__(self, n_tiles, map_width):
+       super().__init__(n_tiles, map_width)
+       self.map_width = map_width
+       self.n_tiles = n_tiles
+       self.axiom_width = axiom_width = 4
+       #FIXME: not currently guaranteeing mutation will have an effect, since we may change only one expansion rule,
+       # which then may not be used when expanding.
+       self.n_rnd_expansions = 5  # how many (stochastic) expansion rules per tile type
+       self.axiom = np.random.randint(0, n_tiles, (axiom_width, axiom_width), dtype=np.uint8)
+       self.expansions = dict([
+           (i, np.repeat(np.random.randint(0, n_tiles, (1, 2, 2)), self.n_rnd_expansions, axis=0)) for i in range(n_tiles)
+       ])
+       # Count up number of expansions needed and make a random choice of expansion rule for each one
+       expanding_w = axiom_width
+       n_expansions = 0
+       while expanding_w < map_width:
+          n_expansions += expanding_w ** 2
+          expanding_w *= 2
+       self.rule_choices = np.random.randint(0, self.n_rnd_expansions, size=n_expansions)
+       self.rng = default_rng()
 
-    def mutate(self):
-        super().mutate()
-        rnd = np.random.random()
-        n_ax_mut = max(0, int(np.random.normal(0, 1)))
-        if n_ax_mut == 0:
-            min_rule_mut = 1
-        else:
-            min_rule_mut = 0
-        n_rule_cells = len(self.expansions) * self.n_expansions * 2 * 2
-        n_rule_mut = max(min_rule_mut, int(np.random.normal(0.5, 2)))
-        for _ in range(n_ax_mut):
-            x, y = (np.random.randint(0, self.axiom_width, (2)))
-            # make sure to mutate to new tile type
-            self.axiom[x, y] = (self.axiom[x, y] + np.random.randint(self.n_tiles)) % self.n_tiles
-        for _ in range(n_rule_mut):
-            rule_id = np.random.randint(len(self.expansions))
-            expansion_id = np.random.randint(self.n_expansions)
-            x, y = (np.random.randint(0, 2, (2)))
-#           print(self.expansions.values())
-            self.expansions[rule_id][expansion_id][x, y] = (self.expansions[rule_id][expansion_id][x, y] + np.random.randint(self.n_tiles)) % self.n_tiles
-#           print(self.expansions.values())
+   def mutate(self):
+      super().mutate()
+      rnd = np.random.random()
+      n_rule_mut = int(self.rng.exponential(scale=self.n_rnd_expansions, size=1))
+      # roughly: change 1 per each random rule per each expansion
+      choice_scale = np.log(self.map_width) / np.log(self.axiom_width)
+      n_choice_mut = int(self.rng.exponential(scale=choice_scale, size=1))
+      if n_rule_mut + n_choice_mut == 0:
+         min_ax_mut = 1
+      else:
+         min_ax_mut = 0
+      n_ax_mut = max(min_ax_mut, int(self.rng.exponential(scale=1.0, size=1)))
+      for _ in range(n_ax_mut):
+         x, y = (np.random.randint(0, self.axiom_width, (2)))
+         # make sure to mutate to new tile type
+         self.axiom[x, y] = (self.axiom[x, y] + np.random.randint(self.n_tiles)) % self.n_tiles
+      for _ in range(n_rule_mut):
+         rule_id = np.random.randint(len(self.expansions))
+         expansion_id = np.random.randint(self.n_rnd_expansions)
+         x, y = (np.random.randint(0, 2, (2)))
+         self.expansions[rule_id][expansion_id][x, y] = (self.expansions[rule_id][expansion_id][x, y] + np.random.randint(self.n_tiles)) % self.n_tiles
+      for _ in range(n_choice_mut):
+         self.rule_choices[np.random.randint(len(self.rule_choices))] = np.random.randint(self.n_rnd_expansions)
 
-#       self.axiom = np.where(np.random.random(self.axiom.shape) < 1/8, np.random.randint(0, self.n_tiles, (self.axiom_width, self.axiom_width)), self.axiom)
-#       [self.expansions.update({k: np.where(np.random.random(expansion.shape) < 1.5/n_rule_cells, np.random.randint(0, self.n_tiles, (2, 2)), expansion)})
-#        for (k, expansion) in self.expansions.items()]
+#     n_rule_cells = len(self.expansions) * self.n_rnd_expansions * 2 * 2
+#     self.axiom = np.where(np.random.random(self.axiom.shape) < 1/8, np.random.randint(0, self.n_tiles, (self.axiom_width, self.axiom_width)), self.axiom)
+#     [self.expansions.update({k: np.where(np.random.random(expansion.shape) < 1.5/n_rule_cells, np.random.randint(0, self.n_tiles, (2, 2)), expansion)})
+#      for (k, expansion) in self.expansions.items()]
 
-    def gen_map(self):
-        np.random.seed(420)
-        map_arr = self.axiom.copy()
-        while map_arr.shape[0] < self.map_width:
-            new_arr = np.empty((map_arr.shape[0] * 2, map_arr.shape[1] * 2), dtype=np.uint8)
-            for i in range(map_arr.shape[0]):
-                for j in range(map_arr.shape[1]):
-                    new_arr[2*i:2*i+2, 2*j:2*j+2] = self.expansions[map_arr[i, j]][np.random.randint(self.n_expansions)]
-            map_arr = new_arr
-        if (map_arr == self.map_arr).all():
-            T()
-        elif self.map_arr is not None:
-            print((map_arr!=self.map_arr).sum())
-#           print(self.expansions.values())
-        self.map_arr = map_arr
-
-#class EvoFitness(Fitness):
-#    def __init__(self, val):
-#       super().__init__(self, val)
-#        self.values = None
-##       self.valid = False
-#
-#    def dominates(self, fitness):
-#        #       assert len(self.values) == 0 and len(fitness.values) == 1
-#        assert len(self.values) == 1 == len(fitness.values)
-#        my_fit = self.values[-1]
-#        their_fit = fitness.values[-1]
-#
-#        return my_fit > their_fit
+   def gen_map(self):
+      # Eliminate randomness from the generation process
+      map_arr = self.axiom.copy()
+      i_exp = 0
+      while map_arr.shape[0] < self.map_width:
+         # Expand until we match the map width
+         new_arr = np.empty((map_arr.shape[0] * 2, map_arr.shape[1] * 2), dtype=np.uint8)
+         for i in range(map_arr.shape[0]):
+            for j in range(map_arr.shape[1]):
+               new_arr[2*i:2*i+2, 2*j:2*j+2] = self.expansions[map_arr[i, j]][self.rule_choices[i_exp]]
+               i_exp += 1
+         map_arr = new_arr
+      # Crop the map to match the target map width
+      curr_width = map_arr.shape[0]
+      crop_0 = int(np.floor((curr_width - self.map_width) / 2))
+      crop_1 = int(np.ceil((curr_width - self.map_width) / 2))
+      map_arr = map_arr[crop_0: -crop_1, crop_0: -crop_1]
+#     if self.map_arr is not None and (map_arr == self.map_arr).all():
+#        raise Exception("Apparently this shouldn't have happened?")
+      self.map_arr = map_arr
 
 
 class EvoIndividual(Individual):
-    def __eq__(self, other):
-        # For qdpy when adding to container and checking against existing elites
-        return self is other
+   def __eq__(self, other):
+       # For qdpy when adding to container and checking against existing elites
+       return self is other
 
-    def __init__(self, iterable, rank, evolver):
-        super().__init__(iterable=iterable)
-        self.iterable = iterable
-        self.rank = rank
-        self.fitness = Fitness([0])
-#       self.fitness = EvoFitness([0])
-        # invalidate fitness
-        self.fitness.delValues()
-#       self.features = Features([0])
-#       self.features.delValues()
-#       self.reset()
-#       self.fitness = Fitness()
-        self.idx = rank
-        self.n_tiles = len(evolver.TILE_PROBS)
-        self.SPAWN_IDX = evolver.SPAWN_IDX
-        self.FOOD_IDX = evolver.mats.FOREST.value.index
-        self.WATER_IDX = evolver.mats.WATER.value.index
-        self.EMPTY_IDX = evolver.mats.GRASS.value.index
-        self.GRIDDLY = evolver.config.GRIDDLY
-        if not self.GRIDDLY:
-            self.SCRUB_IDX = evolver.mats.SCRUB.value.index
-        self.NENT = evolver.config.NENT
-        self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
-        self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
-        if evolver.BASELINE_SIMPLEX or evolver.config.PRETRAIN:
-           # If we're training a baseline agent on frozen maps, iniialize our genomes to generate baseline maps
-           self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width, baseline=True)
-        elif evolver.ALL_GENOMES:
-            rnd = np.random.random()
-            n_genomes = 6
-            if rnd < 1/n_genomes:
-                self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
-            elif rnd < 2/n_genomes:
-                self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
-                                                self.EMPTY_IDX)
-            elif rnd < 3/n_genomes:
-                self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
-            elif rnd < 4/n_genomes:
-                self.chromosome = TileFlipGenome(self.n_tiles, evolver.map_width)
-            elif rnd < 5 / n_genomes:
-                self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
-            else:
-#               seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
-                seed = None
-                self.chromosome = CAGenome(self.n_tiles, evolver.map_width, seed=seed)
-        elif evolver.CPPN:
-            #FIXME: yeesh
-            self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
-#           self.chromosome = evolver.chromosomes[self.idx]
-        elif evolver.CA:
-#           seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
-            seed = None
-            self.chromosome = CAGenome(self.n_tiles, evolver.map_width, seed)
-        elif evolver.LSYSTEM:
-            self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
-        elif evolver.TILE_FLIP:
-            self.chromosome = TileFlipGenome(self.n_tiles, evolver.map_width)
-        elif evolver.PRIMITIVES:
-            self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
-                                            enums.MaterialEnum.GRASS.value.index)
-        elif evolver.SIMPLEX_NOISE:
-            self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
-        self.chromosome.gen_map()
-        self.validate_map()
-        self.score_hists = []
-#       self.feature_hists = {}
-        self.age = -1
-        self.ALPs = []
-    #     self.map_arr = None
-    #     self.multi_hot = None
-    #     self.atk_mults = None
+   def __init__(self, iterable, rank, evolver):
+       super().__init__(iterable=iterable)
+       self.iterable = iterable
+       self.rank = rank
+       self.fitness = Fitness([0])
+       # invalidate fitness
+       self.fitness.delValues()
+       self.idx = rank
+       self.n_tiles = len(evolver.TILE_PROBS)
+       self.SPAWN_IDX = evolver.SPAWN_IDX
+       self.FOOD_IDX = evolver.mats.FOREST.value.index
+       self.WATER_IDX = evolver.mats.WATER.value.index
+       self.EMPTY_IDX = evolver.mats.GRASS.value.index
+       self.GRIDDLY = evolver.config.GRIDDLY
+       if not self.GRIDDLY:
+           self.SCRUB_IDX = evolver.mats.SCRUB.value.index
+       self.NENT = evolver.config.NENT
+       self.TERRAIN_BORDER = evolver.config.TERRAIN_BORDER
+       self.SINGLE_SPAWN = evolver.config.SINGLE_SPAWN
+       if evolver.BASELINE_SIMPLEX or evolver.config.PRETRAIN:
+          # If we're training a baseline agent on frozen maps, iniialize our genomes to generate baseline maps
+          self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width, baseline=True)
+       elif evolver.ALL_GENOMES:
+           rnd = np.random.random()
+           n_genomes = 6
+           if rnd < 1/n_genomes:
+               self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
+           elif rnd < 2/n_genomes:
+               self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
+                                               self.EMPTY_IDX)
+           elif rnd < 3/n_genomes:
+               self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
+           elif rnd < 4/n_genomes:
+               self.chromosome = TileFlipGenome(self.n_tiles, evolver.map_width)
+           elif rnd < 5 / n_genomes:
+               self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
+           else:
+#              seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
+               seed = None
+               self.chromosome = CAGenome(self.n_tiles, evolver.map_width, seed=seed)
+       elif evolver.CPPN:
+           #FIXME: yeesh
+           self.chromosome = DefaultGenome(self.idx, evolver.neat_config, self.n_tiles, evolver.map_width)
+#          self.chromosome = evolver.chromosomes[self.idx]
+       elif evolver.CA:
+#          seed = np.random.random((self.n_tiles, evolver.map_width, evolver.map_width))
+           seed = None
+           self.chromosome = CAGenome(self.n_tiles, evolver.map_width, seed)
+       elif evolver.LSYSTEM:
+           self.chromosome = LSystemGenome(self.n_tiles, evolver.map_width)
+       elif evolver.TILE_FLIP:
+           self.chromosome = TileFlipGenome(self.n_tiles, evolver.map_width)
+       elif evolver.PRIMITIVES:
+           self.chromosome = PatternGenome(self.n_tiles, evolver.map_width,
+                                           enums.MaterialEnum.GRASS.value.index)
+       elif evolver.SIMPLEX_NOISE:
+           self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
+       self.chromosome.gen_map()
+       self.validate_map()
+       self.score_hists = []
+#      self.feature_hists = {}
+       self.age = -1
+       self.ALPs = []
+   #     self.map_arr = None
+   #     self.multi_hot = None
+   #     self.atk_mults = None
 
-    def clone(self, evolver):
-        child = copy.deepcopy(self)
-        child.score_hists = []
-#       child.feature_hists = {}
-        child.age = -1
-        child.idx = None
-        child.ALPs = []
+   def clone(self, evolver):
+       child = copy.deepcopy(self)
+       child.score_hists = []
+#      child.feature_hists = {}
+       child.age = -1
+       child.idx = None
+       child.ALPs = []
 
-        return child
+       return child
 
-    def mutate(self):
-        self.chromosome.mutate()
-        self.chromosome.gen_map()
-        self.validate_map()
-        self.iterable = self.chromosome.get_iterable()
-        self.features = []
+   def mutate(self):
+#     old_map = self.chromosome.map_arr
+      self.chromosome.mutate()
+      self.chromosome.gen_map()
+      self.validate_map()
+#     print("Number of new tiles after map re-generation:", (old_map != self.chromosome.map_arr).sum())
+      self.iterable = self.chromosome.get_iterable()
+      self.features = []
 
-    def validate_map(self):
- #      if not hasattr(self.chromosome, 'multi_hot'):
- #          multi_hot = None
- #      else:
- #          multi_hot = self.chromosome.multi_hot
-        # Let the chromosome sort itself out if applicable
-        map_arr = self.chromosome.map_arr
-        self.chromosome.validate_map(self.SPAWN_IDX, self.FOOD_IDX, self.WATER_IDX, self.NENT)
-        self.add_border(map_arr, None)
-        spawn_idxs = map_arr == self.SPAWN_IDX
-        food_idxs = map_arr == self.FOOD_IDX
-        water_idxs = map_arr == self.WATER_IDX
-        spawn_points = np.vstack(np.where(spawn_idxs)).transpose()
-        # ad hoc replace shitty scrub
+   def validate_map(self):
+ #    if not hasattr(self.chromosome, 'multi_hot'):
+ #        multi_hot = None
+ #    else:
+ #        multi_hot = self.chromosome.multi_hot
+      # Let the chromosome sort itself out if applicable
+      map_arr = self.chromosome.map_arr
+      assert map_arr.shape[0] == map_arr.shape[1] == self.chromosome.map_width
+      self.chromosome.validate_map(self.SPAWN_IDX, self.FOOD_IDX, self.WATER_IDX, self.NENT)
+      self.add_border(map_arr, None)
+      spawn_idxs = map_arr == self.SPAWN_IDX
+      food_idxs = map_arr == self.FOOD_IDX
+      water_idxs = map_arr == self.WATER_IDX
+      spawn_points = np.vstack(np.where(spawn_idxs)).transpose()
+      # ad hoc replace shitty scrub
 
-#       if not self.GRIDDLY:
-        map_arr = np.where(map_arr == self.SCRUB_IDX, self.EMPTY_IDX, map_arr)
+#     if not self.GRIDDLY:
+      map_arr = np.where(map_arr == self.SCRUB_IDX, self.EMPTY_IDX, map_arr)
 
-        n_spawns = len(spawn_points)
-        n_food = (1 * food_idxs).sum()
-        n_water = (1 * water_idxs).sum()
-        if not self.SINGLE_SPAWN:
-            if n_spawns < 1 or n_food < self.NENT or n_water < self.NENT:
-                self.valid_map = False
-            else:
-                self.valid_map = True
-        else:
-            if n_spawns < 1 or n_food < self.NENT or n_water < self.NENT:
-                self.valid_map = False
-            else:
-                self.valid_map = True
-            # In single-spawn mode, remove duplicate spawn tiles
-            sp = spawn_points[:-1]
-            np.random.shuffle(sp)
-            sp = sp.T
-            map_arr[sp[0], sp[1]] = self.EMPTY_IDX
-#           for i in range(n_spawns - 1):
-#               sp = spawn_points[i]
-#               map_arr[sp[0], sp[1]] = self.EMPTY_IDX
-        self.chromosome.map_arr = map_arr
+      n_spawns = len(spawn_points)
+      n_food = (1 * food_idxs).sum()
+      n_water = (1 * water_idxs).sum()
+      if not self.SINGLE_SPAWN:
+          if n_spawns < 1 or n_food < self.NENT or n_water < self.NENT:
+              self.valid_map = False
+          else:
+              self.valid_map = True
+      else:
+          if n_spawns < 1 or n_food < self.NENT or n_water < self.NENT:
+              self.valid_map = False
+          else:
+              self.valid_map = True
+          # In single-spawn mode, remove duplicate spawn tiles
+          sp = spawn_points[:-1]
+          np.random.shuffle(sp)
+          sp = sp.T
+          map_arr[sp[0], sp[1]] = self.EMPTY_IDX
+#         for i in range(n_spawns - 1):
+#             sp = spawn_points[i]
+#             map_arr[sp[0], sp[1]] = self.EMPTY_IDX
+      self.chromosome.map_arr = map_arr
 
 
-    def add_border(self, map_arr, multi_hot=None):
-        b = self.TERRAIN_BORDER
-        # the border must be lava
-        map_arr[0:b, :]= enums.MaterialEnum.LAVA.value.index
-        map_arr[:, 0:b]= enums.MaterialEnum.LAVA.value.index
-        map_arr[-b:, :]= enums.MaterialEnum.LAVA.value.index
-        map_arr[:, -b:]= enums.MaterialEnum.LAVA.value.index
+   def add_border(self, map_arr, multi_hot=None):
+       b = self.TERRAIN_BORDER
+       # the border must be lava
+       map_arr[0:b, :]= enums.MaterialEnum.LAVA.value.index
+       map_arr[:, 0:b]= enums.MaterialEnum.LAVA.value.index
+       map_arr[-b:, :]= enums.MaterialEnum.LAVA.value.index
+       map_arr[:, -b:]= enums.MaterialEnum.LAVA.value.index
 
-        if multi_hot is not None:
-            multi_hot[:, 0:b, :]= -1
-            multi_hot[:, :, 0:b]= -1
-            multi_hot[:, -b:, :]= -1
-            multi_hot[:, :, -b:]= -1
+       if multi_hot is not None:
+           multi_hot[:, 0:b, :]= -1
+           multi_hot[:, :, 0:b]= -1
+           multi_hot[:, -b:, :]= -1
+           multi_hot[:, :, -b:]= -1

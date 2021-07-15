@@ -320,7 +320,7 @@ class EvolverNMMO(LambdaMuEvolver):
       if not self.MAP_TEST:
          individual.score_hists.append(self.calc_fitness(individual.stats))
       else:
-         individual.score_hists.append(self.calc_fitness(individual))
+         individual.score_hists.append(self.calc_fitness(individual=individual, config=self.config))
 
       if ALP:
          score = individual.score_hists[-2] - individual.score_hists[-1]

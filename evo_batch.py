@@ -25,11 +25,12 @@ genomes = [
 #   'CPPN',
 #   'Pattern',
 #   'Simplex',
-    'CA',
-#   'LSystem',
-#   'All',
+#   'CA',
+    'LSystem',
+    'All',
 ]
 fitness_funcs = [
+#   'MapTestText',
 #   'Lifespans',
     'L2',
 #   'Hull',
@@ -121,12 +122,24 @@ def launch_batch(exp_name, preeval=False):
                      items_per_bin = 1
                      feature_calc = 'map_entropy'
 
-
+                  if LOCAL:
+                     if fit_func == 'MapTestText':
+                        N_GENERATIONS = 100000
+                        if gene == 'All':
+                           EVO_SAVE_INTERVAL = 100
+                        else:
+                           EVO_SAVE_INTERVAL = 500
+                     else:
+                        N_GENERATIONS = 100
+                        EVO_SAVE_INTERVAL = 10
+                  else:
+                     EVO_SAVE_INTERVAL = 500
+                     N_GENERATIONS = 10000
 
                   # Write the config file with the desired settings
                   exp_config = copy.deepcopy(default_config)
                   exp_config.update({
-                     'N_GENERATIONS': 10000,
+                     'N_GENERATIONS': N_GENERATIONS,
                      'TERRAIN_SIZE': 70,
                      'NENT': NENT,
                      'GENOME': gene,
@@ -141,7 +154,7 @@ def launch_batch(exp_name, preeval=False):
                      'N_EVO_MAPS': 12,
                      'N_PROC': 12,
                      'TERRAIN_RENDER': False,
-                     'EVO_SAVE_INTERVAL': 250,
+                     'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
                      })
                   if gene == 'Baseline':
                      exp_config.update({
@@ -156,10 +169,8 @@ def launch_batch(exp_name, preeval=False):
 
                   if LOCAL:
                      exp_config.update({
-                        'N_GENERATIONS': 100,
                         'N_EVO_MAPS': 12,
                         'N_PROC': 12,
-                        'EVO_SAVE_INTERVAL': 10,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
                   with open('configs/settings_{}.json'.format(i), 'w') as f:

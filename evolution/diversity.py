@@ -56,7 +56,7 @@ def get_trg_image():
     trg_image.save("trg_img.png")
     trg_image = (np.array(trg_image)[:, :, 0] / 255 * 8).astype(np.uint8)
 
-def ham_text(individual):
+def ham_text(individual, config):
     map_arr = individual.chromosome.map_arr[10:-10, 10:-10]
     return -(trg_image != map_arr).sum()
 
