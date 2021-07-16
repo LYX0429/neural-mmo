@@ -148,7 +148,6 @@ class PlayerManager(EntityGroup):
          pop, name = self.identify()
          pop = self.idx % self.config.NPOP
          color     = self.palette.colors[pop]
-         print(color.rgb)
          player    = Player(self.realm, (r, c), self.idx, pop, name, color)
 
          super().spawn(player)

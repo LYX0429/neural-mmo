@@ -22,14 +22,14 @@ from ForgeEvo import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
-#   'Baseline',
+    'Baseline',
     'Simplex',
     'Random',
-#   'CPPN',
-#   'Pattern',
-#   'CA',
-#   'LSystem',
-#   'All',
+    'CPPN',
+    'Pattern',
+    'CA',
+    'LSystem',
+    'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
