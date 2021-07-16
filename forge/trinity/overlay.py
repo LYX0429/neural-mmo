@@ -105,7 +105,7 @@ class Skills(Overlay):
 class Counts(Overlay):
    def __init__(self, config, realm, *args):
       super().__init__(config, realm)
-      self.values = np.zeros((self.size, self.size, config.NPOP))
+      self.values = np.zeros((self.size, self.size, int(config.NPOP)))
 
    def update(self, obs):
       '''Computes a count-based exploration map by painting

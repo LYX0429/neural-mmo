@@ -3,6 +3,7 @@
 #interaction by agents. Also defines an accurate stimulus that
 #encapsulates the world as seen by a particular agent
 
+from pdb import set_trace as TT
 import random
 from pdb import set_trace as T
 import numpy as np
@@ -145,7 +146,9 @@ class PlayerManager(EntityGroup):
             continue
 
          pop, name = self.identify()
+         pop = self.idx % self.config.NPOP
          color     = self.palette.colors[pop]
+         print(color.rgb)
          player    = Player(self.realm, (r, c), self.idx, pop, name, color)
 
          super().spawn(player)

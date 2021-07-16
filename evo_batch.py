@@ -22,13 +22,13 @@ from ForgeEvo import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
-    'Baseline',
-#   'Random',
+#   'Baseline',
+    'Simplex',
+    'Random',
 #   'CPPN',
 #   'Pattern',
-#   'Simplex',
 #   'CA',
-    'LSystem',
+#   'LSystem',
 #   'All',
 ]
 fitness_funcs = [
@@ -257,8 +257,17 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
-   for (i, model_exp_name) in enumerate(model_exp_names):
-      for (j, map_exp_name) in enumerate(map_exp_names):
+   for (j, map_exp_name) in enumerate(map_exp_names):
+      with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
+         archive = pickle.load(f)
+         best_ind = archive['container'].best
+         infer_idx, best_fitness = best_ind.idx, best_ind.fitness
+         if vis_only:
+            txt_verb = 'Visualizing past inference'
+         else:
+            txt_verb = 'Inferring'
+         print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, best_ind.age))
+      for (i, model_exp_name) in enumerate(model_exp_names):
          # TODO: select best map and from saved archive and evaluate on this one
 #        infer_idx = None
 #        if map_exp_name == 'PCG':
@@ -272,23 +281,29 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
 #        elif 'Simplex' in map_exp_name:
 #           infer_idx = "(10, 5, 0)"
          # get index of most fit map
-         with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
-            archive = pickle.load(f)
-            best_ind = archive['container'].best
-            infer_idx, best_fitness = best_ind.idx, best_ind.fitness
-            print('Inferring on map {}, with fitness {}, and age {}.'.format(infer_idx, best_fitness, best_ind.age))
+         l_eval_args = '--config TreeOrerock --MAP {} --INFER_IDX \"{}\" '.format(map_exp_name,
+                                                                                          infer_idx)
+         if opts.multi_policy:
+            NPOLICIES = len(experiment_names)
+            l_eval_args += '--MODEL {} '.format(str(model_exp_names).replace(' ', ''))
+         else:
+            NPOLICIES = 1
+            l_eval_args += '--MODEL {} '.format(model_exp_name)
+         NPOP = NPOLICIES
+         l_eval_args += '--NPOLICIES {} --NPOP {}'.format(NPOLICIES, NPOP)
+
          if render:
+            render_cmd = 'python Forge.py render {} {}'.format(l_eval_args, eval_args)
             assert LOCAL  # cannot render on SLURM
             assert not vis_only
             client_cmd = 'cd ../neural-mmo-client && ./UnityClient/neural-mmo-resources.x86_64&'
-            new_cmd = 'python Forge.py render --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\"'.format(model_exp_name, map_exp_name, infer_idx)
             os.system(client_cmd)
-            print(new_cmd)
-            os.system(new_cmd)
+            print(render_cmd)
+            os.system(render_cmd)
          elif not vis_only:
-            new_cmd = 'python Forge.py evaluate --config TreeOrerock --MODEL {} --MAP {} --INFER_IDX \"{}\" {} --EVO_DIR {}'.format(model_exp_name, map_exp_name, infer_idx, eval_args, EXP_NAME)
-            print(new_cmd)
-            launch_cmd(new_cmd, n)
+            eval_cmd = 'python Forge.py evaluate {} {} --EVO_DIR {}'.format(l_eval_args, eval_args, EXP_NAME)
+            print(eval_cmd)
+            launch_cmd(eval_cmd, n)
          else:
             eval_data_path = os.path.join(
                'eval_experiment',
@@ -313,6 +328,8 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
               #div_scores[k, i, j] = get_div_calc(div_calc_name)(skill_arr)
                div_scores[k, i, j] = get_div_calc(div_calc_name)(data[0])
             n += 1
+         if opts.multi_policy:
+            break
    if vis_only:
       # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" dimension exclusively.
       # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
@@ -331,6 +348,10 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
             return 'Baseline'
          elif 'gene-CA' in exp_name:
             return 'NCA'
+         elif 'gene-All' in exp_name:
+            return 'All'
+         elif 'gene-LSystem' in exp_name:
+            return 'L-System'
          else:
             return exp_name
 
@@ -527,6 +548,12 @@ if __name__ == '__main__':
       help='Render an episode in unity.',
       action='store_true'
    )
+   opts.add_argument(
+      '-mp',
+      '--multi-policy',
+      help='Evaluate all policies on each map simultaneously, to allow for inter-policy competition.',
+      action='store_true',
+   )
    opts = opts.parse_args()
    EXP_NAME = opts.experiment_name
    EVALUATE = opts.evaluate
@@ -555,12 +582,13 @@ if __name__ == '__main__':
       if RENDER:
          print('rendering experiments: {}\n KeyboardInterrupt (Ctrl+c) to render next.'.format(experiment_names))
          launch_cross_eval(experiment_names, vis_only=False, render=True)
-      elif not VIS_CROSS_EVAL:
-         print('cross evaluating experiments: {}'.format(experiment_names))
-         # only launch these cross evaluations if we need to
-         launch_cross_eval(experiment_names, vis_only=False)
-      # otherwise just load up old data to visualize results
-      launch_cross_eval(experiment_names, vis_only=True)
+      else:
+         if not VIS_CROSS_EVAL:
+            print('cross evaluating experiments: {}'.format(experiment_names))
+            # only launch these cross evaluations if we need to
+            launch_cross_eval(experiment_names, vis_only=False)
+         # otherwise just load up old data to visualize results
+         launch_cross_eval(experiment_names, vis_only=True)
    else:
       # Launch a batch of joint map-evolution and agent-training experiments (maybe also a baseline agent-training experiment on a fixed set of maps).
       launch_batch(EXP_NAME)

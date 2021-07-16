@@ -23,32 +23,14 @@ from ray.tune.utils import merge_dicts
 matplotlib.use('Agg')
 import numpy as np
 import ray
-import ray.rllib.agents.ppo.ppo as ppo
 import torch
-#<<<<<<< HEAD
-from ray import rllib
-from ray.rllib.agents.callbacks import DefaultCallbacks
-from ray.rllib.env import BaseEnv
-from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
-from ray.rllib.models.torch.recurrent_net import RecurrentNetwork
-from ray.rllib.policy import Policy
-from ray.rllib.policy.rnn_sequencing import add_time_dimension
-from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID, SampleBatch
-from ray.rllib.utils.spaces.flexdict import FlexDict
+from ray.rllib.evaluation import RolloutWorker
 from forge.blade.lib.material import Water, Lava, Stone
-from torch import nn
 from tqdm import tqdm
 from plot_diversity import heatmap
 import projekt
-from forge.blade.io.action.static import Action
-from forge.blade.io.stimulus.static import Stimulus
 from forge.blade.lib.log import InkWell
 from forge.blade.core. terrain import Save, MapGenerator
-from forge.ethyr.torch import io, policy
-from forge.ethyr.torch.policy import baseline
-from forge.trinity import Env, evaluator
-from forge.trinity.dataframe import DataType
-from forge.trinity.overlay import OverlayRegistry
 from forge.blade.io import action
 
 from evolution.diversity import DIV_CALCS, diversity_calc
@@ -59,7 +41,7 @@ from ray.rllib.evaluation.worker_set import WorkerSet
 from ray.rllib.execution.rollout_ops import ParallelRollouts, ConcatBatches
 from ray.rllib.execution.train_ops import TrainOneStep
 
-from ray.rllib.utils.typing import EnvConfigDict, EnvType, ResultDict, TrainerConfigDict, PartialTrainerConfigDict
+from ray.rllib.utils.typing import TrainerConfigDict, PartialTrainerConfigDict
 
 
 #Moved log to forge/trinity/env
@@ -623,7 +605,108 @@ class RLlibEvaluator(evaluator.Base):
       self.env.set_map(idx=idx, maps=maps)
       self.env.reset()
 
-#class RLlibPolicy(RecurrentNetwork, nn.Module):
+class RLlibMultiEvaluator(RLlibEvaluator):
+   '''For evaluating multiple policies at once, on the same map.'''
+   def __init__(self, config, trainers, archive=None, createEnv=None):
+      evaluator.Base.__init__(self, config)
+      self.i = 0
+      self.policy_id = 'policy_0'
+      self.trainers  = trainers
+      self.models    = [self.trainers[i].get_policy(self.policy_id).model for i in range(config.NPOLICIES)]
+      self.trainer = self.trainers[0]
+      self.model = self.models[0]
+      if self.config.MAP != 'PCG':
+         #        self.config.ROOT = self.config.MAP
+         self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
+      if self.config.GRIDDLY:
+         self.env = createEnv({'config': config})
+      else:
+         self.env      = projekt.rllib_wrapper.RLlibEnv({'config': config})
+
+      if archive is not None:
+         self.maps = maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in archive])
+         idx = list(maps.keys())[np.random.choice(len(maps))]
+         self.env.set_map(idx=idx, maps=maps)
+      self.env.reset(idx=config.INFER_IDX, step=False)
+      #     self.env.reset(idx=0, step=False)
+      if not config.GRIDDLY:
+         # We're just using the 0th model here, maybe a better way, maybe these visualizations don't matter here
+         self.registry = OverlayRegistry(self.env, self.models[0])#, trainer, config)
+      obs = self.env.step({})[0]
+      self.obs      = obs
+
+      self.state    = {}
+
+      if config.EVALUATE:
+         self.eval_path_map = os.path.join('eval_experiment', self.config.MAP.split('/')[-1])
+
+         try:
+            os.mkdir(self.eval_path_map)
+         except FileExistsError:
+            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+
+         self.eval_path_map = os.path.join(self.eval_path_map, str(self.config.INFER_IDX))
+
+         try:
+            os.mkdir(self.eval_path_map)
+         except FileExistsError:
+            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+
+#        self.eval_path_model = os.path.join(self.eval_path_map, self.config.MODEL.split('/')[-1])
+         self.eval_path_model = os.path.join(self.eval_path_map, 'multi_policy')
+
+         try:
+            os.mkdir(self.eval_path_model)
+         except FileExistsError:
+            print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
+
+         self.calc_diversity = diversity_calc(config)
+
+
+   def tick(self, pos, cmd):
+      '''Compute actions and overlays for a single timestep
+      Args:
+          pos: Camera position (r, c) from the server)
+          cmd: Consol command from the server
+      '''
+
+      #Compute batch of actions
+      obs = {}
+      state = {}
+      actions = {}
+      for m_i in range(len(self.trainers)):
+         m_obs = {k: self.obs[k] for k in self.obs if k % (m_i + 1) == 0}
+         m_state = {k: self.state[k] for k in self.state if k % (m_i + 1) == 0}
+         if not m_obs:
+            assert not m_state
+            continue
+         m_actions, m_state, _ = self.trainers[m_i].compute_actions(
+            m_obs, state=m_state, policy_id=self.policy_id)
+         obs.update(m_obs)
+         state.update(m_state)
+         actions.update(m_actions)
+      #     actions = dict([(i, (2, np.random.randint(5))) for (i, val) in self.env.env.action_space.sample().items()])
+      #     actions = dict([(i, val) for (i, val) in self.env.env.action_space.sample().items()])
+      self.obs, self.state = obs, state
+      if not self.config.GRIDDLY:
+         self.registry.step(self.obs, pos, cmd,
+                            # update='counts values attention wilderness'.split())
+                            )
+
+      #Step environment
+      if hasattr(self.env, 'evo_dones') and self.env.evo_dones is not None:
+         self.env.evo_dones['__all__'] = False
+      ret = evaluator.Base.tick(self, self.obs, actions, pos, cmd)
+
+      if self.config.GRIDDLY:
+         if self.env.dones['__all__'] == True:
+            self.reset_env()
+
+      stats = self.env.get_all_agent_stats()
+      score = self.calc_diversity(stats, verbose=False)
+
+      self.i += 1
+
 ###############################################################################
 ### RLlib Policy, Evaluator, and Trainer wrappers
 class RLlibPolicy(RecurrentNetwork, nn.Module):
@@ -1115,8 +1198,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
          trainPath = config.PATH_TRAINING_DATA.format('current')
          np.save(trainPath, {})
          return
-
-
       if model == 'current':
          modelPath = config.PATH_MODEL.format(config.MODEL)
          path     = os.path.join(modelPath, 'checkpoint')
@@ -1140,7 +1221,6 @@ class SanePPOTrainer(ppo.PPOTrainer):
             path = f.read().splitlines()[0]
          path = os.path.abspath(path)
          #FIXME dumb hack
-
       print('Loading from: {}'.format(path))
       super().restore(path)
 

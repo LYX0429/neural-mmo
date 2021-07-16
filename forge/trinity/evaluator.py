@@ -36,8 +36,6 @@ class Base:
       from forge.trinity.twistedserver import Application
       Application(self.env, self.tick)
 
-#<<<<<<< HEAD
-#  def test(self):
    def evaluate(self, generalize=True):
       '''Evaluate the model on maps according to config params'''
       if self.config.MAP != 'PCG':
@@ -66,10 +64,6 @@ class Base:
       plot_div_2d(ts, div_mat, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
 
       print('Diversity: {}'.format(diversity))
-#=======
-#   def evaluate(self, generalize=True):
-#      '''Evaluate the model on maps according to config params'''
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
       config = self.config
       log    = InkWell()

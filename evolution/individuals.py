@@ -461,16 +461,16 @@ class TileFlipGenome(Genome):
     def mutate(self):
         #TODO: uncomment and tweak this newer/smarter stuff
         map_width = self.map_width
-#       mut_scale = map_width ** 2 * 0.002
-        mut_scale = 1
+        mut_scale = map_width ** 2 * 0.005
+#       mut_scale = 1
         n_muts = max(1, int(self.rng.exponential(scale=mut_scale, size=1)))
-#       new = np.random.randint(1, self.n_tiles, (n_muts))
-        new = np.random.randint(0, self.n_tiles, (n_muts))
+        new = np.random.randint(1, self.n_tiles, (n_muts))
+#       new = np.random.randint(0, self.n_tiles, (n_muts))
         idxs = np.argwhere(np.zeros((map_width, map_width)) == 0)
         pos_idxs = np.random.choice(idxs.shape[0], n_muts, replace=False)
         mut_idxs = idxs[pos_idxs]
-#       self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = (self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] + new) % self.n_tiles
-        self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = new
+        self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = (self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] + new) % self.n_tiles
+#       self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = new
 
     def gen_map(self):
         pass

@@ -2,6 +2,7 @@
 #Data texture pairs are used for enums that require textures.
 #These textures are filled in by the Render class at run time.
 
+from pdb import set_trace as TT
 from pdb import set_trace as T
 import numpy as np
 import colorsys
@@ -181,10 +182,18 @@ class Neon:
 
    def color12():
       return (
-              Neon.CYAN, Neon.MINT, Neon.GREEN,
-              Neon.BLUE, Neon.PURPLE, Neon.MAGENTA,
-              Neon.FUCHSIA, Neon.SPRING, Neon.SKY,
-              Neon.RED, Neon.ORANGE, Neon.YELLOW)
+            Neon.BLUE,
+            Neon.RED,
+            Neon.PURPLE,
+            Neon.CYAN,
+            Neon.MINT,
+            Neon.GREEN,
+            Neon.MAGENTA,
+            Neon.FUCHSIA,
+            Neon.SPRING,
+            Neon.SKY,
+            Neon.ORANGE,
+            Neon.YELLOW)
 
    def rand12():
       twelveColor = color12()

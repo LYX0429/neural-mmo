@@ -12,6 +12,7 @@ import torch
 
 from fire import Fire
 import json
+import copy
 
 import ray
 from ray import rllib
@@ -39,7 +40,6 @@ def createPolicies(config, mapPolicy):
             "act_space_dict": atns}
       key           = mapPolicy(i)
       policies[key] = (None, obs, atns, params)
-
    return policies
 
 def loadTrainer(config):
@@ -50,7 +50,7 @@ def loadTrainer(config):
       [config.set(k, v) for (k, v) in load_args.items()]
 
    torch.set_num_threads(1)
-   ray.init(local_mode=config.LOCAL_MODE)
+   ray.init(local_mode=config.LOCAL_MODE, ignore_reinit_error=True)
 
    #Register custom env
    ray.tune.registry.register_env("Neural_MMO",
@@ -93,6 +93,8 @@ def loadTrainer(config):
 
 def loadEvaluator(config):
    '''Create test/render evaluator'''
+   if config.NPOLICIES > 1 or config.MODEL.startswith('['): # just in case we're doing multi-policy eval with only 1 model for some reason
+      return wrapper.RLlibMultiEvaluator(config, loadModels(config))
    if config.MODEL not in ('scripted-forage', 'scripted-combat'):
       return wrapper.RLlibEvaluator(config, loadModel(config))
 
@@ -111,6 +113,20 @@ def loadEvaluator(config):
       backend = ai.behavior.forageDP
 
    return Evaluator(config, policy, config.SCRIPTED_EXPLORE, backend)
+
+def loadModels(config):
+   # Hot mess list --> string --> list of strings lololol.
+   models = config.MODEL.strip('[').strip(']').split(',')
+   trainers = []
+   for m in models:
+      m_config = copy.deepcopy(config)
+      m_config.NPOLICIES = 1
+      m_config.MODEL = m
+      trainer = loadTrainer(m_config)
+      utils.modelSize(trainer.defaultModel())
+      trainer.restore(m)
+      trainers.append(trainer)
+   return trainers
 
 def loadModel(config):
    '''Load NN weights and optimizer state'''
