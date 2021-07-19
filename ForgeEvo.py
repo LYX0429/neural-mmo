@@ -16,6 +16,7 @@ import projekt
 from evolution.evolver import init_evolver
 from projekt import rllib_wrapper
 from evolution.global_actors import Counter, Stats
+from projekt.config import get_experiment_name
 from pcg import get_tile_data
 TILE_TYPES, TILE_PROBS = get_tile_data(griddly=False)
 
@@ -54,27 +55,6 @@ def createPolicies(config):
         policies[key] = (None, obs, atns, params)
 
     return policies
-
-def get_experiment_name(config):
-   #  assert len(config.SKILLS) == 1
-   experiment_name = 'fit-{}_skills-{}_gene-{}_algo-{}'.format(
-      config.FITNESS_METRIC,
-      config.SKILLS,
-      config.GENOME,
-      config.EVO_ALGO,
-   )
-
-   if config.EVO_ALGO == 'MAP-Elites':
-      #     experiment_name += '_BCs-{}'.format(config.ME_DIMS)
-      if (np.array(config.ME_BIN_SIZES) == 1).all():
-         experiment_name += '_noBCs'
-
-   if config.SINGLE_SPAWN:
-      experiment_name += '_uniSpawn'
-   experiment_name += '_' + config.EVO_DIR
-
-
-   return experiment_name
 
 def process_config(config):
 

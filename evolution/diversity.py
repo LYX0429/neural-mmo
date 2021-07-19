@@ -4,7 +4,6 @@ import scipy
 from scipy.spatial import ConvexHull
 import skimage
 from skimage.morphology import disk
-
 import skbio
 
 global trg_image

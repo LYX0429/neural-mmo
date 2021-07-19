@@ -1,3 +1,7 @@
+scikit-bio
+scikit-image
+tqdm
+deap
 qdpy
 fire==0.4.0
 ray==1.2.0

@@ -489,37 +489,10 @@ class SimplexNoiseGenome(Genome):
    def __init__(self, n_tiles, map_width, baseline=False):
       super().__init__(n_tiles, map_width)
       self.baseline = baseline
+      if baseline:
+         return self.init_baseline()
       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
       self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
-      if baseline:
-         self.step_size = 0.125
-         # Following the parameters for the baseline simplex noise maps -- see projekt/config
-         self.n_bands = 9
-         self.threshes = np.array([
-               0.25,
-               0.4,
-               0.45,
-               0.5,
-               0.715,
-#              0.35,
-               0.75,
-               0.8,
-               0.85,
-            ])
-         self.thresh_tiles = np.array([
-               enums.MaterialEnum.WATER.value.index,
-               enums.MaterialEnum.GRASS.value.index,
-               enums.MaterialEnum.LAVA.value.index,
-               enums.MaterialEnum.SPAWN.value.index,
-               enums.MaterialEnum.GRASS.value.index,
-#              enums.MaterialEnum.FOREST.value.index,
-               enums.MaterialEnum.FOREST.value.index,
-               enums.MaterialEnum.TREE.value.index,
-               enums.MaterialEnum.OREROCK.value.index,
-               enums.MaterialEnum.STONE.value.index,
-            ])
-
-         return
       self.step_size = np.random.random() * 2
       n_bands = np.random.randint(n_tiles, n_tiles + 3)
       threshes = np.random.random(n_bands)
@@ -528,14 +501,46 @@ class SimplexNoiseGenome(Genome):
       # the tile types to be thresholded
       self.thresh_tiles = np.random.randint(0, n_tiles, size=n_bands+1)
 
+   def init_baseline(self):
+      self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
+      self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
+      self.step_size = 0.125
+      # Following the parameters for the baseline simplex noise maps -- see projekt/config
+      self.n_bands = 9
+      self.threshes = np.array([
+         0.25,
+         0.4,
+         0.45,
+         0.5,
+         0.715,
+         #              0.35,
+         0.75,
+         0.8,
+         0.85,
+      ])
+      self.thresh_tiles = np.array([
+         enums.MaterialEnum.WATER.value.index,
+         enums.MaterialEnum.GRASS.value.index,
+         enums.MaterialEnum.LAVA.value.index,
+         enums.MaterialEnum.SPAWN.value.index,
+         enums.MaterialEnum.GRASS.value.index,
+         #              enums.MaterialEnum.FOREST.value.index,
+         enums.MaterialEnum.FOREST.value.index,
+         enums.MaterialEnum.TREE.value.index,
+         enums.MaterialEnum.OREROCK.value.index,
+         enums.MaterialEnum.STONE.value.index,
+      ])
+      return
+
    def mutate(self):
       if self.baseline:
-         return
+         # If running baseline, never mutate (this is a failsafe, we should never end up here)
+         return self.init_baseline()
       n_actions = 4
       actions = np.random.random(n_actions) < 0.3
       full_threshes = np.concatenate((self.threshes, [1]))
       if actions.sum() == 0:
-          actions[np.random.randint(0, n_actions)] = True
+         actions[np.random.randint(0, n_actions)] = True
       if actions[0]:
          if np.random.random() < 0.5 and self.threshes.shape[0] > self.n_tiles:
             j = np.random.randint(0, self.threshes.shape[0])

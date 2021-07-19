@@ -16,27 +16,27 @@ from pdb import set_trace as TT
 import matplotlib
 from matplotlib import pyplot as plt
 
-import projekt
+from projekt import config
 from fire import Fire
-from ForgeEvo import get_experiment_name
+from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
     'Baseline',
-    'Simplex',
-    'Random',
-    'CPPN',
-    'Pattern',
-    'CA',
-    'LSystem',
-    'All',
+#   'Simplex',
+#   'Random',
+#   'CPPN',
+#   'Pattern',
+#   'CA',
+#   'LSystem',
+#   'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
 #   'Lifespans',
-    'L2',
+#   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
 ]
@@ -193,13 +193,13 @@ def launch_batch(exp_name, preeval=False):
                      i += 1
 
                   else:
-                     config = projekt.config.EvoNMMO
+                     evo_config = config.EvoNMMO
                     #sys.argv = sys.argv[:1] + ['override']
                     #Fire(config)
                      for (k, v) in exp_config.items():
-                        setattr(config, k, v)
+                        setattr(evo_config, k, v)
                     #   config.set(config, k, v)
-                     experiment_name = get_experiment_name(config)
+                     experiment_name = get_experiment_name(evo_config)
                      experiment_names.append(experiment_name)
 
                     #config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
@@ -226,7 +226,7 @@ def launch_batch(exp_name, preeval=False):
 #         else:
 #            os.system('sbatch {}'.format(sbatch_file))
 #      else:
-#         config = projekt.config.EvoNMMO
+#         config = config.EvoNMMO
 ##        experiment_names.append(get_experiment_name(config))
 
 def reversed_lines(file):
@@ -276,11 +276,11 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
 #           infer_idx = "(10, 6, 0)"
 #        elif 'CPPN' in map_exp_name:
 #           infer_idx = "(10, 8, 0)"
-#        elif 'Random' in map_exp_name:
-#           infer_idx = "(18, 17, 0)"
-#        elif 'Simplex' in map_exp_name:
-#           infer_idx = "(10, 5, 0)"
-         # get index of most fit map
+         # #        elif 'Random' in map_exp_name:
+         # #           infer_idx = "(18, 17, 0)"
+         # #        elif 'Simplex' in map_exp_name:
+         # #           infer_idx = "(10, 5, 0)"
+         #          # get index of most fit map
          l_eval_args = '--config TreeOrerock --MAP {} --INFER_IDX \"{}\" '.format(map_exp_name,
                                                                                           infer_idx)
          if opts.multi_policy:

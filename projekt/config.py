@@ -1,24 +1,30 @@
-from pdb import set_trace as T
+from pdb import set_trace as TT
+import numpy as np
 from forge.blade import core
 import os
 
-#<<<<<<< HEAD
-#class Config(core.Config):
-#   EVO_MAP = False
-#   MELEE_MULT = 45 / 99
-#   RANGE_MULT = 32 / 99
-#   MAGE_MULT =  24 / 99
-#   # Model to load. None will train from scratch
-#   # Baselines: recurrent, attentional, convolutional
-#   # "current" will resume training custom models
-#=======
-from forge.blade.systems.ai import behavior
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
+def get_experiment_name(config):
+   #  assert len(config.SKILLS) == 1
+   experiment_name = 'fit-{}_skills-{}_gene-{}_algo-{}'.format(
+      config.FITNESS_METRIC,
+      config.SKILLS,
+      config.GENOME,
+      config.EVO_ALGO,
+   )
+
+   if config.EVO_ALGO == 'MAP-Elites':
+      #     experiment_name += '_BCs-{}'.format(config.ME_DIMS)
+      if (np.array(config.ME_BIN_SIZES) == 1).all():
+         experiment_name += '_noBCs'
+
+   if config.SINGLE_SPAWN:
+      experiment_name += '_uniSpawn'
+   experiment_name += '_' + config.EVO_DIR
+
+   return experiment_name
 
 class Base(core.Config):
    '''Base config for RLlib Models
-
-<<<<<<< HEAD
    ENV_NAME                = 'Neural_MMO'
    ENV_VERSION             = '1.5'
    NUM_WORKERS             = 6
@@ -26,7 +32,6 @@ class Base(core.Config):
    NUM_GPUS                = 1
    TRAIN_BATCH_SIZE        = 4800 # to match evo, normally 4000
    #TRAIN_BATCH_SIZE        = 400
-=======
    Extends core Config, which contains environment, evaluation,
    and non-RLlib-specific learning parameters'''
 
@@ -41,7 +46,6 @@ class Base(core.Config):
 
    #Memory/Batch Scale
    TRAIN_BATCH_SIZE        = 400000
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
    ROLLOUT_FRAGMENT_LENGTH = 100
 
    #Optimization Scale

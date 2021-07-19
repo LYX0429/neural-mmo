@@ -62,6 +62,9 @@ class NMMOGrid(Grid):
    def add(self, individual):
       border = self.border
       idx = self.index_grid(individual.features)
+      if self.evolver.BASELINE_SIMPLEX and self.solutions[idx]:
+         # If running baseline, never add to new cell
+         return None
       index = super(NMMOGrid, self).add(individual)
       old_idx = individual.idx
 #     if not (old_idx in self.evolver.population and old_idx in self.evolver.maps and old_idx in self.evolver.chromosomes):
@@ -144,8 +147,6 @@ class meNMMO(EvolverNMMO):
       # FIXME: we should handle this in the parent
       self.init_pop()
 
-
-
    def qdSimple(self, init_batch, toolbox, container, batch_size, niter, cxpb = 0.0, mutpb = 1.0, stats = None, halloffame = None, verbose = False, show_warnings = True, start_time = None, iteration_callback = None):
       """The simplest QD algorithm using DEAP.
       :param init_batch: Sequence of individuals used as initial batch.
@@ -162,10 +163,8 @@ class meNMMO(EvolverNMMO):
       :returns: The final batch
       :returns: A class:`~deap.tools.Logbook` with the statistics of the
                 evolution
-
       TODO
       """
-
       def cull_invalid(offspring):
           if self.MAP_TEST:
               return offspring
@@ -173,15 +172,12 @@ class meNMMO(EvolverNMMO):
           valid_ind = []
           [valid_ind.append(o) if o.valid_map else None for o in offspring]
           return valid_ind
-
       if start_time == None:
           start_time = timer()
       logbook = deap.tools.Logbook()
       logbook.header = ["iteration", "containerSize", "evals", "nbUpdated"] + (stats.fields if stats else []) + ["elapsed"]
-
       if len(init_batch) == 0:
           raise ValueError("``init_batch`` must not be empty.")
-
       # Evaluate the individuals with an invalid fitness
       invalid_ind = [ind for ind in init_batch if not ind.fitness.valid]
       invalid_ind = cull_invalid(invalid_ind)
@@ -191,52 +187,39 @@ class meNMMO(EvolverNMMO):
       self.train_individuals(invalid_ind)
       if self.LEARNING_PROGRESS:
          self.train_individuals(invalid_ind)
-
 #     [self.evaluate(ind) for ind in invalid_ind]
       fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-
       for ind, fit in zip(invalid_ind, fitnesses):
           ind.fitness.values = fit[0]
           ind.features = fit[1]
-
       if len(invalid_ind) == 0:
           raise ValueError("No valid individual found !")
-
       # Update halloffame
-
       if halloffame is not None:
           halloffame.update(init_batch)
-
       # Store batch in container
       nb_updated = container.update(invalid_ind, issue_warning=show_warnings)
       self.archive_update_hist = np.hstack((self.archive_update_hist[1:], [nb_updated]))
-
       # FIXME: we should warn about this when not reloading!
       if nb_updated == 0:
          #NOTE: For reloading.
          print('Warning: empty container/grid')
    #     raise
    #     raise ValueError("No individual could be added to the container !")
-
       else:
          # Compile stats and update logs
          record = stats.compile(container) if stats else {}
          logbook.record(iteration=0, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
-
          if verbose:
              print(logbook.stream)
       # Call callback function
-
       if iteration_callback != None:
           iteration_callback(0, init_batch, container, logbook)
-
       # Begin the generational process
-
       for i in range(1, niter + 1):
          start_time = timer()
          # Select the next batch individuals
          batch = toolbox.select(container, batch_size)
-
          ## Vary the pool of individuals
 #        offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
 #        if self.CPPN:
@@ -246,17 +229,15 @@ class meNMMO(EvolverNMMO):
          mutated = []
          maps = {}
          for (i, o) in enumerate(batch):
-#           newO = self.clone(o)
             rnd = np.random.random()
             # For every 99 individuals we mutate, we inject a new random one
-            if rnd < 0.01:
+            if rnd < 0.01 or self.BASELINE_SIMPLEX:
+                # If running a non-evolved baseline, never mutate, always generate anew
                 newO = EvoIndividual([], i, self)
             else:
                 newO = self.clone(o)
                 newO.mutate()
-               #newO, = self.mutate(newO)
-
-
+                # newO, = self.mutate(newO)
             new_chrom = newO.chromosome
             newO.idx = i
             offspring.append(newO)
@@ -264,10 +245,7 @@ class meNMMO(EvolverNMMO):
             self.maps[i] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
             mutated.append(i)
 #        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-
-
          valid_ind = cull_invalid(offspring)
-
          while len(valid_ind) == 0:
              # FIXME: put this inside our own varAnd function
              self.reset_g_idxs()  # since cloned individuals need new indices
@@ -276,39 +254,30 @@ class meNMMO(EvolverNMMO):
          self.train_individuals(valid_ind)
          if self.LEARNING_PROGRESS:
              self.train_individuals(valid_ind)
-
-
          # Evaluate the individuals with an invalid fitness
 #        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
 #        print('{} invalid individuals'.format(len(invalid_ind)))
          fitnesses = toolbox.map(toolbox.evaluate, valid_ind)
 #        fitnesses = [self.evaluate(ind) for ind in invalid_ind]
-
          for ind, fit in zip(valid_ind, fitnesses):
 #            ind.fitness.setValues(fit[0])
 #            ind.features.setValues(fit[1])
              ind.fitness.values = fit[0]
              ind.features = fit[1]
-
          # Replace the current population by the offspring
          if self.MAP_TEST:
              show_warnings = True
          nb_updated = container.update(valid_ind, issue_warning=show_warnings)
          self.archive_update_hist = np.hstack((self.archive_update_hist[1:], [nb_updated]))
-
          # Update the hall of fame with the generated individuals
-
          if halloffame is not None:
              halloffame.update(container)
-
          # Append the current generation statistics to the logbook
          record = stats.compile(container) if stats else {}
          logbook.record(iteration=i, containersize=container.size_str(), evals=len(invalid_ind), nbupdated=nb_updated, elapsed=timer()-start_time, **record)
-
          if verbose:
             print(logbook.stream)
          # Call callback function
-
          if iteration_callback != None:
              iteration_callback(i, batch, container, logbook)
 
@@ -330,33 +299,17 @@ class meNMMO(EvolverNMMO):
       # update the elites to avoid stagnation (since simulation is stochastic)
 #     if self.n_gen > 0 and (len(container) > 0 and np.random.random() < 0.1):
       if self.config.ARCHIVE_UPDATE_WINDOW == 0:
-          recent_mean_updates = 0
+         recent_mean_updates = 0
       else:
-          recent_mean_updates = np.nanmean(self.archive_update_hist)
+         recent_mean_updates = np.nanmean(self.archive_update_hist)
 #     if self.n_epoch > 0 and len(container) > 0 and not self.MAP_TEST:
       if len(container) > 0 and recent_mean_updates < 0.01 and not self.MAP_TEST:
-     #    try:
-          disrupted_elites = [container[i] for i in np.random.choice(len(container), min(max(1, len(container)-1), self.config.N_EVO_MAPS), replace=False)]
-     #    except Exception:
-     #        TT()
-#    #    disrupted_elites = sorted(container, key=lambda ind: ind.features[0], reverse=True)[:min(len(container), self.config.N_EVO_MAPS)]
-     #    elite_idxs = [ind.idx for ind in disrupted_elites]
-     #    for el, el_idx in zip(disrupted_elites, elite_idxs):
-     #       if el in container:
-#    #           try:
-#    #           container.discard(el, also_from_depot=True)
-#    #           except ValueError as v:
-#    #               # FIXME: why?
-#    #               print(v)
-     #           pass
-     #       else:
-     #           TT()
-     #       #FIXME: iterate through diff. features
-          self.train_individuals(disrupted_elites)
-          nb_updated = container.update(disrupted_elites, issue_warning=True)
-          print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(disrupted_elites)))
-      #nb_el_updated = container.update()
-
+     #   try:
+         disrupted_elites = [container[i] for i in np.random.choice(len(container), min(max(1, len(container)-1), self.config.N_EVO_MAPS), replace=False)]
+         self.train_individuals(disrupted_elites)
+         # We can simply change individuals in-place for now, since map features will not change
+         # nb_updated = container.update(disrupted_elites, issue_warning=True)
+         # print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(disrupted_elites)))
 
       self.idxs = set()
       self.reset_g_idxs()

@@ -26,10 +26,10 @@ from ray.rllib.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch
 
 import projekt
+import neat
 from evolution.diversity import diversity_calc
 from evolution.diversity import calc_map_entropies, calc_global_map_entropy
 from evolution.lambda_mu import LambdaMuEvolver
-import neat
 from evolution.individuals import EvoIndividual
 #from evolution.individuals import CPPNGenome as DefaultGenome
 from evolution.individuals import DefaultGenome
@@ -77,9 +77,6 @@ def calc_fitness_l2():
 
 def calc_map_diversity():
    pass
-
-
-
 
 def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
