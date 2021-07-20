@@ -203,7 +203,7 @@ class meNMMO(EvolverNMMO):
       # FIXME: we should warn about this when not reloading!
       if nb_updated == 0:
          #NOTE: For reloading.
-         print('Warning: empty container/grid')
+         print('Warning: nothing added to container/grid. Not good if this is a fresh run.')
    #     raise
    #     raise ValueError("No individual could be added to the container !")
       else:
@@ -280,6 +280,9 @@ class meNMMO(EvolverNMMO):
          # Call callback function
          if iteration_callback != None:
              iteration_callback(i, batch, container, logbook)
+
+      self.saveMaps()
+      self.plot()
 
       return batch, logbook
 

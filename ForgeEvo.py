@@ -145,7 +145,17 @@ if __name__ == '__main__':
       evolver.config.EVO_SAVE_INTERVAL = config.EVO_SAVE_INTERVAL
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
+      # Running out of RAM depending on size/number of map genomes... try trashing the archive while ray does its
+      # multiprocessing nonsense garbage?
+      # Why does this work !!!
+      # I DO NOT UNDERSTAND MY CODE
+      global container
+      container = evolver.container
+      evolver.container = None
       evolver.restore(trash_trainer=True)
+      # evolver.container = container
+      archive = pickle.load(open(os.path.join('evo_experiment', experiment_name, 'ME_archive.p'), 'rb'))
+      evolver.container = archive['container']
       if config.RENDER:
          evolver.config.INFER_IDX = config.INFER_IDX
       if evolver.MAP_ELITES:

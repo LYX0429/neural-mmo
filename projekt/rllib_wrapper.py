@@ -843,120 +843,120 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       self.init_epoch = True
 
 
-   # FIXME: AWFUL hack, purely to override overriding of batch mode when
-   # initializing eval workers.
-   @override(Trainable)
-   def setup(self, config: PartialTrainerConfigDict):
-      env = self._env_id
-      if env:
-         config["env"] = env
-         # An already registered env.
-         if _global_registry.contains(ENV_CREATOR, env):
-            self.env_creator = _global_registry.get(ENV_CREATOR, env)
-         # A class specifier.
-         elif "." in env:
-            self.env_creator = \
-               lambda env_context: from_config(env, env_context)
-         # Try gym/PyBullet.
-         else:
-
-            def _creator(env_context):
-               import gym
-               # Allow for PyBullet envs to be used as well (via string).
-               # This allows for doing things like
-               # `env=CartPoleContinuousBulletEnv-v0`.
-               try:
-                  import pybullet_envs
-                  pybullet_envs.getList()
-               except (ModuleNotFoundError, ImportError):
-                  pass
-               return gym.make(env, **env_context)
-
-            self.env_creator = _creator
-      else:
-         self.env_creator = lambda env_config: None
-
-      # Merge the supplied config with the class default, but store the
-      # user-provided one.
-      self.raw_user_config = config
-      self.config = Trainer.merge_trainer_configs(self._default_config,
-                                                  config)
-# NMMO won't use tf1 :D
-
-#     # Check and resolve DL framework settings.
-#     # Enable eager/tracing support.
-#     if tf1 and self.config["framework"] in ["tf2", "tfe"]:
-#        if self.config["framework"] == "tf2" and tfv < 2:
-#           raise ValueError("`framework`=tf2, but tf-version is < 2.0!")
-#        if not tf1.executing_eagerly():
-#           tf1.enable_eager_execution()
-#        logger.info("Executing eagerly, with eager_tracing={}".format(
-#           self.config["eager_tracing"]))
-#     if tf1 and not tf1.executing_eagerly() and \
-#             self.config["framework"] != "torch":
-#        logger.info("Tip: set framework=tfe or the --eager flag to enable "
-#                    "TensorFlow eager execution")
-
-      if self.config["normalize_actions"]:
-         inner = self.env_creator
-
-         def normalize(env):
-            import gym  # soft dependency
-            if not isinstance(env, gym.Env):
-               raise ValueError(
-                  "Cannot apply NormalizeActionActionWrapper to env of "
-                  "type {}, which does not subclass gym.Env.", type(env))
-            return NormalizeActionWrapper(env)
-
-         self.env_creator = lambda env_config: normalize(inner(env_config))
-
-      Trainer._validate_config(self.config)
-      if not callable(self.config["callbacks"]):
-         raise ValueError(
-            "`callbacks` must be a callable method that "
-            "returns a subclass of DefaultCallbacks, got {}".format(
-               self.config["callbacks"]))
-      self.callbacks = self.config["callbacks"]()
-      log_level = self.config.get("log_level")
-      if log_level in ["WARN", "ERROR"]:
-         logger.info("Current log_level is {}. For more information, "
-                     "set 'log_level': 'INFO' / 'DEBUG' or use the -v and "
-                     "-vv flags.".format(log_level))
-      if self.config.get("log_level"):
-         logging.getLogger("ray.rllib").setLevel(self.config["log_level"])
-
-      def get_scope():
-#        if tf1 and not tf1.executing_eagerly():
-#           return tf1.Graph().as_default()
-#        else:
-         return open(os.devnull)  # fake a no-op scope
-
-      with get_scope():
-         self._init(self.config, self.env_creator)
-
-         # Evaluation setup.
-         if self.config.get("evaluation_interval"):
-            # Update env_config with evaluation settings:
-            extra_config = copy.deepcopy(self.config["evaluation_config"])
-            # Assert that user has not unset "in_evaluation".
-            assert "in_evaluation" not in extra_config or \
-                   extra_config["in_evaluation"] is True
-            extra_config.update({
-#              "batch_mode": "complete_episodes",
-               # FIXME: what is this shit hahah
-               "rollout_fragment_length": 10,
-               "in_evaluation": True,
-            })
-            logger.debug(
-               "using evaluation_config: {}".format(extra_config))
-
-            self.evaluation_workers = self._make_workers(
-               env_creator=self.env_creator,
-               validate_env=None,
-               policy_class=self._policy_class,
-               config=merge_dicts(self.config, extra_config),
-               num_workers=self.config["evaluation_num_workers"])
-            self.evaluation_metrics = {}
+#   # FIXME: AWFUL hack, purely to override overriding of batch mode when
+#   # initializing eval workers.
+#   @override(Trainable)
+#   def setup(self, config: PartialTrainerConfigDict):
+#      env = self._env_id
+#      if env:
+#         config["env"] = env
+#         # An already registered env.
+#         if _global_registry.contains(ENV_CREATOR, env):
+#            self.env_creator = _global_registry.get(ENV_CREATOR, env)
+#         # A class specifier.
+#         elif "." in env:
+#            self.env_creator = \
+#               lambda env_context: from_config(env, env_context)
+#         # Try gym/PyBullet.
+#         else:
+#
+#            def _creator(env_context):
+#               import gym
+#               # Allow for PyBullet envs to be used as well (via string).
+#               # This allows for doing things like
+#               # `env=CartPoleContinuousBulletEnv-v0`.
+#               try:
+#                  import pybullet_envs
+#                  pybullet_envs.getList()
+#               except (ModuleNotFoundError, ImportError):
+#                  pass
+#               return gym.make(env, **env_context)
+#
+#            self.env_creator = _creator
+#      else:
+#         self.env_creator = lambda env_config: None
+#
+#      # Merge the supplied config with the class default, but store the
+#      # user-provided one.
+#      self.raw_user_config = config
+#      self.config = Trainer.merge_trainer_configs(self._default_config,
+#                                                  config)
+## NMMO won't use tf1 :D
+#
+##     # Check and resolve DL framework settings.
+##     # Enable eager/tracing support.
+##     if tf1 and self.config["framework"] in ["tf2", "tfe"]:
+##        if self.config["framework"] == "tf2" and tfv < 2:
+##           raise ValueError("`framework`=tf2, but tf-version is < 2.0!")
+##        if not tf1.executing_eagerly():
+##           tf1.enable_eager_execution()
+##        logger.info("Executing eagerly, with eager_tracing={}".format(
+##           self.config["eager_tracing"]))
+##     if tf1 and not tf1.executing_eagerly() and \
+##             self.config["framework"] != "torch":
+##        logger.info("Tip: set framework=tfe or the --eager flag to enable "
+##                    "TensorFlow eager execution")
+#
+#      if self.config["normalize_actions"]:
+#         inner = self.env_creator
+#
+#         def normalize(env):
+#            import gym  # soft dependency
+#            if not isinstance(env, gym.Env):
+#               raise ValueError(
+#                  "Cannot apply NormalizeActionActionWrapper to env of "
+#                  "type {}, which does not subclass gym.Env.", type(env))
+#            return NormalizeActionWrapper(env)
+#
+#         self.env_creator = lambda env_config: normalize(inner(env_config))
+#
+#      Trainer._validate_config(self.config)
+#      if not callable(self.config["callbacks"]):
+#         raise ValueError(
+#            "`callbacks` must be a callable method that "
+#            "returns a subclass of DefaultCallbacks, got {}".format(
+#               self.config["callbacks"]))
+#      self.callbacks = self.config["callbacks"]()
+#      log_level = self.config.get("log_level")
+#      if log_level in ["WARN", "ERROR"]:
+#         logger.info("Current log_level is {}. For more information, "
+#                     "set 'log_level': 'INFO' / 'DEBUG' or use the -v and "
+#                     "-vv flags.".format(log_level))
+#      if self.config.get("log_level"):
+#         logging.getLogger("ray.rllib").setLevel(self.config["log_level"])
+#
+#      def get_scope():
+##        if tf1 and not tf1.executing_eagerly():
+##           return tf1.Graph().as_default()
+##        else:
+#         return open(os.devnull)  # fake a no-op scope
+#
+#      with get_scope():
+#         self._init(self.config, self.env_creator)
+#
+#         # Evaluation setup.
+#         if self.config.get("evaluation_interval"):
+#            # Update env_config with evaluation settings:
+#            extra_config = copy.deepcopy(self.config["evaluation_config"])
+#            # Assert that user has not unset "in_evaluation".
+#            assert "in_evaluation" not in extra_config or \
+#                   extra_config["in_evaluation"] is True
+#            extra_config.update({
+##              "batch_mode": "complete_episodes",
+#               # FIXME: what is this shit hahah
+#               "rollout_fragment_length": 10,
+#               "in_evaluation": True,
+#            })
+#            logger.debug(
+#               "using evaluation_config: {}".format(extra_config))
+#
+#            self.evaluation_workers = self._make_workers(
+#               env_creator=self.env_creator,
+#               validate_env=None,
+#               policy_class=self._policy_class,
+#               config=merge_dicts(self.config, extra_config),
+#               num_workers=self.config["evaluation_num_workers"])
+#            self.evaluation_metrics = {}
 
 
    def log_result(self, stuff):

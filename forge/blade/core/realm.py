@@ -133,16 +133,11 @@ class PlayerManager(EntityGroup):
          if len(self.entities) >= self.config.NENT:
             break
 
-#<<<<<<< HEAD
          if self.config.EVO_MAP:# and not self.config.EVALUATE:
             r, c = self.evo_spawn()
          else:
             r, c   = self.config.SPAWN()
-#        if not self.realm.map.tiles[r, c].habitable:
-#=======
-#         r, c   = self.config.SPAWN()
          if self.realm.map.tiles[r, c].occupied:
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
             continue
 
          pop, name = self.identify()

@@ -22,10 +22,10 @@ from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc
 
 genomes = [
-    'Baseline',
+#   'Baseline',
 #   'Simplex',
 #   'Random',
-#   'CPPN',
+    'CPPN',
 #   'Pattern',
 #   'CA',
 #   'LSystem',
@@ -92,9 +92,11 @@ def launch_batch(exp_name, preeval=False):
       else:
          NENT = 3
       N_EVALS = 2
+      N_PROC = 0
    else:
       NENT = 16
       N_EVALS = 20
+      N_PROC = 12
    launched_baseline = False
    i = 0
    global eval_args
@@ -135,7 +137,7 @@ def launch_batch(exp_name, preeval=False):
                         else:
                            EVO_SAVE_INTERVAL = 500
                      else:
-                        N_GENERATIONS = 100
+                        N_GENERATIONS = 10000
                         EVO_SAVE_INTERVAL = 10
                   else:
                      EVO_SAVE_INTERVAL = 500
@@ -157,7 +159,7 @@ def launch_batch(exp_name, preeval=False):
                      'FEATURE_CALC': feature_calc,
                      'ITEMS_PER_BIN': items_per_bin,
                      'N_EVO_MAPS': 12,
-                     'N_PROC': 12,
+                     'N_PROC': N_PROC,
                      'TERRAIN_RENDER': False,
                      'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
                      })
@@ -175,7 +177,6 @@ def launch_batch(exp_name, preeval=False):
                   if LOCAL:
                      exp_config.update({
                         'N_EVO_MAPS': 12,
-                        'N_PROC': 12,
                      })
                   print('Saving experiment config:\n{}'.format(exp_config))
                   with open('configs/settings_{}.json'.format(i), 'w') as f:

@@ -34,7 +34,6 @@ class Player(entity.Entity):
       self.status.immune.update(immune)
 
       self.dataframe.init(Static.Entity, self.entID, self.pos)
-#     self.exploration_grid = np.zeros(realm.shape, dtype=np.bool)
       self.explored = set()
       self.actions_matched = 0
 
@@ -83,25 +82,17 @@ class Player(entity.Entity):
   
    def update(self, realm, actions):
       '''Post-action update. Do not include history'''
-#<<<<<<< HEAD
 #     print('player {} position {} health {}'.format(self.entID, self.pos, self.resources.health.val))
-#      if not super().update(realm, actions):
-#=======
       super().update(realm, actions)
 
       if not self.alive:
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
          return
       if hasattr(realm, 'target_action_sequence') and len(actions) > 0 and self.entID in actions:
-#        act = actions[self.entID][action.static.Move][action.static.Direction]
-#        if act == realm.target_action_sequence[realm.tick]:
          if self.pos[1] - self.history.lastPos[1] == 1:
             self.actions_matched += 1
 
       self.resources.update(realm, self, actions)
       self.skills.update(realm, self, actions)
-      #self.inventory.update(world, actions)
-#<<<<<<< HEAD
       self.explored.add(self.pos)
 
 #   def act(self, world, atnArgs):
@@ -113,5 +104,3 @@ class Player(entity.Entity):
 #   @property
 #   def isPlayer(self) -> bool:
 #      return True
-#=======
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989

@@ -8,7 +8,7 @@ import random
 import sys
 import time
 from pathlib import Path
-from pdb import set_trace as T
+from pdb import set_trace as TT
 from shutil import copyfile
 from typing import Dict
 import skimage
@@ -59,24 +59,24 @@ np.set_printoptions(threshold=sys.maxsize,
 global TRAINER
 TRAINER = None
 
-# FIXME: backward compatability, we point to correct function on restore()
-def calc_convex_hull():
-   pass
-
-def calc_differential_entropy():
-   pass
-
-def calc_discrete_entropy_2():
-   pass
-
-def calc_convex_hull():
-   pass
-
-def calc_fitness_l2():
-   pass
-
-def calc_map_diversity():
-   pass
+# # FIXME: backward compatability, we point to correct function on restore()
+# def calc_convex_hull():
+#    pass
+#
+# def calc_differential_entropy():
+#    pass
+#
+# def calc_discrete_entropy_2():
+#    pass
+#
+# def calc_convex_hull():
+#    pass
+#
+# def calc_fitness_l2():
+#    pass
+#
+# def calc_map_diversity():
+#    pass
 
 def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
@@ -376,10 +376,10 @@ class EvolverNMMO(LambdaMuEvolver):
       plot_exp(self.config.EVO_DIR)
 
    def train_individuals(self, individuals):
-      if self.n_epoch % self.config.EVO_SAVE_INTERVAL == 0:
-         self.saveMaps(self.container)
-         if self.n_epoch > 0:
-             self.plot()
+      # if self.n_epoch % self.config.EVO_SAVE_INTERVAL == 0:
+      #    self.saveMaps(self.container)
+      #    if self.n_epoch > 0:
+      #        self.plot()
       maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in individuals])
 #     if self.config.FROZEN and False:
 #        stats = self.train_and_log_frozen(maps)
@@ -724,67 +724,21 @@ class EvolverNMMO(LambdaMuEvolver):
 
 
    def saveMaps(self, individuals, mutated=None):
-#     if self.n_epoch % 100 == 0:
-#     checkpoint_maps = True
- #    else:
-
-
       # can't have neat with non-cppn representation
-
 #     if self.NEAT:
 #        if mutated is None:
 #           mutated = list(maps.keys())
 #        #FIXME: hack
-
-#        if self.n_epoch == -1:
-#           self.n_epoch += 1
-
-#           return
-
-#     if self.n_epoch % 100 == 0:
       checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
       checkpoint_dir_created = False
       checkpointing = False
-#     else:
-#        checkpointing = False
-
-
       for ind in individuals:
          i = ind.idx
          path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
-#        try:
-#           os.mkdir(path)
-#        except FileExistsError:
-#           pass
-
          map_arr = ind.chromosome.map_arr
-#        atk_mults = ind.chromosome.atk_mults
-
-#        if map_arr is None:
-#           raise Exception
          Save.np(map_arr, path)
-
-#        if self.config.TERRAIN_RENDER or checkpointing:
          png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
          Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
-
-
-         if checkpointing:
-            if not checkpoint_dir_created and not os.path.isdir(checkpoint_dir_path):
-               os.mkdir(checkpoint_dir_path)
-               checkpoint_dir_created = True
-            png_path = os.path.join(checkpoint_dir_path, 'map' + str(i) + '.png')
-            Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
-#           Save.np(map_arr, os.path.join(checkpoint_dir_path, 'map' + str(i) + '.np'))
-#           json_path = os.path.join(checkpoint_dir_path, 'atk_mults' + str(i) + 'json')
-#           with open(json_path, 'w') as json_file:
-#              json.dump(atk_mults, json_file)
-
-        #if self.RAND_GEN or self.PATTERN_GEN:
- #       json_path = os.path.join(self.save_path, 'maps', 'atk_mults' + str(i) + 'json')
- #       with open(json_path, 'w') as json_file:
- #          json.dump(atk_mults, json_file)
-
 
    def make_game(self, child_map):
       config = self.config
@@ -834,6 +788,7 @@ class EvolverNMMO(LambdaMuEvolver):
          }
 
       if self.trainer is None or trash_trainer:
+         self.trainer = None
          del(self.trainer)
 
          # Create policies
