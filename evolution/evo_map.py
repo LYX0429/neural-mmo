@@ -729,9 +729,9 @@ class EvolverNMMO(LambdaMuEvolver):
 #        if mutated is None:
 #           mutated = list(maps.keys())
 #        #FIXME: hack
-      checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
-      checkpoint_dir_created = False
-      checkpointing = False
+      # checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
+      # checkpoint_dir_created = False
+      # checkpointing = False
       for ind in individuals:
          i = ind.idx
          path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')

@@ -5,7 +5,6 @@
 
 from pdb import set_trace as TT
 import random
-from pdb import set_trace as T
 import numpy as np
 
 from collections import defaultdict, Mapping
@@ -122,13 +121,21 @@ class NPCManager(EntityGroup):
 class PlayerManager(EntityGroup):
    def __init__(self, config, realm, identify: Callable):
       super().__init__(config, realm)
+      if config.MULTI_MODEL_NAMES is not None:
+         self.models = config.MULTI_MODEL_NAMES
+      else:
+         self.models = [config.MODEL]
+      self.max_pop = config.MAX_POP
       self.identify = identify
       self.realm    = realm
 
-      self.palette = Palette(config.NPOP)
-      self.idx     = 1
+      # self.palette = Palette(config.NPOP)
+      # self.idx = 1
+      self.palette = Palette(config.NPOP, multi_evo=True)
+      self.reset_pop_counts()
 
-   def spawn(self):
+
+   def old_spawn(self):
       for _ in range(self.config.PLAYER_SPAWN_ATTEMPTS):
          if len(self.entities) >= self.config.NENT:
             break
@@ -142,11 +149,43 @@ class PlayerManager(EntityGroup):
 
          pop, name = self.identify()
          pop = self.idx % self.config.NPOP
-         color     = self.palette.colors[pop]
+         color = self.palette.colors[pop]
          player    = Player(self.realm, (r, c), self.idx, pop, name, color)
-
          super().spawn(player)
          self.idx += 1
+
+
+   def spawn(self):
+      for _ in range(self.config.PLAYER_SPAWN_ATTEMPTS):
+         if len(self.entities) >= self.config.NENT:
+            break
+
+         if self.config.EVO_MAP:# and not self.config.EVALUATE:
+            r, c = self.evo_spawn()
+         else:
+            r, c   = self.config.SPAWN()
+         if self.realm.map.tiles[r, c].occupied:
+            continue
+
+         # pop, name = self.identify()
+         pop = self.idx % self.config.NPOP
+         # color     = self.palette.colors[pop]
+         name = self.models[pop]
+         color = self.palette.colors[name]
+         if self.max_pop is not None and self.pop_counts[name] >= self.max_pop:
+            # print('Not spawning: reached max pop in population {}'.format(name))
+            return
+
+         # player    = Player(self.realm, (r, c), self.idx, pop, name, color)
+         player    = Player(self.realm, (r, c), self.idx, pop, name+'_', color)
+
+         super().spawn(player)
+         self.pop_counts[name] += 1
+         self.idx += 1
+
+   def reset_pop_counts(self):
+      self.idx = 1
+      self.pop_counts = {m: 0 for m in self.models}
 
    def evo_spawn(self):
       assert len(self.realm.spawn_points) != 0
@@ -198,42 +237,15 @@ class Realm:
       else:
          return self.players[entID]
 
-#<<<<<<< HEAD
-#  #Hook for render
-#  def graphicsData(self):
-#     return self.env, self.stats
-
    def set_map(self, idx, map_arr):
       self.map.set_map(self, idx, map_arr)
 
-#  def reset(self, idx):
-#     self.map.reset(self, idx)
-#     self.tick = 0
-
-#     entities = {**self.players.entities, **self.npcs.entities}
-#     for entID, ent in entities.items():
-#        self.dataframe.remove(Static.Entity, entID, ent.pos)
-
-#     self.players  = PlayerManager(self, self.config, self.iden)
-#     self.npcs     = NPCManager(self, self.config)
-#
-#  def step(self, decisions):
-#     print('realm tick:', self.tick)
-#     self.players.spawn()
-#     while len(self.players.entities) == 0:
-#        self.players.spawn()
-
-#     #NPC Spawning and decisions
-#     self.npcs.spawn()
-#     npcDecisions = self.npcs.actions(self)
-#=======
    def step(self, actions):
       '''Run game logic for one tick
       
       Args:
          actions: Dict of agent actions
       '''
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 
       #Prioritize actions
       npcActions = self.npcs.actions(self)

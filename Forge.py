@@ -26,6 +26,7 @@ from forge.trinity.evaluator import Evaluator
 import projekt
 from projekt import rllib_wrapper as wrapper
 from forge.blade.core import terrain
+from ForgeEvo import get_genome_name
 
 def createPolicies(config, mapPolicy):
    '''Generate RLlib policies'''
@@ -93,8 +94,16 @@ def loadTrainer(config):
 
 def loadEvaluator(config):
    '''Create test/render evaluator'''
-   if config.NPOLICIES > 1 or config.MODEL.startswith('['): # just in case we're doing multi-policy eval with only 1 model for some reason
+   if config.NPOLICIES > 1 or config.MODEL.startswith('['): # the latter is just in case we're doing multi-policy eval with only 1 model for some reason
+      models = config.MODEL.strip('[').strip(']').split(',')
+      # Randomize order of models to randomize spawn order for fair evaluation over multiple trials
+      np.random.shuffle(models)
+      config.set('MULTI_MODEL_EXPERIMENTS', models)
+      model_names = [get_genome_name(m) for m in models]
+      config.set('MULTI_MODEL_NAMES', model_names)
       return wrapper.RLlibMultiEvaluator(config, loadModels(config))
+   else:
+      config.set('MULTI_MODEL_NAMES', [get_genome_name(config.MODEL)])
    if config.MODEL not in ('scripted-forage', 'scripted-combat'):
       return wrapper.RLlibEvaluator(config, loadModel(config))
 
@@ -115,12 +124,13 @@ def loadEvaluator(config):
    return Evaluator(config, policy, config.SCRIPTED_EXPLORE, backend)
 
 def loadModels(config):
-   # Hot mess list --> string --> list of strings lololol.
-   models = config.MODEL.strip('[').strip(']').split(',')
+   models = config.MULTI_MODEL_EXPERIMENTS
    trainers = []
    for m in models:
+      # Initialize a separate trainer for each model
       m_config = copy.deepcopy(config)
       m_config.NPOLICIES = 1
+      m_config.NPOP = 1
       m_config.MODEL = m
       trainer = loadTrainer(m_config)
       utils.modelSize(trainer.defaultModel())

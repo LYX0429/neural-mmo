@@ -78,7 +78,7 @@ class Env:
       '''
 
       # ad hoc reset of player indexing
-      self.realm.players.idx = 1
+      self.realm.players.reset_pop_counts()
 #     self.quill = log.Quill(self.realm.identify)
 #
 #     if idx is None:

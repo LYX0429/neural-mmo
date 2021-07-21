@@ -406,13 +406,15 @@ class RLlibEvaluator(evaluator.Base):
 #            self.obs, state=self.state, policy_id='policy_0')
 #      super().tick(self.obs, actions, pos, cmd)
 
+   def count_survivors(self):
+      return
 
    def evaluate(self, generalize=False):
 
       model_name = self.config.MODEL.split('/')[-1]
       map_name = self.config.MAP.split('/')[-1] 
       map_idx = self.config.INFER_IDX
-      exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
+      self.exp_name = exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
       # Render the map in case we hadn't already
       map_arr = self.env.realm.map.inds()
       map_generator = MapGenerator(self.config)
@@ -442,10 +444,9 @@ class RLlibEvaluator(evaluator.Base):
             divs = np.zeros((len(DIV_CALCS) + 1, self.config.EVALUATION_HORIZON // stat_interval))
             stat_i = 0
             for t in tqdm(range(self.config.EVALUATION_HORIZON)):
-               self.tick(None, None)
-   #           print(len(self.env.realm.players.entities))
+               eval_done = self.tick(None, None)
                div_stats = self.env.get_all_agent_stats()
-               if (t + 1) % stat_interval == 0:
+               if (t + 1) % stat_interval == 0 or eval_done:
                   for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
                      diversity = calc_diversity(div_stats, verbose=False)
                      divs[j, stat_i] = diversity
@@ -465,6 +466,9 @@ class RLlibEvaluator(evaluator.Base):
                      heatmaps[i, si, r, c] += xp
                   # What is this doing?
                   heatmaps[i, si+1, r, c] += 1
+               if eval_done:
+                  break
+            self.count_survivors()
             final_stats.append(div_stats)
          with open(data_path, 'wb') as f:
             np.save(f, np.array(final_stats))
@@ -541,9 +545,9 @@ class RLlibEvaluator(evaluator.Base):
       plt.figure()
       plt.title('agent-skill matrix {}'.format(exp_name))
       im, cbar = heatmap(final_agent_skills, {}, self.config.SKILLS)
-      plt.savefig('agent-skill matrix {}'.format(exp_name))
-      if final_agent_skills.shape[1] == 2:
-         plot_div_2d(final_stats)
+      plt.savefig(os.path.join(self.eval_path_model, 'agent-skill matrix {}'.format(exp_name)))
+#     if final_agent_skills.shape[1] == 2:
+#        plot_div_2d(final_stats)
 #        plt.figure()
 #        plt.title('Agents')
 #        sc = plt.scatter(final_agent_skills[:, 0], final_agent_skills[:, 1], c=colors)
@@ -589,10 +593,12 @@ class RLlibEvaluator(evaluator.Base):
          if self.env.dones['__all__'] == True:
                self.reset_env()
 
-      stats = self.env.get_all_agent_stats()
-      score = self.calc_diversity(stats, verbose=False)
+      # stats = self.env.get_all_agent_stats()
+      # score = self.calc_diversity(stats, verbose=False)
 
       self.i += 1
+
+      return False
 
    def reset_env(self):
       stats = self.env.send_agent_stats()
@@ -618,6 +624,7 @@ class RLlibMultiEvaluator(RLlibEvaluator):
       if self.config.MAP != 'PCG':
          #        self.config.ROOT = self.config.MAP
          self.config.ROOT = os.path.join(os.getcwd(), 'evo_experiment', self.config.MAP, 'maps', 'map')
+      self.config.set('MAX_POP', int(np.floor(config.NENT / len(self.models))))
       if self.config.GRIDDLY:
          self.env = createEnv({'config': config})
       else:
@@ -662,6 +669,40 @@ class RLlibMultiEvaluator(RLlibEvaluator):
 
          self.calc_diversity = diversity_calc(config)
 
+      # ad hoc dict to keep track of who's who
+      self.idx_to_pop = {}
+      # self.survivors = np.empty(shape=(self.config.NPOLICIES, self.config.N_EVAL))
+      self.survivors = {i: [] for i in range(self.config.NPOLICIES)}
+
+   def count_survivors(self):
+      # for (k, v) in self.pop_living.items():
+      #    self.survivors[k] = v
+      [self.survivors.update({k: self.survivors[k] + [v]}) for (k, v) in self.n_pop_living.items()]
+
+   def evaluate(self, generalize=False):
+      super().evaluate()
+      data_path = os.path.join(self.eval_path_model, '{} multi_eval.npy'.format(self.exp_name))
+      if self.config.NEW_EVAL:
+         model_names = self.config.MULTI_MODEL_NAMES
+         survivors = {model_names[k]: np.array(v) for (k, v) in self.survivors.items()}
+         with open(data_path, 'wb') as f:
+            np.save(f, self.survivors)
+      else:
+         with open(data_path, 'rb') as f:
+            survivors = np.load(f)
+      x_pos = np.arange(len(survivors))
+      means = [survivors[k].mean() for k in model_names]
+      stds = [survivors[k].std() for k in model_names]
+      fig, ax = plt.subplots()
+      ax.bar(x_pos, means, yerr=stds, align='center', alpha=0.5, ecolor='black', capsize=10)
+      ax.set_ylabel('Mean survivors per episode')
+      ax.set_xticks(x_pos)
+      ax.set_xticklabels(model_names)
+      # ax.set_title('Competitive survival: {} map'.format(get_genome_name(self.config.MAP)))
+      ax.set_title('Competitive survival')
+      plt.tight_layout()
+      plt.savefig(os.path.join(self.eval_path_model, 'Survival.png'))
+      plt.show()
 
    def tick(self, pos, cmd):
       '''Compute actions and overlays for a single timestep
@@ -674,12 +715,31 @@ class RLlibMultiEvaluator(RLlibEvaluator):
       obs = {}
       state = {}
       actions = {}
+      m_obs_dicts = {i: {} for i in range(self.config.NPOLICIES)}
+      m_state_dicts = copy.deepcopy(m_obs_dicts)
+      for p_idx, p_obs in self.obs.items():
+         player = self.env.realm.players.entities[p_idx]
+         p_pop = player.pop
+         model_name = self.config.MULTI_MODEL_NAMES[p_pop]
+         if model_name != player.base.name.split('_')[0] or 'gene-'+model_name not in self.trainers[p_pop].envConfig.MODEL:
+            raise Exception('Agent pop/model/trainers not aligned.')
+         self.idx_to_pop[p_idx] = p_pop
+         m_obs_dicts[p_pop][p_idx] = p_obs
+      for p_idx, p_state in self.state.items():
+         p_pop = self.idx_to_pop[p_idx]
+         m_state_dicts[p_pop][p_idx] = p_state
       for m_i in range(len(self.trainers)):
-         m_obs = {k: self.obs[k] for k in self.obs if k % (m_i + 1) == 0}
-         m_state = {k: self.state[k] for k in self.state if k % (m_i + 1) == 0}
+         # Get observations/states for each model
+         # Check that each agent's population attribute aligns with the trainer we've assigned it
+#        assert np.all([self.env.realm.players.entities[k].pop == m_i for k in self.obs if k % (m_i + 1) == 0])
+         m_obs = m_obs_dicts[m_i]
+         m_state = m_state_dicts[m_i]
+#        m_obs = {k: self.obs[k] for k in self.obs if k % (m_i + 1) == 0}
+#        m_state = {k: self.state[k] for k in self.state if k % (m_i + 1) == 0}
          if not m_obs:
-            assert not m_state
+            # assert not m_state
             continue
+         # Get each population's actions from the appropriate trainer
          m_actions, m_state, _ = self.trainers[m_i].compute_actions(
             m_obs, state=m_state, policy_id=self.policy_id)
          obs.update(m_obs)
@@ -702,10 +762,28 @@ class RLlibMultiEvaluator(RLlibEvaluator):
          if self.env.dones['__all__'] == True:
             self.reset_env()
 
-      stats = self.env.get_all_agent_stats()
-      score = self.calc_diversity(stats, verbose=False)
+      n_pop_living = {i: 0 for i in range(self.config.NPOLICIES)}
+      [n_pop_living.update({player.pop: n_pop_living[player.pop] + 1}) for player in
+       self.env.realm.players.entities.values()]
+      self.n_pop_living = n_pop_living
+      # If max agents of each model type have spawned, but no agents are living, or only agents of one model type are
+      # living, then count survivors
+      if self.config.MAX_POP is not None and \
+            np.all([v >= self.config.MAX_POP for v in self.env.realm.players.pop_counts.values()]):
+         n_living = 0
+         for pop_id, n_pop in n_pop_living.items():
+            if n_pop > 0:
+               n_living += 1
+               if n_living > 1:
+                  break
+         if n_living < 2:
+            return True
+
+      # stats = self.env.get_all_agent_stats()
+      # score = self.calc_diversity(stats, verbose=False)
 
       self.i += 1
+      return False
 
 ###############################################################################
 ### RLlib Policy, Evaluator, and Trainer wrappers
@@ -841,123 +919,6 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       self.saveDir = path
       self.pathDir = '/'.join(path.split(os.sep)[:-1])
       self.init_epoch = True
-
-
-#   # FIXME: AWFUL hack, purely to override overriding of batch mode when
-#   # initializing eval workers.
-#   @override(Trainable)
-#   def setup(self, config: PartialTrainerConfigDict):
-#      env = self._env_id
-#      if env:
-#         config["env"] = env
-#         # An already registered env.
-#         if _global_registry.contains(ENV_CREATOR, env):
-#            self.env_creator = _global_registry.get(ENV_CREATOR, env)
-#         # A class specifier.
-#         elif "." in env:
-#            self.env_creator = \
-#               lambda env_context: from_config(env, env_context)
-#         # Try gym/PyBullet.
-#         else:
-#
-#            def _creator(env_context):
-#               import gym
-#               # Allow for PyBullet envs to be used as well (via string).
-#               # This allows for doing things like
-#               # `env=CartPoleContinuousBulletEnv-v0`.
-#               try:
-#                  import pybullet_envs
-#                  pybullet_envs.getList()
-#               except (ModuleNotFoundError, ImportError):
-#                  pass
-#               return gym.make(env, **env_context)
-#
-#            self.env_creator = _creator
-#      else:
-#         self.env_creator = lambda env_config: None
-#
-#      # Merge the supplied config with the class default, but store the
-#      # user-provided one.
-#      self.raw_user_config = config
-#      self.config = Trainer.merge_trainer_configs(self._default_config,
-#                                                  config)
-## NMMO won't use tf1 :D
-#
-##     # Check and resolve DL framework settings.
-##     # Enable eager/tracing support.
-##     if tf1 and self.config["framework"] in ["tf2", "tfe"]:
-##        if self.config["framework"] == "tf2" and tfv < 2:
-##           raise ValueError("`framework`=tf2, but tf-version is < 2.0!")
-##        if not tf1.executing_eagerly():
-##           tf1.enable_eager_execution()
-##        logger.info("Executing eagerly, with eager_tracing={}".format(
-##           self.config["eager_tracing"]))
-##     if tf1 and not tf1.executing_eagerly() and \
-##             self.config["framework"] != "torch":
-##        logger.info("Tip: set framework=tfe or the --eager flag to enable "
-##                    "TensorFlow eager execution")
-#
-#      if self.config["normalize_actions"]:
-#         inner = self.env_creator
-#
-#         def normalize(env):
-#            import gym  # soft dependency
-#            if not isinstance(env, gym.Env):
-#               raise ValueError(
-#                  "Cannot apply NormalizeActionActionWrapper to env of "
-#                  "type {}, which does not subclass gym.Env.", type(env))
-#            return NormalizeActionWrapper(env)
-#
-#         self.env_creator = lambda env_config: normalize(inner(env_config))
-#
-#      Trainer._validate_config(self.config)
-#      if not callable(self.config["callbacks"]):
-#         raise ValueError(
-#            "`callbacks` must be a callable method that "
-#            "returns a subclass of DefaultCallbacks, got {}".format(
-#               self.config["callbacks"]))
-#      self.callbacks = self.config["callbacks"]()
-#      log_level = self.config.get("log_level")
-#      if log_level in ["WARN", "ERROR"]:
-#         logger.info("Current log_level is {}. For more information, "
-#                     "set 'log_level': 'INFO' / 'DEBUG' or use the -v and "
-#                     "-vv flags.".format(log_level))
-#      if self.config.get("log_level"):
-#         logging.getLogger("ray.rllib").setLevel(self.config["log_level"])
-#
-#      def get_scope():
-##        if tf1 and not tf1.executing_eagerly():
-##           return tf1.Graph().as_default()
-##        else:
-#         return open(os.devnull)  # fake a no-op scope
-#
-#      with get_scope():
-#         self._init(self.config, self.env_creator)
-#
-#         # Evaluation setup.
-#         if self.config.get("evaluation_interval"):
-#            # Update env_config with evaluation settings:
-#            extra_config = copy.deepcopy(self.config["evaluation_config"])
-#            # Assert that user has not unset "in_evaluation".
-#            assert "in_evaluation" not in extra_config or \
-#                   extra_config["in_evaluation"] is True
-#            extra_config.update({
-##              "batch_mode": "complete_episodes",
-#               # FIXME: what is this shit hahah
-#               "rollout_fragment_length": 10,
-#               "in_evaluation": True,
-#            })
-#            logger.debug(
-#               "using evaluation_config: {}".format(extra_config))
-#
-#            self.evaluation_workers = self._make_workers(
-#               env_creator=self.env_creator,
-#               validate_env=None,
-#               policy_class=self._policy_class,
-#               config=merge_dicts(self.config, extra_config),
-#               num_workers=self.config["evaluation_num_workers"])
-#            self.evaluation_metrics = {}
-
 
    def log_result(self, stuff):
       return
@@ -1107,17 +1068,17 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 
       return stats
 
-   def simulate_frozen(self):
-      stats = super()._evaluate()
+#  def simulate_frozen(self):
+#     stats = super()._evaluate()
 
-      # FIXME: switch this off when already saving for other reasons; control from config
-      if self.training_iteration < 100:
-         save_interval = 10
-      else:
-         save_interval = 100
+#     # FIXME: switch this off when already saving for other reasons; control from config
+#     if self.training_iteration < 100:
+#        save_interval = 10
+#     else:
+#        save_interval = 100
 
-      if self.training_iteration % save_interval == 0:
-         self.save()
+#     if self.training_iteration % save_interval == 0:
+#        self.save()
 
    def reset_envs(self):
       obs = self.workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.reset({}, step=True)))

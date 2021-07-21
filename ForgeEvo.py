@@ -30,11 +30,32 @@ own models immediately or hack on the environment'''
 
 # Instantiate a new environment
 
-def createEnv(config):
-#   map_arr = config['map_arr']
+def get_genome_name(exp_name):
+   if 'CPPN' in exp_name:
+      return 'CPPN'
+   elif 'Pattern' in exp_name:
+      return 'Pattern'
+   elif 'Random' in exp_name:
+      return 'Random'
+   elif 'Simplex' in exp_name:
+      return 'Simplex'
+   elif 'Baseline' in exp_name:
+      return 'Baseline'
+   elif 'gene-CA' in exp_name:
+      return 'NCA'
+   elif 'gene-All' in exp_name:
+      return 'All'
+   elif 'gene-LSystem' in exp_name:
+      return 'L-System'
+   else:
+      return exp_name
 
-    return rllib_wrapper.RLlibEnv(#map_arr,
-            config)
+
+def createEnv(config):
+   #   map_arr = config['map_arr']
+
+   return rllib_wrapper.RLlibEnv(#map_arr,
+      config)
 
 # Map agentID to policyID -- requires config global
 
@@ -56,7 +77,7 @@ def createPolicies(config):
 
     return policies
 
-def process_config(config):
+def process_config(config, experiment_name):
 
    config.set('EVO_DIR', experiment_name)
 
@@ -78,13 +99,11 @@ def process_config(config):
 
    return config
 
-if __name__ == '__main__':
+def main():
    # Setup ray
 #  torch.set_num_threads(1)
    torch.set_num_threads(torch.get_num_threads())
    ray.init()
-
-
    global config
 
    config = projekt.config.EvoNMMO()
@@ -125,7 +144,7 @@ if __name__ == '__main__':
    with open(os.path.join(save_path, 'settings.json'), 'w') as f:
       json.dump(config.data, f, indent=4)
 
-   config = process_config(config)
+   config = process_config(config, experiment_name)
 
 
    try:
@@ -145,6 +164,10 @@ if __name__ == '__main__':
       evolver.config.EVO_SAVE_INTERVAL = config.EVO_SAVE_INTERVAL
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
+      if config.VIS_MAPS:
+         evolver.saveMaps(evolver.container)
+         evolver.plot()
+         return
       # Running out of RAM depending on size/number of map genomes... try trashing the archive while ray does its
       # multiprocessing nonsense garbage?
       # Why does this work !!!
@@ -186,3 +209,7 @@ if __name__ == '__main__':
       evolver.infer()
    else:
       evolver.evolve()
+
+if __name__ == '__main__':
+   main()
+

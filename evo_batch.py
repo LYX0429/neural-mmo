@@ -16,16 +16,18 @@ from pdb import set_trace as TT
 import matplotlib
 from matplotlib import pyplot as plt
 
+from plot_diversity import heatmap, annotate_heatmap
 from projekt import config
 from fire import Fire
 from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc
+from ForgeEvo import get_genome_name
 
 genomes = [
-#   'Baseline',
-#   'Simplex',
-#   'Random',
-    'CPPN',
+    'Baseline',
+    'Simplex',
+    'Random',
+#   'CPPN',
 #   'Pattern',
 #   'CA',
 #   'LSystem',
@@ -34,9 +36,9 @@ genomes = [
 fitness_funcs = [
 #   'MapTestText',
 #   'Lifespans',
-#   'L2',
+    'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
 ]
@@ -61,11 +63,11 @@ me_bin_sizes = [
     [100,100],
 ]
 
-EVALUATION_HORIZON = 100
 # TODO: use this variable in the eval command string. Formatting might be weird.
 SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 DIV_CALCS = ['L2', 'Differential', 'Hull', 'Discrete', 'Sum']
 global eval_args
+global EVALUATION_HORIZON
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
@@ -97,6 +99,11 @@ def launch_batch(exp_name, preeval=False):
       NENT = 16
       N_EVALS = 20
       N_PROC = 12
+   global EVALUATION_HORIZON
+   if opts.multi_policy:
+      EVALUATION_HORIZON = 500
+   else:
+      EVALUATION_HORIZON = 100
    launched_baseline = False
    i = 0
    global eval_args
@@ -162,6 +169,7 @@ def launch_batch(exp_name, preeval=False):
                      'N_PROC': N_PROC,
                      'TERRAIN_RENDER': False,
                      'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
+                     'VIS_MAPS': opts.vis_maps,
                      })
                   if gene == 'Baseline':
                      exp_config.update({
@@ -306,6 +314,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
             print(eval_cmd)
             launch_cmd(eval_cmd, n)
          else:
+            global EVALUATION_HORIZON
             eval_data_path = os.path.join(
                'eval_experiment',
                map_exp_name,
@@ -336,25 +345,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
       # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
       row_labels = []
       col_labels = []
-      def get_genome_name(exp_name):
-         if 'CPPN' in exp_name:
-            return 'CPPN'
-         elif 'Pattern' in exp_name:
-            return 'Pattern'
-         elif 'Random' in exp_name:
-            return 'Random'
-         elif 'Simplex' in exp_name:
-            return 'Simplex'
-         elif 'Baseline' in exp_name:
-            return 'Baseline'
-         elif 'gene-CA' in exp_name:
-            return 'NCA'
-         elif 'gene-All' in exp_name:
-            return 'All'
-         elif 'gene-LSystem' in exp_name:
-            return 'L-System'
-         else:
-            return exp_name
+
 
       for r in model_exp_names:
          row_labels.append(get_genome_name(r))
@@ -386,124 +377,6 @@ def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
    ))
    plt.close()
 
-
-def heatmap(data, row_labels, col_labels, ax=None,
-            cbar_kw={}, cbarlabel="", **kwargs):
-   """
-   Create a heatmap from a numpy array and two lists of labels.
-
-   Parameters
-   ----------
-   data
-       A 2D numpy array of shape (N, M).
-   row_labels
-       A list or array of length N with the labels for the rows.
-   col_labels
-       A list or array of length M with the labels for the columns.
-   ax
-       A `matplotlib.axes.Axes` instance to which the heatmap is plotted.  If
-       not provided, use current axes or create a new one.  Optional.
-   cbar_kw
-       A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
-   cbarlabel
-       The label for the colorbar.  Optional.
-   **kwargs
-       All other arguments are forwarded to `imshow`.
-   """
-
-   if not ax:
-      ax = plt.gca()
-
-   # Plot the heatmap
-   im = ax.imshow(data, **kwargs)
-
-   # Create colorbar
-   cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
-   cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
-
-   # We want to show all ticks...
-   ax.set_xticks(np.arange(data.shape[1]))
-   ax.set_yticks(np.arange(data.shape[0]))
-   # ... and label them with the respective list entries.
-   ax.set_xticklabels(col_labels)
-   ax.set_yticklabels(row_labels)
-
-   # Let the horizontal axes labeling appear on top.
-   ax.tick_params(top=True, bottom=False,
-                  labeltop=True, labelbottom=False)
-
-   # Rotate the tick labels and set their alignment.
-   plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
-            rotation_mode="anchor")
-
-   # Turn spines off and create white grid.
-  #ax.spines[:].set_visible(False)
-
-   ax.set_xticks(np.arange(data.shape[1] + 1) - .5, minor=True)
-   ax.set_yticks(np.arange(data.shape[0] + 1) - .5, minor=True)
-   ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
-   ax.tick_params(which="minor", bottom=False, left=False)
-
-   return im, cbar
-
-
-def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
-                     textcolors=("black", "white"),
-                     threshold=None, **textkw):
-   """
-   A function to annotate a heatmap.
-
-   Parameters
-   ----------
-   im
-       The AxesImage to be labeled.
-   data
-       Data used to annotate.  If None, the image's data is used.  Optional.
-   valfmt
-       The format of the annotations inside the heatmap.  This should either
-       use the string format method, e.g. "$ {x:.2f}", or be a
-       `matplotlib.ticker.Formatter`.  Optional.
-   textcolors
-       A pair of colors.  The first is used for values below a threshold,
-       the second for those above.  Optional.
-   threshold
-       Value in data units according to which the colors from textcolors are
-       applied.  If None (the default) uses the middle of the colormap as
-       separation.  Optional.
-   **kwargs
-       All other arguments are forwarded to each call to `text` used to create
-       the text labels.
-   """
-
-   if not isinstance(data, (list, np.ndarray)):
-      data = im.get_array()
-
-   # Normalize the threshold to the images color range.
-   if threshold is not None:
-      threshold = im.norm(threshold)
-   else:
-      threshold = im.norm(data.max()) / 2.
-
-   # Set default alignment to center, but allow it to be
-   # overwritten by textkw.
-   kw = dict(horizontalalignment="center",
-             verticalalignment="center")
-   kw.update(textkw)
-
-   # Get the formatter in case a string is supplied
-   if isinstance(valfmt, str):
-      valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
-
-   # Loop over the data and create a `Text` for each "pixel".
-   # Change the text's color depending on the data.
-   texts = []
-   for i in range(data.shape[0]):
-      for j in range(data.shape[1]):
-         kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
-         text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
-         texts.append(text)
-
-   return texts
 
 if __name__ == '__main__':
    opts = argparse.ArgumentParser(
@@ -543,6 +416,11 @@ if __name__ == '__main__':
       '--vis_cross_eval',
       help='Visualize the results of cross-evaluation. (No new evaluations.)',
       action='store_true',
+   )
+   opts.add_argument(
+      '--vis_maps',
+      help='Save and visualize evolved maps, and plot their fitness.',
+      action='store_true'
    )
    opts.add_argument(
       '--render',

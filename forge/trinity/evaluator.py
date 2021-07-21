@@ -1,23 +1,14 @@
-from pdb import set_trace as T
-import numpy as np
-
+from pdb import set_trace as TT
 import os
-
-from collections import defaultdict
 from tqdm import tqdm
-
-import projekt
+import numpy as np
 
 from forge.trinity import Env
 from forge.trinity.overlay import OverlayRegistry
-
 from forge.blade.io.action import static as Action
 from forge.blade.lib.log import InkWell
 from evolution.diversity import diversity_calc
-import plot_diversity
-
-from matplotlib import pyplot as plt
-
+from plot_diversity import plot_div_2d
 
 
 class Base:

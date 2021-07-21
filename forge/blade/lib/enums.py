@@ -224,8 +224,21 @@ class Solid:
 
 
 class Palette:
-   def __init__(self, n):
+   def __init__(self, n, multi_evo=False):
       self.n = n
+      if multi_evo:
+         self.colors = {
+            'Neural_': Neon.BLUE,
+            'Baseline': Solid.RED,
+            'Simplex': Solid.SKY,
+            'CPPN': Solid.BLUE,
+            'All': Solid.ORANGE,
+            'CA': Solid.GREEN,
+            'LSystem': Solid.PURPLE,
+            'Random': Solid.BROWN,
+            'Pattern': Solid.PINK,
+         }
+         return
       if n <= 12:
          self.colors = Neon.color12()
       else:

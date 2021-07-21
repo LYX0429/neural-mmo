@@ -187,6 +187,10 @@ class TreeOrerock(SmallMaps):
    # reward agents for collective skill-diversity rather than the usual survival reward?
    REWARD_DIVERSITY = False
    PAIRED = False
+   VIS_MAPS = False
+   MULTI_MODEL_EXPERIMENTS = None
+   MULTI_MODEL_NAMES = None
+   MAX_POP = None  # Maximum number of agents belonging to a given population.
 
 
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
