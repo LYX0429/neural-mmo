@@ -26,19 +26,19 @@ from ForgeEvo import get_genome_name
 genomes = [
     'Baseline',
     'Simplex',
-#   'Random',
-#   'CPPN',
-#   'Pattern',
+    'Random',
+    'CPPN',
+    'Pattern',
     'CA',
-#   'LSystem',
-#   'All',
+    'LSystem',
+    'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
 #   'Lifespans',
-    'L2',
+#   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
 ]
@@ -191,8 +191,6 @@ def launch_batch(exp_name, preeval=False):
                      json.dump(exp_config, f, ensure_ascii=False, indent=4)
 
                   # Edit the sbatch file to load the correct config file
-
-
                   # Launch the experiment. It should load the saved settings
 
                   if not preeval:
@@ -454,7 +452,7 @@ if __name__ == '__main__':
       default_config = json.load(f)
    print('Loaded default config:\n{}'.format(default_config))
 
-   if EVALUATE:
+   if EVALUATE and not opts.vis_maps:
       experiment_names = []
       # just get the names of experiments in which we are interested (no actual evaluations are run)
       launch_batch(EXP_NAME, preeval=True)

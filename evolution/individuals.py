@@ -571,9 +571,6 @@ class SimplexNoiseGenome(Genome):
               self.step_size = np.random.random() * 2
 
    def gen_map(self):
-      if self.baseline and self.map_arr is not None:
-         # No need to re-generate map if this is baseline
-         return
       map_width = self.map_width
       s = np.arange(map_width)
       X, Y = np.meshgrid(s, s)
