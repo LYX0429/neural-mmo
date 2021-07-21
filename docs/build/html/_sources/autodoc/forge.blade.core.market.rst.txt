@@ -3,6 +3,7 @@ forge.blade.core.market namespace
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.core.market.config
    forge.blade.core.market.new_visualizer

@@ -1,0 +1,55 @@
+{
+    "FIXED_MAPS": false,
+    "EVALUATE": false,
+    "FITNESS_METRIC": "L2",
+    "GENOME": "Random",
+    "THRESHOLD": false,
+    "TERRAIN_MODE": "contract",
+    "EVO_MAP": true,
+    "RENDER": false,
+    "MODEL": "current",
+    "NENT": 16,
+    "TERRAIN_SIZE": 70,
+    "EVO_DIR": "0",
+    "ROOT": "/home/sme/neural-mmo/evo_experiment/experiment-name_0/maps/map",
+    "N_EVO_MAPS": 48,
+    "MAX_STEPS": 100,
+    "MATURE_AGE": 3,
+    "ROLLING_FITNESS": 25,
+    "TERRAIN_RENDER": false,
+    "TERRAIN_WATER": 0.15,
+    "TERRAIN_GRASS": 0.35,
+    "TERRAIN_LAVA": 0.45,
+    "TERRAIN_FOREST_LOW": 0.55,
+    "TERRAIN_FOREST_HIGH": 0.7,
+    "TERRAIN_TREE": 0.8,
+    "TERRAIN_OREROCK": 0.9,
+    "NET_RENDER": false,
+    "EVO_ALGO": "Simple",
+    "N_PROC": 6,
+    "PRETRAINED": false,
+    "ME_DIMS": [
+        "mining",
+        "woodcutting"
+    ],
+    "ME_BIN_SIZES": [
+        20,
+        20
+    ],
+    "ME_BOUNDS": [
+        [
+            0,
+            100
+        ],
+        [
+            0,
+            100
+        ]
+    ],
+    "ARCHIVE_UPDATE_WINDOW": 0,
+    "FEATURE_CALC": "map entropy",
+    "TEST": false,
+    "ITEMS_PER_BIN": 1,
+    "FROZEN": false,
+    "SINGLE_SPAWN": false
+}

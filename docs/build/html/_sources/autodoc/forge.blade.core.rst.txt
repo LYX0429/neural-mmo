@@ -8,14 +8,16 @@ forge.blade.core package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.core.market
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.core.config
-   forge.blade.core.env
    forge.blade.core.map
    forge.blade.core.realm
+   forge.blade.core.terrain
    forge.blade.core.tile

@@ -2,6 +2,7 @@
 #Data texture pairs are used for enums that require textures.
 #These textures are filled in by the Render class at run time.
 
+from pdb import set_trace as TT
 from pdb import set_trace as T
 import numpy as np
 import colorsys
@@ -9,61 +10,90 @@ from enum import Enum
 #from forge.blade.item import ore
 from forge.blade import systems
 
-class Tile:
-   capacity = 3
-   respawnProb = 0.1
-   def __init__(self):
-      self.harvestable = False
-
-class Lava(Tile):
-   index = 0
-   tex = 'lava'
-class Water(Tile):
-   index = 1
-   tex = 'water'
-class Grass(Tile):
-   index = 2
-   tex = 'grass'
-class Scrub(Tile):
-   index = 3
-   tex = 'scrub'
-class Forest(Tile):
-   index = 4
-   degen = Scrub
-   tex = 'forest'
-   #capacity = 3
-   capacity = 1
-   respawnProb = 0.025
-   def __init__(self):
-      super().__init__()
-      self.harvestable = True
-      #self.dropTable = DropTable.DropTable()
-class Stone(Tile):
-   index = 5
-   tex = 'stone'
-class Orerock(Tile):
-   index = 6
-   degenIndex = Stone.index
-   tex = 'iron_ore'
-   capacity = 1
-   respawnprob = 0.05
-   def __init__(self):
-      super().__init__()
-      self.harvestable = True
-      #self.dropTable = systems.DropTable()
-      #self.dropTable.add(ore.Copper, 1)
-
-class Material(Enum):
-   LAVA     = Lava
-   WATER    = Water
-   GRASS    = Grass
-   SCRUB    = Scrub
-   FOREST   = Forest
-   STONE    = Stone
-   OREROCK  = Orerock
-
-IMPASSIBLE = (1, 5, 6)
-
+#<<<<<<< HEAD
+#class Tile:
+#   capacity = 3
+#   respawnProb = 0.1
+#   def __init__(self):
+#      self.harvestable = False
+#
+#class Lava(Tile):
+#   index = 0
+#   tex = 'lava'
+#class Water(Tile):
+#   index = 1
+#   tex = 'water'
+#class Grass(Tile):
+#   index = 2
+#   tex = 'grass'
+#class Scrub(Tile):
+#   index = 3
+#   tex = 'scrub'
+#class Forest(Tile):
+#   index = 4
+#   degen = Scrub
+#   tex = 'forest'
+#   #capacity = 3
+#   capacity = 1
+#   respawnProb = 0.025
+#   def __init__(self):
+#      super().__init__()
+#      self.harvestable = True
+#      #self.dropTable = DropTable.DropTable()
+#class Stone(Tile):
+#   index = 5
+#   tex = 'stone'
+#class Orerock(Tile):
+#   index = 6
+#   degen = Grass
+#   tex = 'iron_ore'
+#   capacity = 1
+#   respawnprob = 0.025
+#   def __init__(self):
+#      super().__init__()
+#      self.harvestable = True
+#      #self.dropTable = systems.DropTable()
+#      #self.dropTable.add(ore.Copper, 1)
+#class Tree(Tile):
+#   index = 7
+#   degen = Forest
+#   tex = 'tree'
+#   capacity = 1
+#   respawnProb = 0.025
+#   def __init__(self):
+#      super().__init__()
+#      self.harvestable = True
+#class Spawn(Tile):
+#   index = 8
+#   tex = 'spawn'
+#
+from forge.blade.lib import material
+class MaterialEnum(Enum):
+   LAVA     = material.Lava
+   WATER    = material.Water
+   GRASS    = material.Grass
+   SCRUB    = material.Scrub
+   FOREST   = material.Forest
+   STONE    = material.Stone
+   OREROCK  = material.Orerock
+   TREE     = material.Tree
+   SPAWN    = material.Spawn
+#class Material(Enum):
+#   LAVA     = Lava
+#   WATER    = Water
+#   GRASS    = Grass
+#   SCRUB    = Scrub
+#   FOREST   = Forest
+#   STONE    = Stone
+#   OREROCK  = Orerock
+#   TREE     = Tree
+#   SPAWN    = Spawn
+#
+#IMPASSIBLE = (1, 5) # 6, 7)
+#HABITABLE  = (2, 3, 4, 6, 7, 8)
+#
+#=======
+#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
 class Defaults:
    BLACK    = (0, 0, 0)
    GRAY3    = (20, 20, 20)
@@ -111,6 +141,16 @@ class Color256:
       return colors
    colors = make256()
 
+class Tier:
+   BLACK    = Color('BLACK', '#000000')
+   WOOD     = Color('WOOD', '#784d1d')
+   BRONZE   = Color('BRONZE', '#db4508')
+   SILVER   = Color('SILVER', '#dedede')
+   GOLD     = Color('GOLD', '#ffae00')
+   PLATINUM = Color('PLATINUM', '#cd75ff')
+   DIAMOND  = Color('DIAMOND', '#00bbbb')
+   
+
 class Neon:
    RED      = Color('RED', '#ff0000')
    ORANGE   = Color('ORANGE', '#ff8000')
@@ -142,19 +182,63 @@ class Neon:
 
    def color12():
       return (
-              Neon.CYAN, Neon.MINT, Neon.GREEN,
-              Neon.BLUE, Neon.PURPLE, Neon.MAGENTA,
-              Neon.FUCHSIA, Neon.SPRING, Neon.SKY,
-              Neon.RED, Neon.ORANGE, Neon.YELLOW)
+            Neon.BLUE,
+            Neon.RED,
+            Neon.PURPLE,
+            Neon.CYAN,
+            Neon.MINT,
+            Neon.GREEN,
+            Neon.MAGENTA,
+            Neon.FUCHSIA,
+            Neon.SPRING,
+            Neon.SKY,
+            Neon.ORANGE,
+            Neon.YELLOW)
 
    def rand12():
       twelveColor = color12()
       randInd = np.random.randint(0, len(twelveColor))
       return twelveColor[randInd]
 
+class Solid:
+   BLUE       = Color('BLUE', '#1f77b4')
+   ORANGE     = Color('ORANGE', '#ff7f0e')
+   GREEN      = Color('GREEN', '#2ca02c')
+
+   RED        = Color('RED',  '#D62728')
+   PURPLE     = Color('PURPLE', '#9467bd')
+   BROWN      = Color('BROWN', '#8c564b')
+
+   PINK       = Color('PINK', '#e377c2')
+   GREY       = Color('GREY', '#7f7f7f')
+   CHARTREUSE = Color('CHARTREUSE', '#bcbd22')
+
+   SKY        = Color('SKY', '#17becf')
+
+   def color10():
+      return (
+              Solid.BLUE, Solid.ORANGE, Solid.GREEN,
+              Solid.RED, Solid.PURPLE, Solid.BROWN,
+              Solid.PINK, Solid.CHARTREUSE, Solid.SKY,
+              Solid.GREY)
+
+
 class Palette:
-   def __init__(self, n):
+   def __init__(self, n, multi_evo=False):
       self.n = n
+      if multi_evo:
+         self.colors = {
+            'Neural_': Neon.BLUE,
+            'Baseline': Solid.RED,
+            'Simplex': Solid.SKY,
+            'CPPN': Solid.BLUE,
+            'All': Solid.ORANGE,
+            'NCA': Solid.GREEN,
+            'LSystem': Solid.PURPLE,
+            'Random': Solid.BROWN,
+            'Pattern': Solid.PINK,
+         }
+         return
       if n <= 12:
          self.colors = Neon.color12()
       else:

@@ -8,10 +8,7 @@ projekt package
 
 
 .. toctree::
+   :maxdepth: 4
 
    projekt.config
-   projekt.evaluator
-   projekt.overlay
-   projekt.policy
-   projekt.realm
-   projekt.rlutils
+   projekt.rllib_wrapper

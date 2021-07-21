@@ -3,11 +3,11 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>forge.ethyr.torch.save module &mdash; Neural MMO v1.4 1.4 documentation</title>
+  <title>forge.ethyr.torch.save module &mdash; Neural MMO v1.5 1.5 documentation</title>
   
 
   
@@ -16,7 +16,10 @@
 
   
   
+
   
+  
+
   
 
   
@@ -51,7 +54,7 @@
           
 
           
-            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> Neural MMO v1.4
+            <a href="../index.html" class="icon icon-home"> Neural MMO v1.5
           
 
           
@@ -84,22 +87,25 @@
             
               <p class="caption"><span class="caption-text">User Guide</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html"> Abstract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html"> Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-installation"> Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-overview"> Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-getting-started"> Getting Started</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-training-from-scratch"> Training from scratch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-cli"> CLI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-terrain-generation"> Terrain Generation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-rendering-and-overlays"> Rendering and Overlays</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-the-io-api"> The IO API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-training"> Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-evaluation"> Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/userguide.html#icon-dashboard-and-statistics"> Dashboard and Statistics</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Update Materials</span></p>
+<p class="caption"><span class="caption-text">Developer Guide</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html"> Video Demos</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-publications"> Publications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-presentations"> Presentations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-update-slides"> Update Slides</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-additional-links"> Additional Links</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-patch-notes-version-history"> Patch Notes + Version History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html"> Foreword</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-contributing"> Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-code-structure"> Code Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-style"> Style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-tech-stack"> Tech Stack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-client-map-representation"> Client Map Representation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-observation-representation"> Observation Representation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-model-io"> Model IO</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Documentation</span></p>
 <ul class="current">
@@ -118,13 +124,20 @@
 </ul>
 </li>
 </ul>
-<p class="caption"><span class="caption-text">Developer Guide</span></p>
+<p class="caption"><span class="caption-text">Baselines</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html"> Foreword</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-before-you-start"> Before You Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-tech-stack"> Tech Stack</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-versioning"> Versioning</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../rst/devguide.html#icon-style"> Style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/baselines.html"> Evaluation Protocol</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/baselines.html#icon-small-maps"> Small Maps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/baselines.html#icon-large-maps"> Large Maps</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Updates</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html"> Video Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-publications"> Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-presentations"> Presentations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-update-slides"> Update Slides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-additional-links"> Additional Links</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rst/updates.html#icon-patch-notes-version-history"> Patch Notes + Version History</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Ideology</span></p>
 <ul>
@@ -151,7 +164,7 @@
       <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">Neural MMO v1.4</a>
+          <a href="../index.html">Neural MMO v1.5</a>
         
       </nav>
 
@@ -161,6 +174,8 @@
         <div class="rst-content">
         
           
+
+
 
 
 
@@ -195,7 +210,7 @@
     
       <li class="wy-breadcrumbs-aside">
         
-            
+          
             <a href="../_sources/autodoc/forge.ethyr.torch.save.rst.txt" rel="nofollow"> View page source</a>
           
         
@@ -211,9 +226,9 @@
             
   <div class="section" id="module-forge.ethyr.torch.save">
 <span id="forge-ethyr-torch-save-module"></span><h1>forge.ethyr.torch.save module<a class="headerlink" href="#module-forge.ethyr.torch.save" title="Permalink to this headline">¶</a></h1>
-<dl class="class">
+<dl class="py class">
 <dt id="forge.ethyr.torch.save.Resetter">
-<em class="property">class </em><code class="sig-prename descclassname">forge.ethyr.torch.save.</code><code class="sig-name descname">Resetter</code><span class="sig-paren">(</span><em class="sig-param">resetTol</em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Resetter" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">forge.ethyr.torch.save.</code><code class="sig-name descname">Resetter</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">resetTol</span></em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Resetter" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Utility for model stalling that keeps track
 of the time since the model has improved</p>
@@ -222,9 +237,9 @@ of the time since the model has improved</p>
 <dd class="field-odd"><p><strong>resetTol</strong> – ticks before resetting</p>
 </dd>
 </dl>
-<dl class="method">
+<dl class="py method">
 <dt id="forge.ethyr.torch.save.Resetter.step">
-<code class="sig-name descname">step</code><span class="sig-paren">(</span><em class="sig-param">best=False</em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Resetter.step" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">step</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">best</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Resetter.step" title="Permalink to this definition">¶</a></dt>
 <dd><p>Step the resetter</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -246,9 +261,9 @@ performance thus far</p>
 
 </dd></dl>
 
-<dl class="class">
+<dl class="py class">
 <dt id="forge.ethyr.torch.save.Saver">
-<em class="property">class </em><code class="sig-prename descclassname">forge.ethyr.torch.save.</code><code class="sig-name descname">Saver</code><span class="sig-paren">(</span><em class="sig-param">root</em>, <em class="sig-param">savef</em>, <em class="sig-param">bestf</em>, <em class="sig-param">resetTol</em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Saver" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">forge.ethyr.torch.save.</code><code class="sig-name descname">Saver</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">root</span></em>, <em class="sig-param"><span class="n">savef</span></em>, <em class="sig-param"><span class="n">bestf</span></em>, <em class="sig-param"><span class="n">resetTol</span></em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Saver" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Model save/load class</p>
 <dl class="field-list simple">
@@ -261,9 +276,9 @@ performance thus far</p>
 </ul>
 </dd>
 </dl>
-<dl class="method">
+<dl class="py method">
 <dt id="forge.ethyr.torch.save.Saver.checkpoint">
-<code class="sig-name descname">checkpoint</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">opt</em>, <em class="sig-param">lifetime</em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Saver.checkpoint" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">checkpoint</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">params</span></em>, <em class="sig-param"><span class="n">opt</span></em>, <em class="sig-param"><span class="n">lifetime</span></em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Saver.checkpoint" title="Permalink to this definition">¶</a></dt>
 <dd><p>Save the model to file</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -276,9 +291,9 @@ performance thus far</p>
 </dl>
 </dd></dl>
 
-<dl class="method">
+<dl class="py method">
 <dt id="forge.ethyr.torch.save.Saver.load">
-<code class="sig-name descname">load</code><span class="sig-paren">(</span><em class="sig-param">opt</em>, <em class="sig-param">param</em>, <em class="sig-param">best=False</em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Saver.load" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">load</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">opt</span></em>, <em class="sig-param"><span class="n">param</span></em>, <em class="sig-param"><span class="n">best</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Saver.load" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the model from file</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -297,7 +312,7 @@ performance thus far</p>
 </dl>
 </dd></dl>
 
-<dl class="method">
+<dl class="py method">
 <dt id="forge.ethyr.torch.save.Saver.perf">
 <code class="sig-name descname">perf</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#forge.ethyr.torch.save.Saver.perf" title="Permalink to this definition">¶</a></dt>
 <dd><p>Print stats for the latest epoch</p>
@@ -312,37 +327,29 @@ performance thus far</p>
            
           </div>
           <footer>
-  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="forge.ethyr.torch.utils.html" class="btn btn-neutral float-right" title="forge.ethyr.torch.utils module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="forge.ethyr.torch.param.html" class="btn btn-neutral float-left" title="forge.ethyr.torch.param module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+        <a href="forge.ethyr.torch.utils.html" class="btn btn-neutral float-right" title="forge.ethyr.torch.utils module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="forge.ethyr.torch.param.html" class="btn btn-neutral float-left" title="forge.ethyr.torch.param module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        
-        &copy; Copyright 2020, Joseph Suarez
+        &#169; Copyright 2020, Joseph Suarez.
 
     </p>
   </div>
     
     
     
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     
     provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
-
         </div>
       </div>
 
@@ -409,6 +416,10 @@ performance thus far</p>
 
     .row-even {
       background: var(--accent);
+    }
+
+    html.writer-html5 .rst-content table.docutils th {
+      border: 1px solid var(--accent);
     }
 
     /* Top line */
@@ -648,10 +659,12 @@ html.writer-html4 .rst-content dl:not(.docutils) dl:not(.field-list) > dt, html.
     }
     h1 {
       color: var(--title);
+      font-size: 150%
     }
 
     h2 {
       color: var(--accent);
+      font-size: 125%
     }
 
     h3 {

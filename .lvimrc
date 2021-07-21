@@ -1,0 +1,3 @@
+set tabstop=3           " use 3 spaces to represent tab
+set softtabstop=3
+set shiftwidth=3        " number of spaces to use for auto indent

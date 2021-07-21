@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from forge.blade.io import stimulus
+from forge.blade.io import node 
 
 class Embedding(nn.Module):
    def __init__(self, var, dim):
@@ -22,16 +22,16 @@ class Input(nn.Module):
       '''Embedding wrapper around discrete and continuous vals'''
       super().__init__()
       self.cls = cls
-      if isinstance(cls, stimulus.node.Discrete):
+      if isinstance(cls, node.Discrete):
          self.embed = Embedding(cls, config.EMBED)
-      elif isinstance(cls, stimulus.node.Continuous):
+      elif isinstance(cls, node.Continuous):
          self.embed = torch.nn.Linear(1, config.EMBED)
 #     self.embed = self.embed.cuda()
 
    def forward(self, x):
-      if isinstance(self.cls, stimulus.node.Discrete):
+      if isinstance(self.cls, node.Discrete):
          x = x.long()
-      elif isinstance(self.cls, stimulus.node.Continuous):
+      elif isinstance(self.cls, node.Continuous):
          x = x.float().unsqueeze(-1)
 #     self.embed = self.embed.cuda()
 #     x = x.cuda()
@@ -52,3 +52,19 @@ class BiasedInput(nn.Module):
 #     self.bias = self.bias.cuda()
 #     x = x.cuda()
       return self.embed(x) + self.bias.weight
+
+class MixedDTypeInput(nn.Module):
+   def __init__(self, continuous, discrete, config):
+      super().__init__()
+
+      self.continuous = torch.nn.ModuleList([
+            torch.nn.Linear(1, config.EMBED) for _ in range(continuous)])
+      self.discrete   = torch.nn.Embedding(discrete, config.EMBED)
+
+   def forward(self, x):
+      continuous = x['Continuous'].split(1, dim=-1)
+      continuous = [net(e) for net, e in zip(self.continuous, continuous)]
+      continuous = torch.stack(continuous, dim=-2)
+      discrete   = self.discrete(x['Discrete'].long())
+
+      return torch.cat((continuous, discrete), dim=-2)

@@ -8,6 +8,7 @@ forge.ethyr.torch.policy package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.ethyr.torch.policy.attention
    forge.ethyr.torch.policy.baseline

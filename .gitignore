@@ -2,4 +2,10 @@
 *.pth
 *.swo
 *.swp
-experiment/*
+baselines/models/current/*
+forge/embyr
+docs/source/resource/maps/
+evo_experiment/*
+eval_experiment/*
+docs/source/autodoc/
+docs/build/

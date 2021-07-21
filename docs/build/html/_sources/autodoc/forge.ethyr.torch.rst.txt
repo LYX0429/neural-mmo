@@ -8,12 +8,14 @@ forge.ethyr.torch package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.ethyr.torch.io
    forge.ethyr.torch.policy
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.ethyr.torch.loss
    forge.ethyr.torch.model

@@ -8,11 +8,8 @@ forge.blade.entity package
 
 
 .. toctree::
-
-   forge.blade.entity.npc
-
-
-.. toctree::
+   :maxdepth: 4
 
    forge.blade.entity.entity
+   forge.blade.entity.npc
    forge.blade.entity.player

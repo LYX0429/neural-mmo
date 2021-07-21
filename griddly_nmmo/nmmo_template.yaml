@@ -1,0 +1,605 @@
+Version: "0.1"
+Environment:
+  Name: nmmo_template
+  Description: An NMMO-type game. The idea is to set up an open-ended system wherein agents can progress from hunter gathering, to agriculture, to basic civilization.
+  Observers:
+    Sprite2D:
+      TileSize: 16
+      BackgroundTile: oryx/oryx_tiny_galaxy/tg_sliced/tg_world/tg_world_floor_panel_metal_a.png
+    Isometric:
+      TileSize: [32, 48]
+      BackgroundTile: oryx/oryx_iso_dungeon/grass-1.png
+#     BackgroundTile: mushy/ground/train_324_0003-61.png
+      IsoTileHeight: 16
+      IsoTileDepth: 4
+  Variables:
+    - Name: player_resources
+      InitialValue: 0
+    - Name: player_done
+      InitialValue: 0
+      PerPlayer: true
+    - Name: drink_skill
+      InitialValue: 0
+      PerPlayer: true
+    - Name: gather_skill
+      InitialValue: 0
+      PerPlayer: true
+    - Name: woodcut_skill
+      InitialValue: 0
+      PerPlayer: true
+    - Name: mine_skill
+      InitialValue: 0
+      PerPlayer: true
+    - Name: melee_skill
+      InitialValue: 0
+      PerPlayer: true
+    - Name: score
+      InitialValue: 0
+      PerPlayer: true
+  Player:
+    Count: 5
+    Observer:
+      RotateWithAvatar: true
+      TrackAvatar: true
+      Height: 7
+      Width: 7
+      OffsetX: 0
+      OffsetY: 0
+    AvatarObject: gnome
+  Termination:
+    Lose: []
+      #FIXME: This is broken, probably because gnomes are also player avatars.
+#     - eq: [gnome:count, 0] # If all the gnomes are dead
+    Win: []
+#     - eq: [_score, 10] # First player to 10 reward points
+
+  Levels: # An initial placeholder level will be added at runtime using python.
+
+Actions:
+  - Name: animate_lava
+    InputMapping:
+      Inputs:
+        1:
+          Description: Lava returns to standard level 1 turn after being interacted with
+          VectorToDest: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: lava
+          Commands:
+            - set_tile: 0
+        Dst:
+          Object: lava
+          Commands:
+            - set_tile: 0
+
+  - Name: increase_health
+    InputMapping:
+      Inputs:
+        1:
+          Description: Increase the gnomes's health.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Preconditions:
+            - gt: [thirst, 0]
+            - gt: [hunger, 0]
+            - lt: [health, 10]
+          Commands:
+            - incr: health
+            - set_tile: 0
+        Dst:
+          Object: gnome
+
+  - Name: increase_hunger
+    InputMapping:
+      Inputs:
+        1:
+          Description: The gnome has eaten.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Preconditions:
+            - lt: [hunger, 10]
+          Commands:
+            # Not ideal
+            - add: [hunger, 10]
+        Dst:
+          Object: _empty
+
+
+  - Name: increase_thirst
+    InputMapping:
+      Inputs:
+        1:
+          Description: The gnome has drunk.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Preconditions:
+            - lt: [thirst, 10]
+          Commands:
+            - add: [thirst, 10]
+        Dst:
+          Object: water
+
+  - Name: decrease_health_starvation
+    InputMapping:
+      Inputs:
+        1:
+          Description: Decrease the gnome's health if they are starving.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Preconditions:
+            - lt: [hunger, 1]
+            - lt: [hunger, thirst]
+            - gt: [health, 0]
+          Commands:
+            - decr: health
+        Dst:
+          Object: gnome
+
+  - Name: decrease_health_thirst
+    InputMapping:
+      Inputs:
+        1:
+          Description: Decrease the gnomes's health if they are thirsty.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      # if hunger > 0 and thirst > 0: health += 1
+      - Src:
+          Object: gnome
+          Preconditions:
+            - lt: [thirst, 1]
+            - lt: [thirst, hunger]
+            - gt: [health, 0] # no negative health
+          Commands:
+            - decr: health
+        Dst:
+          Object: gnome
+
+
+  - Name: decrease_health_hungerThirst
+    InputMapping:
+      Inputs:
+        1:
+          Description: Decrease the gnomes's health if they are thirsty.
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      # if hunger > 0 and thirst > 0: health += 1
+      - Src:
+          Object: gnome
+          Preconditions:
+            - lt: [thirst, 1]
+            - eq: [thirst, hunger]
+            - gt: [health, 0]
+          Commands:
+            - decr: health
+        Dst:
+          Object: gnome
+
+
+  - Name: tick_state
+    InputMapping:
+      Inputs:
+        1:
+          Description: Tick the gnome's internal state
+          OrientationVector: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: gnome
+          Commands:
+            # increase health if appropriate
+            - exec:
+                Action: increase_health
+                Delay: 0
+            # if hunger > 0, hunger -= 1
+            - gt:
+                Arguments: [hunger, 0]
+                Commands:
+                  - decr: hunger
+            # if thirst > 0, thirst -= 1
+            - gt:
+               Arguments: [thirst, 0]
+               Commands:
+                  - decr: thirst
+            #TODO: clean this up if we get an "or" operator. 
+            # Check for starvation if hunger < thirst, otherwise check for thirst.
+            # This prevents double-decrementing health if both are depleted.
+            - exec:
+                Action: decrease_health_starvation
+                Delay: 0
+            - exec:
+                Action: decrease_health_thirst
+                Delay: 0
+            - exec:
+                Action: decrease_health_hungerThirst
+                Delay: 0
+            # if health <= 0, die
+#           - lt:
+#               Arguments: [health, 1]
+#               Commands:
+#                 - set: [player_done, 1]
+#                 - set_tile: 1
+#                 - reward: -1
+#                 - decr: score
+#                 - remove: true
+            # keep ticking
+            - exec:
+                Action: tick_state
+                Delay: 1
+
+        Dst:
+            Object: gnome
+
+# - Name: spawn_chicken
+#   InputMapping:
+#     Internal: true
+#   Behaviours:
+#     - Src:
+#         Object: chicken_spawn
+#         Commands:
+#           - spawn: chicken
+#           - exec:
+#               Action: spawn_chicken
+#               Delay: 50
+#               Randomize: true
+
+#       Dst:
+#         Object: _empty
+
+# # Define action that cannot be controlled by the player. (In this case the chicken movement)
+# - Name: random_movement
+#   InputMapping:
+#     Inputs:
+#       1:
+#         Description: Rotate left
+#         OrientationVector: [-1, 0]
+#       2:
+#         Description: Move forwards
+#         OrientationVector: [0, -1]
+#         VectorToDest: [0, -1]
+#       3:
+#         Description: Rotate right
+#         OrientationVector: [1, 0]
+#     Relative: true
+#     Internal: true
+#   Behaviours:
+#     # Spider rotates on the spot
+#     - Src:
+#         Object: chicken
+#         Commands:
+#           - rot: _dir
+#           - exec:
+#               Action: random_movement
+#               Delay: 3
+#               Randomize: true
+#       Dst:
+#         Object: chicken
+
+#     # The chicken and the chicken can move into empty space
+#     - Src:
+#         Object: chicken
+#         Commands:
+#           - mov: _dest
+#           - exec:
+#               Action: random_movement
+#               Delay: 3
+#               Randomize: true
+#       Dst:
+#         Object: _empty
+
+#     # If the chicken runs into lava it dies
+#     - Src:
+#         Object: chicken
+#         Commands:
+#           - remove: true
+#       Dst:
+#         Object: lava
+#         Commands:
+#           - remove: true
+#           - reward: -1
+
+#     # If the gnome moves into a chicken
+#     - Src:
+#         Object: chicken
+#       Dst:
+#         Object: gnome
+
+  - Name: spawn_forest
+    InputMapping:
+      Inputs:
+        1:
+          Description: Respawn a depleted forest after some time.
+          VectorToDest: [0, 0]
+      Relative: true
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: forest
+          Commands:
+            - spawn: forest
+        Dst:
+          Object: _empty
+
+# - Name: craft_campfire
+#   InputMapping:
+#      Inputs:
+#         1:
+#            Description: Craft a fire out of materials.
+#            VectorToDest: [0, 1]
+#      Relative: true
+#   Behaviours:
+#     - Src:
+#         Object: gnome
+#         Commands:
+#            - spawn: campfire
+#       Dst:
+#          Object: _empty
+
+
+  - Name: attack
+    Behaviours:
+      - Src:
+          Object: gnome
+          Commands:
+            - incr: melee_skill
+          
+        Dst:
+          Object: gnome
+          Commands:
+            - add: [health, -3]
+
+  - Name: gather
+    InputMapping:
+      Inputs:
+        1:
+          VectorToDest: [1, 0]
+        2:
+          VectorToDest: [0, 1]
+        3:
+          VectorToDest: [-1, 0]
+        4:
+          VectorToDest: [0, -1]
+      Relative: true
+    Behaviours:
+      - Src:
+          Object: gnome
+        Dst:
+          Object: lava
+
+
+
+  - Name: move
+    Behaviours:
+      # gnomes will disintegrate in lava
+      - Src:
+          Object: gnome
+#         Preconditions:
+#           - lt: [player_dead, 1]
+          Commands:
+#           - set: [ player_done, 1 ]
+#           - set_tile: 1
+#           - reward: -1
+#           - decr: score
+#           - remove: true
+        Dst:
+          Object: lava
+          Commands:
+            - set_tile: 1 # the lave rises a bit
+            - exec:
+                Action: animate_lava  #FIXME: this is broken
+                Delay: 1
+
+      # gnomes can move into empty spaces
+      - Src:
+          Object: gnome
+#         Preconditions:
+#           - lt: [player_dead, 1]
+          Commands:
+            - mov: _dest # mov will move the object, _dest is the destination location of the action
+        Dst:
+          Object: _empty
+
+      # gnomes can gather forest
+      - Src:
+          Object: gnome
+          Commands:
+            # leaves give +5 hunger
+            - incr: gather_skill
+            - incr: score
+            - reward: 1
+            - exec:
+                Action: increase_hunger
+                Delay: 0
+
+        Dst:
+          Object: forest
+          Commands:
+#           - decr: leaves
+#           - set_tile: 1
+            - remove: true
+            #           - exec:
+            #               Action: spawn_forest
+            #               Delay: ${_forest_respawn}
+      - Src:
+          Object: gnome
+          Commands:
+            # water gives +5 thirst
+            - incr: drink_skill
+            - exec:
+                Action: increase_thirst
+                Delay: 0
+        Dst:
+          Object: water
+          Commands:
+            - set_tile: 1
+
+      - Src:
+          Object: gnome
+          Commands:
+            - add: [wood, 1]
+            - incr: woodcut_skill
+        Dst:
+          Object: tree
+          Commands:
+            - remove: true
+
+      - Src:
+          Object: gnome
+          Commands:
+            - add: [ore, 1]
+            - incr: mine_skill
+        Dst:
+          Object: iron_ore
+          Commands:
+            - remove: true
+
+
+Objects:
+  - Name: forest
+    MapCharacter: S
+#   Variables:
+      # Actions are applied to the destination object first.
+#     - Name: leaves
+#       InitialValue: 1
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/bush-1.png
+          Offset: [0, 0]
+        - Image: oryx/oryx_iso_dungeon/bush-1.png
+          Offset: [0, 10]
+
+  - Name: tree
+    MapCharacter: T
+    Observers:
+      Isometric:
+        - Image: deadtrees/deadtree3_00.png
+          Offset: [0, 0]
+
+  - Name: iron_ore
+    MapCharacter: O
+    Observers:
+       Isometric:
+#         - Image: blocks/Ruby 8.png
+          - Image: iron.png
+#         - Image: mushy/rocks/train_419_0000-32.png
+            TileSize: [10, 100]
+            Offset: [0, 10]
+
+  - Name: water
+    MapCharacter: W
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/water-1.png
+#       - Image: mushy/water/train_419_0000-32.png
+          Offset: [0, 2]
+        - Image: oryx/oryx_iso_dungeon/water-1.png
+          Offset: [0, 0]
+
+  - Name: stone
+    MapCharacter: R
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/wall-grey-1.png
+          Offset: [0, 15]
+
+  - Name: lava
+    MapCharacter: L
+    Observers:
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/lava-1.png
+       #- Image: mushy/ground/train_429_0003-56.png
+          Offset: [0, 4]
+        - Image: oryx/oryx_iso_dungeon/lava-1.png
+       #- Image: mushy/ground/train_429_0003-56.png
+          Offset: [0, 2]
+
+  - Name: campfire 
+    MapCharacter: C
+    Observers:
+       Isometric:
+          - Image: bonfire.png
+            Offset: [0, 10]
+
+  - Name: chicken
+    InitialActions:
+      - Action: random_movement
+        Delay: 3
+        Randomize: true
+    MapCharacter: 'G'
+    Observers:
+      Sprite2D:
+        - Image: chicken.png
+      Block2D:
+        - Shape: triangle
+          Color: [1.0, 0.0, 0.0]
+          Scale: 0.8
+      Isometric:
+        - Image: chicken.png
+
+
+  - Name: chicken_spawn
+    MapCharacter: 'N'
+    InitialActions:
+      - Action: spawn_chicken
+        Delay: 10
+        Randomize: true
+    Observers:
+      Sprite2D:
+        - Image: oryx/oryx_fantasy/bush-1.png
+      Block2D:
+        - Shape: triangle
+          Color: [0.0, 0.0, 1.0]
+          Scale: 0.8
+      Isometric:
+        - Image: egg.png
+
+  - Name: gnome
+    InitialActions:
+      # Start ticking hunger after an initial grace period.
+      - Action: tick_state
+        Delay: 1
+    MapCharacter: H
+    Variables:
+      - Name: health
+        InitialValue: 10
+      - Name: hunger
+        InitialValue: 20
+      - Name: thirst
+        InitialValue: 20
+      - Name: wood
+        InitialValue: 0
+      - Name: ore
+        InitialValue: 0
+    Observers:
+      Sprite2D:
+        - Image: oryx/oryx_tiny_galaxy/tg_sliced/tg_monsters/tg_monsters_jelly_d1.png
+      Block2D:
+        - Shape: square
+          Color: [0.6, 0.2, 0.2]
+          Scale: 0.5
+      Isometric:
+        - Image: oryx/oryx_iso_dungeon/avatars/gnome-1.png
+          #FIXME: shitty death symbol, also rarely renders, or only when other gnomes nearby
+        - Image: bones.png

@@ -8,6 +8,7 @@ forge package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade
    forge.ethyr

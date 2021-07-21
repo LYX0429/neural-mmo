@@ -8,6 +8,7 @@ forge.blade package
 
 
 .. toctree::
+   :maxdepth: 4
 
    forge.blade.core
    forge.blade.entity
