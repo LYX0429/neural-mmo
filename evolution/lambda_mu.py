@@ -293,6 +293,7 @@ class LambdaMuEvolver():
       csv_lines = []
       old_log_path = self.log_path.strip('log.csv') + 'log_old.csv'
       copyfile(self.log_path, old_log_path)
+      print('Reloading log.csv.')
       with open(old_log_path, mode='r') as old_log_file:
          csv_reader = csv.reader(old_log_file)
          with open(self.log_path, mode='w') as log_file:
@@ -304,12 +305,9 @@ class LambdaMuEvolver():
                match = re.match(r'epoch (\d+)', row[0])
                if match:
                   groups = match.groups()
-                  print(groups, len(groups))
                   assert len(groups) == 1
                   n_log_gen = groups[0]
                   n_log_gen = int(n_log_gen)
-                  print(row)
-                  print(n_log_gen)
                   if n_log_gen >= self.n_gen:
                      break
                log_writer.writerow(row)

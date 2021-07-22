@@ -25,11 +25,11 @@ from ForgeEvo import get_genome_name
 
 genomes = [
     'Baseline',
-    'Simplex',
+#   'Simplex',
 #   'Random',
 #   'CPPN',
 #   'Pattern',
-    'CA',
+#   'CA',
 #   'LSystem',
 #   'All',
 ]

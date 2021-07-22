@@ -131,7 +131,7 @@ class PlayerManager(EntityGroup):
 
       # self.palette = Palette(config.NPOP)
       # self.idx = 1
-      self.palette = Palette(config.NPOP, multi_evo=True)
+      self.palette = Palette(config.NPOP, multi_evo=config.EVALUATE)
       self.reset_pop_counts()
 
 
@@ -171,7 +171,10 @@ class PlayerManager(EntityGroup):
          pop = self.idx % self.config.NPOP
          # color     = self.palette.colors[pop]
          name = self.models[pop]
-         color = self.palette.colors[name]
+         if self.config.EVALUATE:
+            color = self.palette.colors[name]
+         else:
+            color = self.palette.colors[pop]
          if self.max_pop is not None and self.pop_counts[name] >= self.max_pop:
             # print('Not spawning: reached max pop in population {}'.format(name))
             return
