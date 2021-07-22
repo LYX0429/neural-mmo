@@ -26,7 +26,8 @@ from forge.trinity.evaluator import Evaluator
 import projekt
 from projekt import rllib_wrapper as wrapper
 from forge.blade.core import terrain
-from ForgeEvo import get_genome_name
+from evolution.utils import get_genome_name
+
 
 def createPolicies(config, mapPolicy):
    '''Generate RLlib policies'''

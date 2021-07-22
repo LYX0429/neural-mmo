@@ -3,10 +3,8 @@ import json
 import pickle
 import sys
 # My favorite debugging macro
-from pdb import set_trace as TT
 
 import re
-import numpy as np
 import ray
 import torch
 from fire import Fire
@@ -29,26 +27,6 @@ prebuilt IO networks in PyTorch to start training your
 own models immediately or hack on the environment'''
 
 # Instantiate a new environment
-
-def get_genome_name(exp_name):
-   if 'CPPN' in exp_name:
-      return 'CPPN'
-   elif 'Pattern' in exp_name:
-      return 'Pattern'
-   elif 'Random' in exp_name:
-      return 'Random'
-   elif 'Simplex' in exp_name:
-      return 'Simplex'
-   elif 'Baseline' in exp_name:
-      return 'Baseline'
-   elif 'gene-CA' in exp_name:
-      return 'NCA'
-   elif 'gene-All' in exp_name:
-      return 'All'
-   elif 'gene-LSystem' in exp_name:
-      return 'L-System'
-   else:
-      return exp_name
 
 
 def createEnv(config):

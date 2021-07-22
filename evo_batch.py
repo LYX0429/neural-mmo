@@ -21,15 +21,15 @@ from projekt import config
 from fire import Fire
 from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc
-from ForgeEvo import get_genome_name
+from evolution.utils import get_genome_name
 
 genomes = [
-    'Baseline',
-#   'Simplex',
+#  'CA',
+   'Baseline',
+   'Simplex',
 #   'Random',
 #   'CPPN',
 #   'Pattern',
-#   'CA',
 #   'LSystem',
 #   'All',
 ]
@@ -317,7 +317,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
             global EVALUATION_HORIZON
             if opts.multi_policy:
                model_exp_folder = 'multi_policy'
-               model_name = str(model_exp_names).replace(" ", "").replace("'", "")
+               model_name = str([get_genome_name(m) for m in model_exp_names]).replace(" ", "").replace("'", "")
             else:
                model_name = model_exp_folder = model_exp_name
             map_exp_folder = map_exp_name
@@ -328,7 +328,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
                model_exp_folder,
                'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
                   model_name,
-                  map_exp_name,
+                  get_genome_name(map_exp_name),
                   infer_idx,
                   EVALUATION_HORIZON
                ),

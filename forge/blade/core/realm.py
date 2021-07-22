@@ -167,20 +167,19 @@ class PlayerManager(EntityGroup):
          if self.realm.map.tiles[r, c].occupied:
             continue
 
-         # pop, name = self.identify()
-         pop = self.idx % self.config.NPOP
-         # color     = self.palette.colors[pop]
-         name = self.models[pop]
          if self.config.EVALUATE:
+            pop = self.idx % self.config.NPOP
+            name = self.models[pop]
             color = self.palette.colors[name]
+            player    = Player(self.realm, (r, c), self.idx, pop, name, color)
          else:
-            color = self.palette.colors[pop]
+            pop, name = self.identify()
+            color     = self.palette.colors[pop]
+            player    = Player(self.realm, (r, c), self.idx, pop, name+'_', color)
          if self.max_pop is not None and self.pop_counts[name] >= self.max_pop:
             # print('Not spawning: reached max pop in population {}'.format(name))
             return
 
-         # player    = Player(self.realm, (r, c), self.idx, pop, name, color)
-         player    = Player(self.realm, (r, c), self.idx, pop, name+'_', color)
 
          super().spawn(player)
          self.pop_counts[name] += 1

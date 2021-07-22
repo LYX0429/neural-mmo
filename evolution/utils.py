@@ -1,3 +1,5 @@
+import ray
+
 @ray.remote
 class Counter:
    ''' When using rllib trainer to train and simulate on evolved maps, this global object will be
@@ -49,3 +51,24 @@ class Stats:
       self.mults[g_hash] = mults
    def get_mults(self, g_hash):
       return self.mults[g_hash]
+
+
+def get_genome_name(exp_name):
+   if 'CPPN' in exp_name:
+      return 'CPPN'
+   elif 'Pattern' in exp_name:
+      return 'Pattern'
+   elif 'Random' in exp_name:
+      return 'Random'
+   elif 'Simplex' in exp_name:
+      return 'Simplex'
+   elif 'Baseline' in exp_name:
+      return 'Baseline'
+   elif 'gene-CA' in exp_name:
+      return 'NCA'
+   elif 'gene-All' in exp_name:
+      return 'All'
+   elif 'gene-LSystem' in exp_name:
+      return 'L-System'
+   else:
+      return exp_name
