@@ -228,22 +228,22 @@ class meNMMO(EvolverNMMO):
          offspring = []
          mutated = []
          maps = {}
-         for (i, o) in enumerate(batch):
+         for (j, o) in enumerate(batch):
             rnd = np.random.random()
             # For every 99 individuals we mutate, we inject a new random one
             if rnd < 0.01 or self.BASELINE_SIMPLEX:
                 # If running a non-evolved baseline, never mutate, always generate anew
-                newO = EvoIndividual([], i, self)
+                newO = EvoIndividual([], j, self)
             else:
                 newO = self.clone(o)
                 newO.mutate()
                 # newO, = self.mutate(newO)
             new_chrom = newO.chromosome
-            newO.idx = i
+            newO.idx = j
             offspring.append(newO)
 #           self.gen_cppn_map(newO.chromosome)
-            self.maps[i] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
-            mutated.append(i)
+            self.maps[j] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
+            mutated.append(j)
 #        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
          valid_ind = cull_invalid(offspring)
          while len(valid_ind) == 0:

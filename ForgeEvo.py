@@ -176,6 +176,7 @@ def main():
       container = evolver.container
       evolver.container = None
       evolver.restore(trash_trainer=True)
+      evolver.reload_log()
       # evolver.container = container
       archive = pickle.load(open(os.path.join('evo_experiment', experiment_name, 'ME_archive.p'), 'rb'))
       evolver.container = archive['container']

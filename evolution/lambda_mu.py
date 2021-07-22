@@ -1,10 +1,12 @@
 import csv
 import os
 import pickle
+import shutil
 import time
 from multiprocessing import Pipe, Process
-from pdb import set_trace as T
+from pdb import set_trace as TT
 from shutil import copyfile
+import re
 
 import numpy as np
 
@@ -282,9 +284,36 @@ class LambdaMuEvolver():
    def mutate(self, map_arr):
        raise NotImplementedError()
 
-   def restore():
-       ''' Use saved maps to instantiate games. '''
-       raise NotImplementedError()
+   def restore(self):
+      raise NotImplementedError
+
+   def reload_log(self):
+      '''Get rid of log entries that correspond to generations that occured after the latest checkpoint of the evolver
+      being reloaded.'''
+      csv_lines = []
+      old_log_path = self.log_path.strip('log.csv') + 'log_old.csv'
+      copyfile(self.log_path, old_log_path)
+      with open(old_log_path, mode='r') as old_log_file:
+         csv_reader = csv.reader(old_log_file)
+         with open(self.log_path, mode='w') as log_file:
+            log_writer = csv.writer(
+               log_file, delimiter=',',
+               quotechar='"',
+               quoting=csv.QUOTE_MINIMAL)
+            for row in csv_reader:
+               match = re.match(r'epoch (\d+)', row[0])
+               if match:
+                  groups = match.groups()
+                  print(groups, len(groups))
+                  assert len(groups) == 1
+                  n_log_gen = groups[0]
+                  n_log_gen = int(n_log_gen)
+                  print(row)
+                  print(n_log_gen)
+                  if n_log_gen >= self.n_gen:
+                     break
+               log_writer.writerow(row)
+      os.remove(old_log_path)
 
    def infer(self):
        raise NotImplementedError()

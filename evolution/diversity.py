@@ -7,7 +7,7 @@ from skimage.morphology import disk
 import skbio
 
 global trg_image
-
+trg_image = None
 
 def diversity_calc(config):
    div_calc_name = config.FITNESS_METRIC
@@ -56,6 +56,8 @@ def get_trg_image():
     trg_image = (np.array(trg_image)[:, :, 0] / 255 * 8).astype(np.uint8)
 
 def ham_text(individual, config):
+    if trg_image is None:
+       get_trg_image()
     map_arr = individual.chromosome.map_arr[10:-10, 10:-10]
     return -(trg_image != map_arr).sum()
 
