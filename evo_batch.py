@@ -26,12 +26,12 @@ from ForgeEvo import get_genome_name
 genomes = [
     'Baseline',
     'Simplex',
-    'Random',
-    'CPPN',
-    'Pattern',
+#   'Random',
+#   'CPPN',
+#   'Pattern',
     'CA',
-    'LSystem',
-    'All',
+#   'LSystem',
+#   'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
@@ -264,6 +264,8 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
+   if opts.multi_policy:
+      mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names)))
    for (j, map_exp_name) in enumerate(map_exp_names):
       with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
          archive = pickle.load(f)
@@ -313,13 +315,19 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
             launch_cmd(eval_cmd, n)
          else:
             global EVALUATION_HORIZON
+            if opts.multi_policy:
+               model_exp_folder = 'multi_policy'
+               model_name = str(model_exp_names).replace(" ", "").replace("'", "")
+            else:
+               model_name = model_exp_folder = model_exp_name
+            map_exp_folder = map_exp_name
             eval_data_path = os.path.join(
                'eval_experiment',
-               map_exp_name,
+               map_exp_folder,
                str(infer_idx),
-               model_exp_name,
+               model_exp_folder,
                'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
-                  model_exp_name,
+                  model_name,
                   map_exp_name,
                   infer_idx,
                   EVALUATION_HORIZON
@@ -336,6 +344,12 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
               #div_scores[k, i, j] = get_div_calc(div_calc_name)(skill_arr)
                div_scores[k, i, j] = get_div_calc(div_calc_name)(data[0])
             n += 1
+            if opts.multi_policy:
+               model_name_idxs = {get_genome_name(r): i for (i, r) in enumerate(model_exp_names)}
+               multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
+               survivors = np.load(multi_eval_data_path, allow_pickle=True).item()
+               for survivor_name, n_survivors in survivors.items():
+                  mean_survivors[model_name_idxs[survivor_name], i] = np.mean(n_survivors)
          if opts.multi_policy:
             break
    if vis_only:
@@ -355,6 +369,8 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
          cross_eval_heatmap(mean_skills[k], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
       for (k, div_calc_name) in enumerate(DIV_CALCS):
          cross_eval_heatmap(div_scores[k], row_labels, col_labels, "{} diversity".format(div_calc_name), "{} diversity".format(div_calc_name))
+      if opts.multi_policy:
+         cross_eval_heatmap(mean_survivors, row_labels, col_labels, "mean survivors", "")
 
 def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
    fig, ax = plt.subplots()

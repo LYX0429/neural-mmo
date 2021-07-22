@@ -686,10 +686,10 @@ class RLlibMultiEvaluator(RLlibEvaluator):
          model_names = self.config.MULTI_MODEL_NAMES
          survivors = {model_names[k]: np.array(v) for (k, v) in self.survivors.items()}
          with open(data_path, 'wb') as f:
-            np.save(f, self.survivors)
+            np.save(f, survivors)
       else:
          with open(data_path, 'rb') as f:
-            survivors = np.load(f)
+            survivors = np.load(f, allow_pickle=True)
       x_pos = np.arange(len(survivors))
       means = [survivors[k].mean() for k in model_names]
       stds = [survivors[k].std() for k in model_names]

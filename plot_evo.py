@@ -16,6 +16,7 @@ def plot_exp(exp_name, render=False):
         results = {}
         csv_reader = csv.DictReader(log_file)
         curr_epoch = 0
+        results[curr_epoch] = {}
         newest_epoch = 0
         # NB: we've written to the csv incorrectly :( annoying
 
@@ -23,12 +24,15 @@ def plot_exp(exp_name, render=False):
             row = list(row.values())
 
             if row[0].startswith('epoch'):
+                # Denotes a new epoch
                 curr_epoch = int(row[0].split(' ')[-1])
+                results[curr_epoch] = {}
             elif row[0] == 'id':
+                # These are the headers for the following rows
                 pass
             else:
-                if curr_epoch not in results:
-                    results[curr_epoch] = {}
+                # if curr_epoch not in results:
+                #     results[curr_epoch] = {}
                 map_id = row[0]
                 results[curr_epoch][map_id] = row[1]
     ep_scores = []

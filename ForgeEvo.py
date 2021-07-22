@@ -165,8 +165,10 @@ def main():
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
       if config.VIS_MAPS:
-         evolver.saveMaps(evolver.container)
+         print('Plotting histogram of map fitness.')
          evolver.plot()
+         print('Saving and rendering maps from the archive of elites.')
+         evolver.saveMaps(evolver.container)
          return
       # Running out of RAM depending on size/number of map genomes... try trashing the archive while ray does its
       # multiprocessing nonsense garbage?
