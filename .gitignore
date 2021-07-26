@@ -7,5 +7,6 @@ forge/embyr
 docs/source/resource/maps/
 evo_experiment/*
 eval_experiment/*
+configs/*
 docs/source/autodoc/
 docs/build/

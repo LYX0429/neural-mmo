@@ -16,6 +16,7 @@ from pdb import set_trace as TT
 import matplotlib
 from matplotlib import pyplot as plt
 
+from forge.blade.core.terrain import MapGenerator, Save
 from plot_diversity import heatmap, annotate_heatmap
 from projekt import config
 from fire import Fire
@@ -24,14 +25,14 @@ from evolution.diversity import get_div_calc
 from evolution.utils import get_genome_name
 
 genomes = [
-#  'CA',
-   'Baseline',
-   'Simplex',
-#   'Random',
-#   'CPPN',
-#   'Pattern',
-#   'LSystem',
-#   'All',
+    'CA',
+    'Baseline',
+    'Simplex',
+    'Random',
+    'CPPN',
+    'Pattern',
+    'LSystem',
+    'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
@@ -68,12 +69,16 @@ SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defen
 DIV_CALCS = ['L2', 'Differential', 'Hull', 'Discrete', 'Sum']
 global eval_args
 global EVALUATION_HORIZON
+global TERRAIN_BORDER  # Assuming this is the same for all experiments!
+global MAP_GENERATOR  # Also tile-set
+TERRAIN_BORDER = None
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
       content = f.read()
-      content_0 = re.sub('nmmo\d*', 'nmmo{}'.format(i), content)
-      new_content = re.sub('python Forge.*', new_cmd, content_0)
+      content = re.sub('nmmo\d*', 'nmmo{}'.format(i), content)
+      content = re.sub('#SBATCH --time=\d+:', '#SBATCH --time={}:'.format(JOB_TIME), content)
+      new_content = re.sub('python Forge.*', new_cmd, content)
 
    with open(sbatch_file, 'w') as f:
       f.write(new_content)
@@ -85,8 +90,8 @@ def launch_cmd(new_cmd, i):
 
 
 def launch_batch(exp_name, preeval=False):
-
-
+   global TERRAIN_BORDER
+   global MAP_GENERATOR
    if LOCAL:
       default_config['n_generations'] = 1
       if EVALUATE:
@@ -120,11 +125,12 @@ def launch_batch(exp_name, preeval=False):
 
             for algo in algos:
                for me_bins in me_bin_sizes:
-                  if gene == 'Baseline' and launched_baseline:
-                     # Only launch one baseline, these other settings are irrelevant
-                     continue
-                  else:
-                     launched_baseline = True
+                  if gene == 'Baseline':
+                     if launched_baseline:
+                        # Only launch one baseline, these other settings are irrelevant
+                        continue
+                     else:
+                        launched_baseline = True
                   if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
                      # If using MAP-Elites, ME bin sizes are irrelevant
                      continue
@@ -206,6 +212,11 @@ def launch_batch(exp_name, preeval=False):
                      for (k, v) in exp_config.items():
                         setattr(evo_config, k, v)
                     #   config.set(config, k, v)
+                     if TERRAIN_BORDER is None:
+                        TERRAIN_BORDER = evo_config.TERRAIN_BORDER
+                        MAP_GENERATOR = MapGenerator(evo_config)
+                     else:
+                        assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
                      experiment_name = get_experiment_name(evo_config)
                      experiment_names.append(experiment_name)
 
@@ -271,6 +282,11 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
          archive = pickle.load(f)
          best_ind = archive['container'].best
          infer_idx, best_fitness = best_ind.idx, best_ind.fitness
+         map_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx), '')
+         map_arr = best_ind.chromosome.map_arr
+         Save.np(map_arr, map_path)
+         png_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx) + '.png')
+         Save.render(map_arr[TERRAIN_BORDER:-TERRAIN_BORDER, TERRAIN_BORDER:-TERRAIN_BORDER], MAP_GENERATOR.textures, png_path)
          if vis_only:
             txt_verb = 'Visualizing past inference'
          else:
@@ -327,7 +343,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
                str(infer_idx),
                model_exp_folder,
                'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
-                  model_name,
+                  get_genome_name(model_name),
                   get_genome_name(map_exp_name),
                   infer_idx,
                   EVALUATION_HORIZON
@@ -452,9 +468,15 @@ if __name__ == '__main__':
    EVALUATE = opts.evaluate
    LOCAL = opts.local
    TRAIN_BASELINE = opts.train_baseline
-   CUDA = not opts.cpu
+   CUDA = not opts.cpu and not opts.vis_maps
    VIS_CROSS_EVAL = opts.vis_cross_eval
    RENDER = opts.render
+   if EVALUATE or opts.vis_maps:
+      JOB_TIME = 12
+   elif CUDA:
+      JOB_TIME = 48  # NYU HPC Greene limits number of gpu jobs otherwise
+   else:
+      JOB_TIME = 120
 
    if CUDA:
       sbatch_file = 'evo_train.sh'
