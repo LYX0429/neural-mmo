@@ -124,7 +124,10 @@ class PlayerManager(EntityGroup):
       if config.MULTI_MODEL_NAMES is not None:
          self.models = config.MULTI_MODEL_NAMES
       else:
-         self.models = [config.MODEL]
+         if config.MODEL is None:
+            self.models = [config.GENOME]
+         else:
+            self.models = [config.MODEL]
       self.max_pop = config.MAX_POP
       self.identify = identify
       self.realm    = realm
@@ -167,15 +170,15 @@ class PlayerManager(EntityGroup):
          if self.realm.map.tiles[r, c].occupied:
             continue
 
+         pop = self.idx % self.config.NPOP
+         name = self.models[pop]
          if self.config.EVALUATE:
-            pop = self.idx % self.config.NPOP
-            name = self.models[pop]
             color = self.palette.colors[name]
-            player    = Player(self.realm, (r, c), self.idx, pop, name, color)
-         else:
-            pop, name = self.identify()
-            color     = self.palette.colors[pop]
             player    = Player(self.realm, (r, c), self.idx, pop, name+'_', color)
+         else:
+            # pop, name = self.identify()
+            color     = self.palette.colors[pop]
+            player    = Player(self.realm, (r, c), self.idx, pop, name, color)
          if self.max_pop is not None and self.pop_counts[name] >= self.max_pop:
             # print('Not spawning: reached max pop in population {}'.format(name))
             return

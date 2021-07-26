@@ -290,7 +290,7 @@ class meNMMO(EvolverNMMO):
       self.g_idxs = set(range(self.config.N_EVO_MAPS))
 
    def iteration_callback(self, i, batch, container, logbook):
-      print('pattern_map_elites iteration {}'.format(self.n_gen))
+      print('qdpy-based MAP-elites iteration {}'.format(self.n_gen))
 #     if not len(self.population) == len(self.maps) == len(self.chromosomes):
 #        raise Exception
       # FIXME: doesn't work -- sync up these iteration/generation counts

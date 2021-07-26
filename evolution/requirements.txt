@@ -1,0 +1,5 @@
+qdpy
+neat-python
+scikit-bio
+scikit-image
+deap
