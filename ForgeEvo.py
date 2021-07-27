@@ -156,7 +156,10 @@ def main():
       container = evolver.container
       evolver.container = None
       evolver.restore(trash_trainer=True)
-      evolver.reload_log()
+      # TODO: properly writing to the log is so time-consuming that HPC GPU jobs get cancelled for not using enough GPU.
+      #   move this functionality to a separate batch command that can clean all the csv's at once to allow for proper
+      #   rendering of fitness histogram.
+      # evolver.reload_log()
       # evolver.container = container
       archive = pickle.load(open(os.path.join('evo_experiment', experiment_name, 'ME_archive.p'), 'rb'))
       evolver.container = archive['container']

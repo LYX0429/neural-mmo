@@ -25,14 +25,14 @@ from evolution.diversity import get_div_calc
 from evolution.utils import get_genome_name
 
 genomes = [
-    'CA',
+#   'CA',
     'Baseline',
     'Simplex',
-    'Random',
-    'CPPN',
-    'Pattern',
-    'LSystem',
-    'All',
+#   'Random',
+#   'CPPN',
+#   'Pattern',
+#   'LSystem',
+#   'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
@@ -98,7 +98,7 @@ def launch_batch(exp_name, preeval=False):
          NENT = 16
       else:
          NENT = 3
-      N_EVALS = 2
+      N_EVALS = 5
       N_PROC = 0
    else:
       NENT = 16
@@ -276,7 +276,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
    if opts.multi_policy:
-      mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names)))
+      mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names)), dtype=np.float)
    for (j, map_exp_name) in enumerate(map_exp_names):
       with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
          archive = pickle.load(f)
@@ -333,9 +333,9 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
             global EVALUATION_HORIZON
             if opts.multi_policy:
                model_exp_folder = 'multi_policy'
-               model_name = str([get_genome_name(m) for m in model_exp_names]).replace(" ", "").replace("'", "")
+               model_name = str([get_genome_name(m) for m in model_exp_names])
             else:
-               model_name = model_exp_folder = model_exp_name
+               model_name = model_exp_folder = get_genome_name(model_exp_name)
             map_exp_folder = map_exp_name
             eval_data_path = os.path.join(
                'eval_experiment',
@@ -343,7 +343,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
                str(infer_idx),
                model_exp_folder,
                'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
-                  get_genome_name(model_name),
+                  model_name,
                   get_genome_name(map_exp_name),
                   infer_idx,
                   EVALUATION_HORIZON
@@ -365,7 +365,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
                multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
                survivors = np.load(multi_eval_data_path, allow_pickle=True).item()
                for survivor_name, n_survivors in survivors.items():
-                  mean_survivors[model_name_idxs[survivor_name], i] = np.mean(n_survivors)
+                  mean_survivors[model_name_idxs[survivor_name], j] = n_survivors.mean()
          if opts.multi_policy:
             break
    if vis_only:

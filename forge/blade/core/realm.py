@@ -163,6 +163,11 @@ class PlayerManager(EntityGroup):
          if len(self.entities) >= self.config.NENT:
             break
 
+         pop = self.idx % self.config.NPOP
+         name = self.models[pop]
+         if self.max_pop is not None and self.pop_counts[name] >= self.max_pop:
+            # print('Not spawning: reached max pop in population {}'.format(name))
+            return
          if self.config.EVO_MAP:# and not self.config.EVALUATE:
             r, c = self.evo_spawn()
          else:
@@ -170,8 +175,6 @@ class PlayerManager(EntityGroup):
          if self.realm.map.tiles[r, c].occupied:
             continue
 
-         pop = self.idx % self.config.NPOP
-         name = self.models[pop]
          if self.config.EVALUATE:
             color = self.palette.colors[name]
             player    = Player(self.realm, (r, c), self.idx, pop, name+'_', color)
@@ -179,10 +182,6 @@ class PlayerManager(EntityGroup):
             # pop, name = self.identify()
             color     = self.palette.colors[pop]
             player    = Player(self.realm, (r, c), self.idx, pop, name, color)
-         if self.max_pop is not None and self.pop_counts[name] >= self.max_pop:
-            # print('Not spawning: reached max pop in population {}'.format(name))
-            return
-
 
          super().spawn(player)
          self.pop_counts[name] += 1
