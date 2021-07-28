@@ -45,13 +45,20 @@ def get_div_calc(div_calc_name):
 
 def get_trg_image():
     from PIL import Image, ImageDraw, ImageFont
-    fnt = ImageFont.truetype('arial.ttf', 15)
+    font_size = 15
+    try:
+       font = ImageFont.truetype("arial.ttf", font_size)
+    except OSError:
+       try:
+          font = ImageFont.truetype("LiberationMono-Regular.ttf", font_size)
+       except OSError:
+          font = ImageFont.truetype("SFNSMono.ttf", 32)
     global trg_image
     trg_image = Image.new(mode = "RGB", size=(50, 50))
     draw = ImageDraw.Draw(trg_image)
-    draw.text((1,1), "Evo", font=fnt, fill=(255,0,0))
-    draw.text((1,15), "NMMO", font=fnt, fill=(255,0,0))
-    draw.text((1,32), "¯\_(ツ)_/¯", font=fnt, fill=(255,0,0))
+    draw.text((1,1), "Evo", font=font, fill=(255,0,0))
+    draw.text((1,15), "NMMO", font=font, fill=(255,0,0))
+    draw.text((1,32), "¯\_(ツ)_/¯", font=font, fill=(255,0,0))
     trg_image.save("trg_img.png")
     trg_image = (np.array(trg_image)[:, :, 0] / 255 * 8).astype(np.uint8)
 

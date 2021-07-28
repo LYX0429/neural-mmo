@@ -25,21 +25,21 @@ from evolution.diversity import get_div_calc
 from evolution.utils import get_genome_name
 
 genomes = [
-#   'CA',
-    'Baseline',
-    'Simplex',
-#   'Random',
-#   'CPPN',
-#   'Pattern',
-#   'LSystem',
-#   'All',
+#  'Baseline',
+#  'Simplex',
+#  'CA',
+#  'Random',
+#  'CPPN',
+   'Pattern',
+#  'LSystem',
+#  'All',
 ]
 fitness_funcs = [
-#   'MapTestText',
+    'MapTestText',
 #   'Lifespans',
 #   'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
 ]
@@ -84,7 +84,8 @@ def launch_cmd(new_cmd, i):
       f.write(new_content)
    if LOCAL:
       os.system(new_cmd)
-      os.system('ray stop')
+      if not (opts.vis_maps or opts.vis_cross_eval):
+         os.system('ray stop')
    else:
       os.system('sbatch {}'.format(sbatch_file))
 
@@ -247,26 +248,6 @@ def launch_batch(exp_name, preeval=False):
 #         config = config.EvoNMMO
 ##        experiment_names.append(get_experiment_name(config))
 
-def reversed_lines(file):
-   "Generate the lines of file in reverse order."
-   part = ''
-   for block in reversed_blocks(file):
-      for c in reversed(block):
-         if c == '\n' and part:
-            yield part[::-1]
-            part = ''
-         part += c
-   if part: yield part[::-1]
-
-def reversed_blocks(file, blocksize=4096):
-   "Generate blocks of file's contents in reverse order."
-   file.seek(0, os.SEEK_END)
-   here = file.tell()
-   while 0 < here:
-      delta = min(blocksize, here)
-      here -= delta
-      file.seek(here, os.SEEK_SET)
-      yield file.read(delta)
 
 def launch_cross_eval(experiment_names, vis_only=False, render=False):
    n = 0

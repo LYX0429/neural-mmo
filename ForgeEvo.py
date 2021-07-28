@@ -2,6 +2,7 @@ import os
 import json
 import pickle
 import sys
+from pdb import set_trace as TT
 # My favorite debugging macro
 
 import re
@@ -142,12 +143,6 @@ def main():
       evolver.config.EVO_SAVE_INTERVAL = config.EVO_SAVE_INTERVAL
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
-      if config.VIS_MAPS:
-         print('Plotting histogram of map fitness.')
-         evolver.plot()
-         print('Saving and rendering maps from the archive of elites.')
-         evolver.saveMaps(evolver.container)
-         return
       # Running out of RAM depending on size/number of map genomes... try trashing the archive while ray does its
       # multiprocessing nonsense garbage?
       # Why does this work !!!
@@ -161,12 +156,18 @@ def main():
       #   rendering of fitness histogram.
       # evolver.reload_log()
       # evolver.container = container
-      archive = pickle.load(open(os.path.join('evo_experiment', experiment_name, 'ME_archive.p'), 'rb'))
-      evolver.container = archive['container']
       if config.RENDER:
          evolver.config.INFER_IDX = config.INFER_IDX
       if evolver.MAP_ELITES:
-         evolver.load()
+         evolver.reload_archive()
+      if config.VIS_MAPS:
+         print('Plotting histogram of map fitness.')
+         evolver.plot()
+         print('Saving and rendering maps from the archive of elites.')
+         evolver.saveMaps(evolver.container)
+         return
+      if evolver.MAP_ELITES:
+         return evolver.resume()
 
    except FileNotFoundError as e:
       print(e)

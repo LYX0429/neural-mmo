@@ -7,8 +7,31 @@ from multiprocessing import Pipe, Process
 from pdb import set_trace as TT
 from shutil import copyfile
 import re
+from timeit import default_timer as timer
 
 import numpy as np
+
+
+def reversed_lines(file):
+   "Generate the lines of file in reverse order."
+   part = ''
+   for block in reversed_blocks(file):
+      for c in reversed(block):
+         if c == '\n' and part:
+            yield part[::-1]
+            part = ''
+         part += c
+   if part: yield part[::-1]
+
+def reversed_blocks(file, blocksize=4096):
+   "Generate blocks of file's contents in reverse order."
+   file.seek(0, os.SEEK_END)
+   here = file.tell()
+   while 0 < here:
+      delta = min(blocksize, here)
+      here -= delta
+      file.seek(here, os.SEEK_SET)
+      yield file.read(delta)
 
 
 class LambdaMuEvolver():
@@ -290,28 +313,33 @@ class LambdaMuEvolver():
    def reload_log(self):
       '''Get rid of log entries that correspond to generations that occured after the latest checkpoint of the evolver
       being reloaded.'''
+      reload_log_start = timer()
       csv_lines = []
       old_log_path = self.log_path.strip('log.csv') + 'log_old.csv'
       copyfile(self.log_path, old_log_path)
       print('Reloading log.csv.')
       with open(old_log_path, mode='r') as old_log_file:
-         csv_reader = csv.reader(old_log_file)
+         csv_rows = list(csv.reader(old_log_file))
+         csv_reader = reversed(csv_rows)
+         for (i, row) in enumerate(csv_reader):
+            match = re.match(r'epoch (\d+)', row[0])
+            if match:
+               groups = match.groups()
+               assert len(groups) == 1
+               n_log_gen = groups[0]
+               n_log_gen = int(n_log_gen)
+               if n_log_gen < self.n_gen:
+                  break
+            # log_writer.writerow(row)
+         csv_rows = csv_rows[0:-i]
          with open(self.log_path, mode='w') as log_file:
             log_writer = csv.writer(
                log_file, delimiter=',',
                quotechar='"',
                quoting=csv.QUOTE_MINIMAL)
-            for row in csv_reader:
-               match = re.match(r'epoch (\d+)', row[0])
-               if match:
-                  groups = match.groups()
-                  assert len(groups) == 1
-                  n_log_gen = groups[0]
-                  n_log_gen = int(n_log_gen)
-                  if n_log_gen >= self.n_gen:
-                     break
-               log_writer.writerow(row)
+            log_writer.writerows(csv_rows)
       os.remove(old_log_path)
+      print('Reload log timer: {}'.format(timer() - reload_log_start))
 
    def infer(self):
        raise NotImplementedError()

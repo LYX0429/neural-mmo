@@ -274,7 +274,7 @@ class meNMMO(EvolverNMMO):
              halloffame.update(container)
          # Append the current generation statistics to the logbook
          record = stats.compile(container) if stats else {}
-         logbook.record(iteration=i, containersize=container.size_str(), evals=len(invalid_ind), nbupdated=nb_updated, elapsed=timer()-start_time, **record)
+         logbook.record(iteration=self.n_gen, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
          if verbose:
             print(logbook.stream)
          # Call callback function
@@ -290,7 +290,7 @@ class meNMMO(EvolverNMMO):
       self.g_idxs = set(range(self.config.N_EVO_MAPS))
 
    def iteration_callback(self, i, batch, container, logbook):
-      print('qdpy-based MAP-elites iteration {}'.format(self.n_gen))
+      # print('qdpy-based MAP-elites iteration {}'.format(self.n_gen))
 #     if not len(self.population) == len(self.maps) == len(self.chromosomes):
 #        raise Exception
       # FIXME: doesn't work -- sync up these iteration/generation counts
@@ -310,9 +310,10 @@ class meNMMO(EvolverNMMO):
      #   try:
          disrupted_elites = [container[i] for i in np.random.choice(len(container), min(max(1, len(container)-1), self.config.N_EVO_MAPS), replace=False)]
          self.train_individuals(disrupted_elites)
-         # We can simply change individuals in-place for now, since map features will not change
+         # NOTE: We're simply changing individuals in-place for now, since map features will not change
          # nb_updated = container.update(disrupted_elites, issue_warning=True)
          # print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(disrupted_elites)))
+         print('Re-evaluated {} individuals in-place.'.format(len(disrupted_elites)))
 
       self.idxs = set()
       self.reset_g_idxs()
@@ -321,25 +322,30 @@ class meNMMO(EvolverNMMO):
       self.n_gen += 1
 
       if self.n_gen == 2 or self.n_gen > 0 and self.n_gen % self.config.EVO_SAVE_INTERVAL == 0:
-#     if self.n_gen == 1:
-         self.log_me(container)
-         algo = self.algo
-         self.algo = None
-         toolbox = self.toolbox
-         self.toolbox = None
-#        for k, v in inspect.getmembers(self.algo):
-#           if k.startswith('_') and k != '__class__': #or inspect.ismethod(v):
-#              setattr(self, k, lambda x: None)
          self.save()
-         algo.container.evolver = None
-         algo.save(os.path.join(self.save_path, 'ME_archive.p'))
-         algo.container.evolver = self
-         self.algo = algo
-         self.toolbox = toolbox
-         self.container = container
       # Remove mutants after each iteration, since they have either been added to the container/archive, or deleted.
       #FIXME: why wouldn't it be?
 
+   def save(self):
+      evo_save_start = timer()
+      self.log_me(self.container)
+      # A bunch of workarounds to not save circular or reduntant stuff (elite archive)
+      # TODO: These references could be a whole lot less circular, eh?
+      algo = self.algo
+      algo.container.evolver = None
+      algo.save(os.path.join(self.save_path, 'ME_archive.p'))
+      algo.container.evolver = self
+      self.algo = None
+      toolbox = self.toolbox
+      self.toolbox = None
+      self.container = None
+      super().save()
+      self.algo = algo
+      self.toolbox = toolbox
+      self.container = algo.container
+      evo_save_end = timer()
+      evo_save_time = evo_save_end - evo_save_start
+      print('qdpy save time elapsed: {}'.format(evo_save_time))
 
    def compile(self):
 
@@ -535,29 +541,35 @@ class meNMMO(EvolverNMMO):
                         dimension=dimension)
        self.algo = algo
 
-   def load(self):
+   def reload_archive(self):
+      import pickle
+      with open(os.path.join(self.save_path, 'ME_archive.p'), "rb") as f:
+         archive = pickle.load(f)
+      self.container = archive['container']
+
+   def resume(self):
       import pickle
       self.init_toolbox()
       with open(os.path.join(self.save_path, 'ME_archive.p'), "rb") as f:
          archive = pickle.load(f)
-         # NOTE: (Elite) individuals saved in the grid will have overlapping indexes.
-         self.init_algo(
-                 self.qdSimple,
-                 self.toolbox,
-                 container=archive['container'],
-                 init_batch_size=archive['init_batch_size'],
-                 batch_size=archive['batch_size'],
-                 niter=archive['nb_iterations'],
-         )
-         # ZOINKYS!
-         self.algo.container.evolver = self
+      # NOTE: (Elite) individuals saved in the grid will have overlapping indexes.
+      self.init_algo(
+              self.qdSimple,
+              self.toolbox,
+              container=archive['container'],
+              init_batch_size=archive['init_batch_size'],
+              batch_size=archive['batch_size'],
+              niter=archive['nb_iterations'],
+      )
+      # ZOINKYS!
+      self.algo.container.evolver = self
 
-         self.algo.current_iteration = archive['current_iteration']
-         self.algo.start_time = timer()
-         if not self.config.RENDER:
-            self.algo.run()
+      self.algo.current_iteration = archive['current_iteration']
+      self.algo.start_time = timer()
+      if not self.config.RENDER:
+         self.algo.run()
 
-         return
+      return
 
 
    def expr(self):

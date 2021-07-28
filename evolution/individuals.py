@@ -11,6 +11,7 @@ from qdpy.phenotype import Individual, Fitness, Features
 from evolution.paint_terrain import PRIMITIVE_TYPES
 from opensimplex import OpenSimplex
 import vec_noise
+from numba import njit
 from typing import Any
 
 # Not using this
@@ -351,7 +352,30 @@ class DefaultGenome(neat.genome.DefaultGenome, Genome):
 
 
 class PatternGenome(Genome):
-    def __init__(self, n_tiles, map_width, default_tile):
+   @staticmethod
+   def mutate_patterns(rng, patterns, max_patterns, n_tiles, map_width):
+      n_patterns = len(patterns)
+      n_add = int(rng.exponential(scale=1.0, size=1))
+      n_add = min(max_patterns - n_patterns, n_add)
+      n_del = int(rng.exponential(scale=1.0, size=1))
+      n_del = min(n_patterns - 1, int(rng.exponential(scale=1.0, size=1)))
+      n_mut = max(1, int(rng.exponential(scale=1.0, size=1)))
+      #       print('n_add: {}, n_mut: {}, n_del: {}'.format(n_add, n_mut, n_del))
+      mutees = np.random.choice(patterns, n_mut)
+      for m in mutees:
+         m.mutate()
+      for i in range(n_del):
+         patterns.pop(np.random.randint(n_patterns - i))
+      new_types = np.random.choice(PRIMITIVE_TYPES, n_add)
+      [patterns.append(n.generate(n,
+                                       tile_i=np.random.randint(0, n_tiles - 1),
+                                       intensity=np.random.random(),
+                                       n_tiles=n_tiles,
+                                       map_width=map_width)) for n in new_types]
+      #       print('added {} patterns, mutated {}, deleted {}'.format(n_add, n_mut, n_del))
+      return patterns
+
+   def __init__(self, n_tiles, map_width, default_tile):
         super().__init__(n_tiles, map_width)
         self.map_width = map_width
         self.n_tiles = n_tiles
@@ -391,66 +415,50 @@ class PatternGenome(Genome):
 
     #     return p
 
-    def gen_map(self):
+   def gen_map(self):
 
-#       self.update_features()
-        return self.paint_map()
+#      self.update_features()
+       return self.paint_map()
 
-#   def update_features(self):
-#       self.features = [0, 0]
-#       for p in self.patterns:
-#           if isinstance(p, (Line, Rectangle, RectanglePerimeter)):
-#               self.features[0] += 1
-#           elif isinstance(p, (CirclePerimeter, Circle, Gaussian)):
-#               self.features[1] += 1
+#  def update_features(self):
+#      self.features = [0, 0]
+#      for p in self.patterns:
+#          if isinstance(p, (Line, Rectangle, RectanglePerimeter)):
+#              self.features[0] += 1
+#          elif isinstance(p, (CirclePerimeter, Circle, Gaussian)):
+#              self.features[1] += 1
 
-    def get_iterable(self):
-        # each pattern has: type, intensity, p1, p2, p3, p4
-        it = np.zeros(shape=())
+   def get_iterable(self):
+       # each pattern has: type, intensity, p1, p2, p3, p4
+       it = np.zeros(shape=())
 
-        return []
+       return []
 
-#       #FIXME: hack
-#       return [self.__hash__]
+#      #FIXME: hack
+#      return [self.__hash__]
 
-    def mutate(self):
-        super().mutate()
-        n_patterns = len(self.patterns)
-        n_add = int(self.rng.exponential(scale=1.0, size=1))
-        n_add = min(self.max_patterns - n_patterns, n_add)
-        n_del = int(self.rng.exponential(scale=1.0, size=1))
-        n_del = min(n_patterns - 1, int(self.rng.exponential(scale=1.0, size=1)))
-        n_mut = max(1, int(self.rng.exponential(scale=1.0, size=1)))
-#       print('n_add: {}, n_mut: {}, n_del: {}'.format(n_add, n_mut, n_del))
-        mutees = np.random.choice(self.patterns, n_mut)
-        for m in mutees:
-            m.mutate()
-        for i in range(n_del):
-            self.patterns.pop(np.random.randint(n_patterns-i))
-        new_types = np.random.choice(PRIMITIVE_TYPES, n_add)
-        [self.patterns.append(n.generate(n,
-                                         tile_i=np.random.randint(0, self.n_tiles-1),
-                                         intensity=np.random.random(),
-                                         n_tiles=self.n_tiles,
-                                         map_width=self.map_width)) for n in new_types]
-        self.multi_hot = None
-#       self.flat_map = None
-#       self.update_features()
-#       print('added {} patterns, mutated {}, deleted {}'.format(n_add, n_mut, n_del))
+   def mutate(self):
+      super().mutate()
+      patterns = PatternGenome.mutate_patterns(rng=self.rng, patterns=self.patterns, max_patterns=self.max_patterns,
+                                      n_tiles=self.n_tiles, map_width=self.map_width)
+      self.patterns = patterns
+      self.multi_hot = None
+#      self.flat_map = None
+#      self.update_features()
 
 
-    def paint_map(self):
-#       if hasattr(self, 'flat_map') and self.flat_map is not None:
-#           return self.flat_map, self.multi_hot
-        multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_width))
-        multi_hot[self.default_tile, :, :] = 1e-10
+   def paint_map(self):
+#      if hasattr(self, 'flat_map') and self.flat_map is not None:
+#          return self.flat_map, self.multi_hot
+       multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_width))
+       multi_hot[self.default_tile, :, :] = 1e-10
 
-        for p in self.patterns:
-            p.paint(multi_hot)
-        map_arr = np.argmax(multi_hot, axis=0)
-        self.map_arr, self.multi_hot = map_arr, multi_hot
+       for p in self.patterns:
+           p.paint(multi_hot)
+       map_arr = np.argmax(multi_hot, axis=0)
+       self.map_arr, self.multi_hot = map_arr, multi_hot
 
-#       return map_arr, multi_hot
+#      return map_arr, multi_hot
 
 class TileFlipGenome(Genome):
     def __init__(self, n_tiles, map_width):

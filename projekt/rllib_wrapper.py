@@ -413,8 +413,8 @@ class RLlibEvaluator(evaluator.Base):
    def evaluate(self, generalize=False):
 
       if self.config.NPOLICIES > 1 or self.config.MODEL.startswith('['):
-         model_name = self.config.MULTI_MODEL_NAMES
-         TT()
+         # model_name = self.config.MULTI_MODEL_NAMES
+         model_name = [get_genome_name(m) for m in self.config.MODEL.strip('[').strip(']').split(',')]
       else:
          model_name = get_genome_name(self.config.MODEL.split('/')[-1])
       # model_name = self.config.MODEL.split('/')[-1]
@@ -767,6 +767,7 @@ class RLlibMultiEvaluator(RLlibEvaluator):
       #Step environment
       if hasattr(self.env, 'evo_dones') and self.env.evo_dones is not None:
          self.env.evo_dones['__all__'] = False
+
       ret = evaluator.Base.tick(self, self.obs, actions, pos, cmd)
 
       if self.config.GRIDDLY:
@@ -1099,13 +1100,13 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       stats = super().train()
 
       # FIXME: switch this off when already saving for other reasons; control from config
-      if self.training_iteration < 100:
-         save_interval = 10
-      else:
-         save_interval = 100
+      # if self.training_iteration < 100:
+      #    save_interval = 10
+      # else:
+      #    save_interval = 100
 
-      if self.training_iteration % save_interval == 0:
-         self.save()
+      # if self.training_iteration % self.config.EVO_SAVE_INTERVAL == 0:
+      #    self.save()
 
       nSteps = stats['info']['num_steps_trained']
       VERBOSE = False

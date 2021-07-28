@@ -1238,13 +1238,11 @@ class EvolverNMMO(LambdaMuEvolver):
 
    def save(self):
        save_file= open(self.evolver_path, 'wb')
-
        population = copy.deepcopy(self.population)
-
        for g_hash in self.population:
            game, score, age= self.population[g_hash]
            # FIXME: something weird is happening after reload. Not the maps though.
-           # so for now, trash score history and re-calculate after reload
+           #   so for now, trash score history and re-calculate after reload
            self.population[g_hash]= None, score, age
           #self.population[g_hash]= None, score, age
        if not self.MAP_TEST:
