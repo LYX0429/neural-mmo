@@ -26,22 +26,23 @@ from evolution.utils import get_genome_name
 
 genomes = [
 #  'Baseline',
-#  'Simplex',
+   'Simplex',
 #  'CA',
 #  'Random',
 #  'CPPN',
-   'Pattern',
+#  'Pattern',
 #  'LSystem',
 #  'All',
 ]
 fitness_funcs = [
-    'MapTestText',
+#   'MapTestText',
 #   'Lifespans',
 #   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
+#   'InvL2',
 ]
 
 skills = [
@@ -149,7 +150,7 @@ def launch_batch(exp_name, preeval=False):
                         if gene == 'All':
                            EVO_SAVE_INTERVAL = 100
                         else:
-                           EVO_SAVE_INTERVAL = 500
+                           EVO_SAVE_INTERVAL = 1000
                      else:
                         N_GENERATIONS = 10000
                         EVO_SAVE_INTERVAL = 10

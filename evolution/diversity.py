@@ -1,4 +1,4 @@
-from pdb import set_trace as T
+from pdb import set_trace as TT
 import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
@@ -16,6 +16,8 @@ def diversity_calc(config):
 def get_div_calc(div_calc_name):
    if div_calc_name == 'L2':
       calc_diversity = calc_diversity_l2
+   elif div_calc_name == 'InvL2':
+      calc_diversity = calc_homogeneity_l2
    elif div_calc_name == 'Differential':
       calc_diversity = calc_differential_entropy
    elif div_calc_name == 'Discrete':
@@ -368,6 +370,37 @@ def calc_discrete_entropy(agent_stats, skill_headers=None):
 
    return score
 
+def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False):
+   '''Use L2 distance to punish agents for having high mean pairwise distance. Optimal state is all agents at the same
+   point in skill-space, with maximal lifespans.'''
+   if 'skills' not in agent_stats:
+      raise Exception('We should be including dead agents in this calculation, so we should get at least some skill '
+                      'stats back here')
+   agent_skills = agent_stats['skills']
+   lifespans = agent_stats['lifespans']
+   assert len(agent_skills) == len(lifespans)
+   a_skills = np.vstack(agent_skills)
+   a_lifespans = np.hstack(lifespans)
+   weights = sigmoid_lifespan(a_lifespans)
+   weight_mat = np.outer(weights, weights)
+   # assert len(agent_skills) == 1
+   a = a_skills
+   n_agents = a.shape[0]
+   b = a.reshape(n_agents, 1, a.shape[1])
+   # https://stackoverflow.com/questions/43367001/how-to-calculate-euclidean-distance-between-pair-of-rows-of-a-numpy-array
+   distances = np.sqrt(np.einsum('ijk, ijk->ij', a - b, a - b))
+   w_dists = (2 - weight_mat) * (distances + 10)
+   score = np.sum(w_dists) / n_agents ** 2
+
+   if verbose:
+      #  print(skill_headers)
+      print('agent skills:\n{}'.format(a.transpose()))
+      print('lifespans:\n{}'.format(a_lifespans))
+      print('score:\n{}\n'.format(
+         score))
+
+   return -score
+
 
 def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False):
    if 'skills' not in agent_stats:
@@ -386,8 +419,8 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False):
    # https://stackoverflow.com/questions/43367001/how-to-calculate-euclidean-distance-between-pair-of-rows-of-a-numpy-array
    distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
    w_dists = weight_mat * distances
-   score = np.sum(w_dists)/2
-   score = score / n_agents
+   score = np.sum(w_dists)  # /2
+   score = score / n_agents ** 2
 
    if verbose:
 #  print(skill_headers)
