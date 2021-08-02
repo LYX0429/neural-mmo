@@ -140,25 +140,6 @@ class PlayerManager(EntityGroup):
       self.reset_pop_counts()
 
 
-   def old_spawn(self):
-      for _ in range(self.config.PLAYER_SPAWN_ATTEMPTS):
-         if len(self.entities) >= self.config.NENT:
-            break
-
-         if self.config.EVO_MAP:# and not self.config.EVALUATE:
-            r, c = self.evo_spawn()
-         else:
-            r, c   = self.config.SPAWN()
-         if self.realm.map.tiles[r, c].occupied:
-            continue
-
-         pop, name = self.identify()
-         pop = self.idx % self.config.NPOP
-         color = self.palette.colors[pop]
-         player    = Player(self.realm, (r, c), self.idx, pop, name, color)
-         super().spawn(player)
-         self.idx += 1
-
 
    def spawn(self):
       for _ in range(self.config.PLAYER_SPAWN_ATTEMPTS):
@@ -177,7 +158,7 @@ class PlayerManager(EntityGroup):
          if self.realm.map.tiles[r, c].occupied:
             continue
 
-         if self.config.EVALUATE:
+         if self.config.EVALUATE or self.config.PAIRED:
             color = self.palette.colors[name]
             player    = Player(self.realm, (r, c), self.idx, pop, name+'_', color)
          else:
