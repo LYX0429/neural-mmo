@@ -96,6 +96,10 @@ def calc_local_map_entropy(individual, config):
 
     return local_ent.item()
 
+def get_pop_stats(agent_stats, pop=None):
+   pops = agent_stats[0].keys() if pop is None else [pop]
+   return np.hstack([stats_i[p] for p in pops for stats_i in agent_stats])
+
 def calc_scores(agent_stats, skill_headers=None, verbose=False):
     scores = np.hstack(agent_stats['scores'])
     if verbose:
@@ -125,18 +129,10 @@ def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False):
 
     return mean_lifetime
 
-def sum_lifespans(agent_stats, skill_headers=None, n_policies=1, verbose=False):
-#  lifespans = np.hstack(agent_stats['lifespans'])
-#  lifetimes = np.hstack(agent_stats['lifetimes'])
-   lifespans = np.hstack(agent_stats['lifespans'])
-   if n_policies == 1:
-       return lifespans.mean()
-   elif n_policies == 2:
-       idx_0 = [i*2 for i in range(np.ceil(len(lifespans)/2))]
-       idx_1 = [i*2+1 for i in range(np.floor(len(lifespans)/2))]
-       # ad hoc PAIRED reward function (regret)
-       return lifespans[idx_0].mean() - lifespans[idx_1].mean()
-   
+def sum_lifespans(agent_stats, skill_headers=None, n_policies=1, verbose=False, pop=None):
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop=pop)
+   return lifespans.mean()
+
 
 def sum_experience(agent_stats, skill_headers=None, verbose=False):
    # No need to weight by lifespan.
@@ -164,7 +160,7 @@ def sigmoid_lifespan(x):
 
    return res
 
-def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}):
+def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None):
    # Penalize if under max pop agents living
   #for i, a_skill in enumerate(agent_skills):
   #   if a_skill.shape[0] < max_pop:

@@ -26,32 +26,30 @@ from evolution.utils import get_genome_name
 
 genomes = [
 #  'Baseline',
-   'Simplex',
+#  'Simplex',
 #  'CA',
 #  'Random',
-#  'CPPN',
+   'CPPN',
 #  'Pattern',
 #  'LSystem',
 #  'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
-#   'Lifespans',
+    'Lifespans',
 #   'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
 #   'InvL2',
 ]
-
 skills = [
     'ALL',
 #   'HARVEST',
 #   'COMBAT',
 #   'EXPLORATION',
 ]
-
 algos = [
     'MAP-Elites',
 #   'Simple',
@@ -59,10 +57,14 @@ algos = [
 #   'CMAME',
 #   'NEAT',
 ]
-
 me_bin_sizes = [
 #   [1,1],
-    [100,100],
+    [40, 40],
+#   [100,100],
+]
+PAIRED_bools = [
+   True,
+#  False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
@@ -101,7 +103,7 @@ def launch_batch(exp_name, preeval=False):
       else:
          NENT = 3
       N_EVALS = 5
-      N_PROC = 0
+      N_PROC = 4
    else:
       NENT = 16
       N_EVALS = 20
@@ -127,102 +129,105 @@ def launch_batch(exp_name, preeval=False):
 
             for algo in algos:
                for me_bins in me_bin_sizes:
-                  if gene == 'Baseline':
-                     if launched_baseline:
-                        # Only launch one baseline, these other settings are irrelevant
-                        continue
-                     else:
-                        launched_baseline = True
-                  if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
-                     # If using MAP-Elites, ME bin sizes are irrelevant
-                     continue
-                  if (np.array(me_bins) == 1).all():
-                     # If we're doing a simple evolutionary strategy (lazily, through qdpy ME, then set 12 individuals per bin
-                     items_per_bin = 12
-                     feature_calc = None
-                  else:
-                     items_per_bin = 1
-                     feature_calc = 'map_entropy'
-
-                  if LOCAL:
-                     if fit_func == 'MapTestText':
-                        N_GENERATIONS = 100000
-                        if gene == 'All':
-                           EVO_SAVE_INTERVAL = 100
+                  for PAIRED_bool in PAIRED_bools:
+                     if gene == 'Baseline':
+                        if launched_baseline:
+                           # Only launch one baseline, these other settings are irrelevant
+                           continue
                         else:
-                           EVO_SAVE_INTERVAL = 1000
+                           launched_baseline = True
+                     if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
+                        # If using MAP-Elites, ME bin sizes are irrelevant
+                        continue
+                     if (np.array(me_bins) == 1).all():
+                        # If we're doing a simple evolutionary strategy (lazily, through qdpy ME, then set 12 individuals per bin
+                        items_per_bin = 12
+                        feature_calc = None
                      else:
+                        items_per_bin = 1
+                        feature_calc = 'map_entropy'
+
+                     if LOCAL:
+                        if fit_func == 'MapTestText':
+                           N_GENERATIONS = 100000
+                           if gene == 'All':
+                              EVO_SAVE_INTERVAL = 100
+                           else:
+                              EVO_SAVE_INTERVAL = 100
+                        else:
+                           N_GENERATIONS = 10000
+                           EVO_SAVE_INTERVAL = 10
+                     else:
+                        EVO_SAVE_INTERVAL = 500
                         N_GENERATIONS = 10000
-                        EVO_SAVE_INTERVAL = 10
-                  else:
-                     EVO_SAVE_INTERVAL = 500
-                     N_GENERATIONS = 10000
 
-                  # Write the config file with the desired settings
-                  exp_config = copy.deepcopy(default_config)
-                  exp_config.update({
-                     'N_GENERATIONS': N_GENERATIONS,
-                     'TERRAIN_SIZE': 70,
-                     'NENT': NENT,
-                     'GENOME': gene,
-                     'FITNESS_METRIC': fit_func,
-                     'EVO_ALGO': algo,
-                     'EVO_DIR': exp_name,
-                     'SKILLS': skillset,
-                     'ME_BIN_SIZES': me_bins,
-                     'ME_BOUNDS': [(0,100),(0,100)],
-                     'FEATURE_CALC': feature_calc,
-                     'ITEMS_PER_BIN': items_per_bin,
-                     'N_EVO_MAPS': 12,
-                     'N_PROC': N_PROC,
-                     'TERRAIN_RENDER': False,
-                     'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
-                     'VIS_MAPS': opts.vis_maps,
-                     })
-                  if gene == 'Baseline':
+                     # Write the config file with the desired settings
+                     exp_config = copy.deepcopy(default_config)
                      exp_config.update({
-                         'PRETRAIN': True,
-                     })
-
-                  if CUDA:
-                     exp_config.update({
+                        'N_GENERATIONS': N_GENERATIONS,
+                        'TERRAIN_SIZE': 70,
+                        'NENT': NENT,
+                        'GENOME': gene,
+                        'FITNESS_METRIC': fit_func,
+                        'EVO_ALGO': algo,
+                        'EVO_DIR': exp_name,
+                        'SKILLS': skillset,
+                        'ME_BIN_SIZES': me_bins,
+                        'ME_BOUNDS': [(0,100),(0,100)],
+                        'FEATURE_CALC': feature_calc,
+                        'ITEMS_PER_BIN': items_per_bin,
                         'N_EVO_MAPS': 12,
-                        'N_PROC': 12,
-                     })
+                        'N_PROC': N_PROC,
+                        'TERRAIN_RENDER': False,
+                        'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
+                        'VIS_MAPS': opts.vis_maps,
+                        'PAIRED': PAIRED_bool,
+                        })
+                     if gene == 'Baseline':
+                        exp_config.update({
+                            'PRETRAIN': True,
+                        })
 
-                  if LOCAL:
-                     exp_config.update({
-                        'N_EVO_MAPS': 12,
-                     })
-                  print('Saving experiment config:\n{}'.format(exp_config))
-                  with open('configs/settings_{}.json'.format(i), 'w') as f:
-                     json.dump(exp_config, f, ensure_ascii=False, indent=4)
+                     if CUDA:
+                        exp_config.update({
+                           'N_EVO_MAPS': 12,
+                           'N_PROC': 12,
+                        })
 
-                  # Edit the sbatch file to load the correct config file
-                  # Launch the experiment. It should load the saved settings
+                     if LOCAL:
+                        exp_config.update({
+                           'N_EVO_MAPS': 12,
+                        })
+                     print('Saving experiment config:\n{}'.format(exp_config))
+                     with open('configs/settings_{}.json'.format(i), 'w') as f:
+                        json.dump(exp_config, f, ensure_ascii=False, indent=4)
 
-                  if not preeval:
-                     assert not EVALUATE
-                     new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
-                     launch_cmd(new_cmd, i)
-                     i += 1
+                     # Edit the sbatch file to load the correct config file
+                     # Launch the experiment. It should load the saved settings
 
-                  else:
-                     evo_config = config.EvoNMMO
-                    #sys.argv = sys.argv[:1] + ['override']
-                    #Fire(config)
-                     for (k, v) in exp_config.items():
-                        setattr(evo_config, k, v)
-                    #   config.set(config, k, v)
-                     if TERRAIN_BORDER is None:
-                        TERRAIN_BORDER = evo_config.TERRAIN_BORDER
-                        MAP_GENERATOR = MapGenerator(evo_config)
+                     if not preeval:
+                        assert not EVALUATE
+                        new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
+                        launch_cmd(new_cmd, i)
+                        i += 1
+
                      else:
-                        assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
-                     experiment_name = get_experiment_name(evo_config)
-                     experiment_names.append(experiment_name)
+                        evo_config = config.EvoNMMO
+                       #sys.argv = sys.argv[:1] + ['override']
+                       #Fire(config)
+                        for (k, v) in exp_config.items():
+                           setattr(evo_config, k, v)
+                       #   config.set(config, k, v)
+                        if TERRAIN_BORDER is None:
+                           TERRAIN_BORDER = evo_config.TERRAIN_BORDER
+                           MAP_GENERATOR = MapGenerator(evo_config)
+                        else:
+                           assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
+                        experiment_name = get_experiment_name(evo_config)
+                        experiment_names.append(experiment_name)
+                        experiment_configs.append({'PAIRED': PAIRED_bool})
 
-                    #config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
+                       #config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
 
 #   if TRAIN_BASELINE:
 #      # Finally, launch a baseline
@@ -250,7 +255,7 @@ def launch_batch(exp_name, preeval=False):
 ##        experiment_names.append(get_experiment_name(config))
 
 
-def launch_cross_eval(experiment_names, vis_only=False, render=False):
+def launch_cross_eval(experiment_names, experiment_configs=[], vis_only=False, render=False):
    n = 0
    model_exp_names = experiment_names
    map_exp_names = experiment_names
@@ -274,7 +279,7 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
          else:
             txt_verb = 'Inferring'
          print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, best_ind.age))
-      for (i, model_exp_name) in enumerate(model_exp_names):
+      for (i, (model_exp_name, model_config)) in enumerate(zip(model_exp_names, experiment_configs)):
          # TODO: select best map and from saved archive and evaluate on this one
 #        infer_idx = None
 #        if map_exp_name == 'PCG':
@@ -297,7 +302,8 @@ def launch_cross_eval(experiment_names, vis_only=False, render=False):
             NPOLICIES = 1
             l_eval_args += '--MODEL {} '.format(model_exp_name)
          NPOP = NPOLICIES
-         l_eval_args += '--NPOLICIES {} --NPOP {}'.format(NPOLICIES, NPOP)
+         #TODO: deal with PAIRED, and combinations of PAIRED and non-PAIRED experiments
+         l_eval_args += '--NPOLICIES {} --NPOP {} --PAIRED {}'.format(NPOLICIES, NPOP, model_config['PAIRED'])
 
          if render:
             render_cmd = 'python Forge.py render {} {}'.format(l_eval_args, eval_args)
@@ -472,13 +478,14 @@ if __name__ == '__main__':
       default_config = json.load(f)
    print('Loaded default config:\n{}'.format(default_config))
 
-   if EVALUATE and not opts.vis_maps:
+   if EVALUATE or RENDER and not opts.vis_maps:
       experiment_names = []
+      experiment_configs = []
       # just get the names of experiments in which we are interested (no actual evaluations are run)
       launch_batch(EXP_NAME, preeval=True)
       if RENDER:
          print('rendering experiments: {}\n KeyboardInterrupt (Ctrl+c) to render next.'.format(experiment_names))
-         launch_cross_eval(experiment_names, vis_only=False, render=True)
+         launch_cross_eval(experiment_names, vis_only=False, render=True, experiment_configs=experiment_configs)
       else:
          if not VIS_CROSS_EVAL:
             print('cross evaluating experiments: {}'.format(experiment_names))

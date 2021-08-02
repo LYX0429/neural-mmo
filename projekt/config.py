@@ -12,6 +12,9 @@ def get_experiment_name(config):
       config.EVO_ALGO,
    )
 
+   if config.PAIRED:
+      experiment_name += '_PAIRED'
+
    if config.EVO_ALGO == 'MAP-Elites':
       #     experiment_name += '_BCs-{}'.format(config.ME_DIMS)
       if (np.array(config.ME_BIN_SIZES) == 1).all():

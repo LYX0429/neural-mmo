@@ -3,6 +3,7 @@ import inspect
 import operator
 import os
 import random
+import pickle
 import warnings
 from pdb import set_trace as TT
 from timeit import default_timer as timer
@@ -27,6 +28,7 @@ from qdpy.plots import *
 from evolution.evo_map import EvolverNMMO
 from evolution.individuals import EvoIndividual, NeuralCA
 from evolution.cmaes import EvoCMAES
+import matplotlib.pyplot as plt
 
 # from qdpy.plots import *
 
@@ -146,9 +148,11 @@ class meNMMO(EvolverNMMO):
 #        pass
       # FIXME: we should handle this in the parent
       self.init_pop()
+      self.logbook_path = os.path.join(self.save_path, 'logbook.pkl')
 
-   def qdSimple(self, init_batch, toolbox, container, batch_size, niter, cxpb = 0.0, mutpb = 1.0, stats = None, halloffame = None, verbose = False, show_warnings = True, start_time = None, iteration_callback = None):
-      """The simplest QD algorithm using DEAP.
+   def qdSimple(self, init_batch, toolbox, container, batch_size, niter, cxpb=0.0, mutpb=1.0, stats=None,
+                halloffame=None, verbose=False, show_warnings=True, start_time=None, iteration_callback=None):
+      """The simplest QD algorithm using DEAP, adapted for evolving maps in NMMO.
       :param init_batch: Sequence of individuals used as initial batch.
       :param toolbox: A :class:`~deap.base.Toolbox` that contains the evolution operators.
       :param batch_size: The number of individuals in a batch.
@@ -174,8 +178,13 @@ class meNMMO(EvolverNMMO):
           return valid_ind
       if start_time == None:
           start_time = timer()
-      logbook = deap.tools.Logbook()
-      logbook.header = ["iteration", "containerSize", "evals", "nbUpdated"] + (stats.fields if stats else []) + ["elapsed"]
+      if self.n_gen == 0:
+         logbook = deap.tools.Logbook()
+         logbook.header = ["iteration", "containerSize", "evals", "nbUpdated"] + (stats.fields if stats else []) + [
+            "elapsed"]
+      else:
+         with open(self.logbook_path, 'rb') as lb_file:
+            logbook = pickle.load(lb_file)
       if len(init_batch) == 0:
           raise ValueError("``init_batch`` must not be empty.")
       # Evaluate the individuals with an invalid fitness
@@ -209,14 +218,15 @@ class meNMMO(EvolverNMMO):
       else:
          # Compile stats and update logs
          record = stats.compile(container) if stats else {}
-         logbook.record(iteration=0, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+         logbook.record(iteration=0, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated,
+                        elapsed=timer()-start_time, **record)
          if verbose:
              print(logbook.stream)
       # Call callback function
       if iteration_callback != None:
           iteration_callback(0, init_batch, container, logbook)
       # Begin the generational process
-      for i in range(1, niter + 1):
+      for i in range(self.n_gen + 1, niter + 1):
          start_time = timer()
          # Select the next batch individuals
          batch = toolbox.select(container, batch_size)
@@ -281,10 +291,51 @@ class meNMMO(EvolverNMMO):
          if iteration_callback != None:
              iteration_callback(i, batch, container, logbook)
 
-      self.saveMaps()
+      self.saveMaps(self.container)
       self.plot()
 
       return batch, logbook
+
+   def plot(self, logbook=None):
+      if logbook is None:
+         logbook = self.algo.logbook
+      gen = logbook.select("iteration")
+      fit_mins = logbook.select("min")
+      fit_avgs = logbook.select("avg")
+      fit_stds = logbook.select("std")
+      fit_maxs = logbook.select("max")
+
+      fig, ax1 = plt.subplots()
+      line0 = ax1.plot(gen, fit_mins, "b--")
+      line1_err = ax1.errorbar(gen, fit_avgs, fit_stds, color='green', mfc='green', mec='green', linestyle="-", label="Average Fitness",
+                               ms=20, mew=4,
+                               alpha=100/len(gen),
+                               # alpha=0.9,
+                              )
+      line1 = ax1.plot(gen, fit_avgs, 'b-', label='Average Fitness')
+      line2 = ax1.plot(gen, fit_maxs, "b--")
+      ax1.set_xlabel("Generation")
+      ax1.set_ylabel("Fitness")
+      if not np.all(self.config.ME_BIN_SIZES == 1):
+         # plot the size of the archive
+         containerSize_avgs = logbook.select('containerSize')
+         for tl in ax1.get_yticklabels():
+            tl.set_color("b")
+         ax2 = ax1.twinx()
+         line2 = ax2.plot(gen, containerSize_avgs, "r-", label="Archive Size")
+         ax2.set_ylabel("Size", color="r")
+         # ax2_ticks = ax2.get_yticklabels()
+         start, end = ax2.get_ylim()
+         ax2.yaxis.set_ticks(np.arange(start, end, (end - start) / 10))
+         for tl in ax2.get_yticklabels():
+            tl.set_color("r")
+         lns = line1 + line2
+         labs = [l.get_label() for l in lns]
+         ax1.legend(lns, labs, loc="center right")
+
+      plt.tight_layout()
+      # plt.show()
+      plt.savefig(os.path.join(self.save_path, 'fitness.png'))
 
    def reset_g_idxs(self):
       self.g_idxs = set(range(self.config.N_EVO_MAPS))
@@ -326,6 +377,12 @@ class meNMMO(EvolverNMMO):
       # Remove mutants after each iteration, since they have either been added to the container/archive, or deleted.
       #FIXME: why wouldn't it be?
 
+   def log(self, verbose=False):
+      pass
+
+   def reload_log(self):
+      pass
+
    def save(self):
       evo_save_start = timer()
       self.log_me(self.container)
@@ -339,6 +396,8 @@ class meNMMO(EvolverNMMO):
       toolbox = self.toolbox
       self.toolbox = None
       self.container = None
+      with open(self.logbook_path, 'wb') as lb_file:
+         pickle.dump(algo.logbook, lb_file)
       super().save()
       self.algo = algo
       self.toolbox = toolbox
@@ -509,10 +568,10 @@ class meNMMO(EvolverNMMO):
                  ea_fn,
                  toolbox,
                  container,
-               init_batch_size,
-               batch_size,
-               niter,
-       ):
+                 init_batch_size,
+                 batch_size,
+                 niter,
+                ):
        if self.MAP_ELITES:
            algo = EvoDEAPQD(
                qd_fun=ea_fn,
@@ -559,7 +618,8 @@ class meNMMO(EvolverNMMO):
               container=archive['container'],
               init_batch_size=archive['init_batch_size'],
               batch_size=archive['batch_size'],
-              niter=archive['nb_iterations'],
+              # niter=archive['nb_iterations'],
+              niter=self.config.N_GENERATIONS,
       )
       # ZOINKYS!
       self.algo.container.evolver = self
@@ -713,21 +773,6 @@ class meNMMO(EvolverNMMO):
          print("Smallest best:", smallest_best)
          print("Smallest best fitness:", smallest_best.fitness)
          print("Smallest best features:", smallest_best.features)
-
-         # It is possible to access the results (including the genomes of the solutions, their performance, etc) stored in the pickle file by using the following code:
-         # ----8<----8<----8<----8<----8<----8<
-         # from deap import base, creator, gp
-         # import pickle
-         # fitness_weight = -1.0
-         # creator.create("FitnessMin", base.Fitness, weights=(fitness_weight,))
-         # creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin, features=list)
-         # pset = gp.PrimitiveSet("MAIN", 1)
-         # pset.addEphemeralConstant("rand101", lambda: random.randint(-4.,4.))
-         # with open("final.p", "rb") as f:
-         #    data = pickle.load(f)
-         # print(data)
-         # ----8<----8<----8<----8<----8<----8<
-         # --> data is a dictionary containing the results.
 
          # Create plots
          plot_path = os.path.join(log_base_path, "performancesGrid.pdf")

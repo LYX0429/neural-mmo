@@ -1,4 +1,4 @@
-from pdb import set_trace as T
+from pdb import set_trace as TT
 import json
 import os
 import numpy as np
@@ -98,7 +98,7 @@ class Env:
 
 #     self.env_reset = time.time()
 
-      self.agent_skills = {}
+      self.agent_skills = {i: {} for i in range(self.config.NPOP)}
       self.lifetimes = {}
       self.actions_matched = {}
 
@@ -233,15 +233,7 @@ class Env:
          infos:
             An empty dictionary provided only for conformity with OpenAI Gym.
       '''
-#<<<<<<< HEAD
-##     print(self.realm.tick)
-#      self.env_step = time.time()
-#
-#      ###Preprocess actions
-#      self.preprocess_actions = time.time()
-#=======
       #Preprocess actions
-#>>>>>>> 1473e2bf0dd54f0ab2dbf0d05f6dbb144bdd1989
       if preprocessActions:
          for entID in list(actions.keys()):
             ent = self.realm.players[entID]
@@ -274,7 +266,7 @@ class Env:
          for entID, ent in dead.items():
             lifetime = ent.history.timeAlive.val
             self.lifetimes[entID] = lifetime
-            self.agent_skills[entID] = self.get_agent_stats(ent)
+            self.agent_skills[ent.base.population.val][entID] = self.get_agent_stats(ent)
             if hasattr(self, 'actions_matched'):
                actions_matched = ent.actions_matched
                self.actions_matched[entID] = actions_matched

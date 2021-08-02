@@ -224,8 +224,10 @@ class Solid:
 
 
 class Palette:
-   def __init__(self, n, multi_evo=False):
+   def __init__(self, n, multi_evo=False, paired=False):
       self.n = n
+      if multi_evo and paired:
+         raise NotImplementedError
       if multi_evo:
          self.colors = {
             'Neural_': Neon.BLUE,
@@ -237,6 +239,12 @@ class Palette:
             'LSystem': Solid.PURPLE,
             'Random': Solid.BROWN,
             'Pattern': Solid.PINK,
+         }
+         return
+      if paired:
+         self.colors = {
+            'protagonist': Solid.BLUE,
+            'antagonist': Solid.RED,
          }
          return
       if n <= 12:

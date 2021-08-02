@@ -124,7 +124,9 @@ class PlayerManager(EntityGroup):
       if config.MULTI_MODEL_NAMES is not None:
          self.models = config.MULTI_MODEL_NAMES
       else:
-         if config.MODEL is None:
+         if config.PAIRED:
+            self.models = ['protagonist', 'antagonist']
+         elif config.MODEL is None:
             self.models = [config.GENOME]
          else:
             self.models = [config.MODEL]
@@ -134,7 +136,7 @@ class PlayerManager(EntityGroup):
 
       # self.palette = Palette(config.NPOP)
       # self.idx = 1
-      self.palette = Palette(config.NPOP, multi_evo=config.EVALUATE)
+      self.palette = Palette(config.NPOP, multi_evo=config.MULTI_MODEL_NAMES is not None, paired=config.PAIRED)
       self.reset_pop_counts()
 
 

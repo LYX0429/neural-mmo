@@ -47,7 +47,7 @@ class LambdaMuEvolver():
    ):
        self.maps = {}
        self.save_path = save_path
-       self.evolver_path = os.path.join(self.save_path, 'evolver')
+       self.evolver_path = os.path.join(self.save_path, 'evolver.pkl')
        self.log_path = os.path.join(self.save_path, 'log.csv')
        self.n_proc = n_proc
       #self.make_env = make_env
@@ -321,6 +321,7 @@ class LambdaMuEvolver():
       with open(old_log_path, mode='r') as old_log_file:
          csv_rows = list(csv.reader(old_log_file))
          csv_reader = reversed(csv_rows)
+         i = 0
          for (i, row) in enumerate(csv_reader):
             match = re.match(r'epoch (\d+)', row[0])
             if match:

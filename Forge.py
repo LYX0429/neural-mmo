@@ -50,6 +50,9 @@ def loadTrainer(config):
       load_args = json.load(
          open('configs/settings_{}.json'.format(config.load_arguments), 'r'))
       [config.set(k, v) for (k, v) in load_args.items()]
+   if config.PAIRED:
+      config.set('NPOP', 2)
+      config.set('NPOLICIES', 2)
 
    torch.set_num_threads(1)
    ray.init(local_mode=config.LOCAL_MODE, ignore_reinit_error=True)
@@ -62,9 +65,6 @@ def loadTrainer(config):
    rllib.models.ModelCatalog.register_custom_model('godsword', wrapper.RLlibPolicy)
    mapPolicy = lambda agentID: 'policy_{}'.format(agentID % config.NPOLICIES)
    policies  = createPolicies(config, mapPolicy)
-
-
-   map_arr = np.zeros((120, 120), dtype=int)
 
    #Instantiate monolithic RLlib Trainer object.
    return wrapper.SanePPOTrainer(config={
@@ -84,7 +84,6 @@ def loadTrainer(config):
       'callbacks': wrapper.RLlibLogCallbacks,
       'env_config': {
          'config': config,
-         'map_arr': map_arr,
       },
       'multiagent': {
          'policies': policies,
@@ -99,7 +98,9 @@ def loadTrainer(config):
 
 def loadEvaluator(config):
    '''Create test/render evaluator'''
-   if config.NPOLICIES > 1 or config.MODEL.startswith('['): # the latter is just in case we're doing multi-policy eval with only 1 model for some reason
+   if config.PAIRED:
+      pass
+   elif config.NPOLICIES > 1 or config.MODEL.startswith('['): # the latter is just in case we're doing multi-policy eval with only 1 model for some reason
       models = config.MODEL.strip('[').strip(']').split(',')
       # Randomize order of models to randomize spawn order for fair evaluation over multiple trials
       np.random.shuffle(models)

@@ -11,6 +11,7 @@ from qdpy.phenotype import Individual, Fitness, Features
 from evolution.paint_terrain import PRIMITIVE_TYPES
 from opensimplex import OpenSimplex
 import vec_noise
+from pytorch_neat.cppn import create_cppn
 from numba import njit
 from typing import Any
 
@@ -284,71 +285,90 @@ class CAGenome(Genome):
 # Actually CPPNGenome, but needs to be named this way for neat-python to stomach it? Whack. Should hack out neat-python
 # and make it our own
 class DefaultGenome(neat.genome.DefaultGenome, Genome):
-    ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
-    beyond the map.'''
-    def __init__(self, key, neat_config, n_tiles, map_width):
-        super().__init__(key)
-        self.configure_new(neat_config.genome_config)
-        self.map_arr = None
-        self.multi_hot = None
-        self.atk_mults = gen_atk_mults()
-        self.age = 0
-        self.neat_config = neat_config
-        self.map_width = self.map_height = map_width
-        self.n_tiles = n_tiles
+   @staticmethod
+   def gen_map_arrs(n_tiles, map_width, map_height, cppn):
+      multi_hot_1 = np.zeros((n_tiles, map_width, map_height), dtype=np.float)
+      map_arr = np.zeros((map_width, map_height), dtype=np.uint8)
+      X = np.arange(map_width)
+      # center from -1 to 1
+      X = X * 2 / map_width - 1
+      # scale (ad hoc)
+      X = X * 2
+      X, Y = np.meshgrid(X, X)
+      # swapping axes to match naive implementation
+      multi_hot = [node(x_in=torch.Tensor(X), y_in=torch.Tensor(Y)).numpy() for node in cppn]
+      chan_types = [type(multi_hot[i]) for i in range(len(multi_hot))]
+      if float in chan_types:
+         raise Exception
+      multi_hot = np.array(multi_hot)
+      # multi_hot = multi_hot.swapaxes(1, 2)
+      map_arr = np.argmax(multi_hot, axis=0)
+      # for x in range(map_width):
+      #    for y in range(map_height):
+      #        # a decent scale for NMMO
+      #        x_i, y_i = x * 2 / map_width - 1, y * 2 / map_width - 1
+      #        x_i, y_i = x_i * 2, y_i * 2
+      #        v = cppn.activate((x_i, y_i))
 
-    def configure_crossover(self, parent1, parent2, config):
-        super().configure_crossover(parent1, parent2, config)
-        mults_1, mults_2 = parent1.atk_mults, parent2.atk_mults
-        self.atk_mults, _ = mate_atk_mults(mults_1, mults_2, single_offspring=True)
+      #    #    if self.config.THRESHOLD:
+      #    #        # use NMMO's threshold logic
+      #    #        assert len(v) == 1
+      #    #        v = v[0]
+      #    #        v = self.map_generator.material_evo(self.config, v)
+      #    #    else:
+      #        # CPPN has output channel for each tile type; take argmax over channels
+      #        # also a spawn-point tile
+      #        assert len(v) == n_tiles
+      #        multi_hot_1[:, x, y] = v
+      #        v = np.array(v)
+      #        # Shuffle before selecting argmax to prevent bias for certain tile types in case of ties
+      #        # v = np.random.choice(np.flatnonzero(v == v.max()))
+      #        v = np.argmax(v)
+      #        map_arr[x, y] = v
+      # # Debugging: make sure we match the naive approach, within reason
+      # assert np.sum(abs(multi_hot_1 - multi_hot)) < 1e-5
 
-    def mutate(self):
-        super().mutate(self.neat_config.genome_config)
-        self.atk_mults = mutate_atk_mults(self.atk_mults)
-        self.age = 0
+      return map_arr, multi_hot
 
-    def clone(self):
-        child = copy.deepcopy(self)
-        child.age = 0
+   ''' A wrapper class for a NEAT genome, which smuggles in other evolvable params for NMMO,
+   beyond the map.'''
+   def __init__(self, key, neat_config, n_tiles, map_width):
+       super().__init__(key)
+       self.configure_new(neat_config.genome_config)
+       self.map_arr = None
+       self.multi_hot = None
+       self.atk_mults = gen_atk_mults()
+       self.age = 0
+       self.neat_config = neat_config
+       self.map_width = self.map_height = map_width
+       self.n_tiles = n_tiles
 
-        return child
+   def configure_crossover(self, parent1, parent2, config):
+       super().configure_crossover(parent1, parent2, config)
+       mults_1, mults_2 = parent1.atk_mults, parent2.atk_mults
+       self.atk_mults, _ = mate_atk_mults(mults_1, mults_2, single_offspring=True)
 
-    def gen_map(self):
-       #if self.map_arr is not None and self.multi_hot is not None:
-       #    return self.map_arr, self.multi_hot
+   def mutate(self):
+       super().mutate(self.neat_config.genome_config)
+       self.atk_mults = mutate_atk_mults(self.atk_mults)
+       self.age = 0
 
-        cppn = neat.nn.FeedForwardNetwork.create(self, self.neat_config)
-        #       if self.config.NET_RENDER:
-        #          with open('nmmo_cppn.pkl', 'wb') a
-        multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
-        map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
+   def clone(self):
+       child = copy.deepcopy(self)
+       child.age = 0
 
-        for x in range(self.map_width):
-            for y in range(self.map_height):
-                # a decent scale for NMMO
-                x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
-                x_i, y_i = x_i * 2, y_i * 2
-                v = cppn.activate((x_i, y_i))
+       return child
 
-           #    if self.config.THRESHOLD:
-           #        # use NMMO's threshold logic
-           #        assert len(v) == 1
-           #        v = v[0]
-           #        v = self.map_generator.material_evo(self.config, v)
-           #    else:
-                # CPPN has output channel for each tile type; take argmax over channels
-                # also a spawn-point tile
-                assert len(v) == self.n_tiles
-                multi_hot[:, x, y] = v
-                # Shuffle before selecting argmax to prevent bias for certain tile types in case of ties
-                v = np.array(v)
-               #v = np.random.choice(np.flatnonzero(v == v.max()))
-                v = np.argmax(v)
-                map_arr[x, y] = v
-        self.map_arr = map_arr
-        self.multi_hot = multi_hot
+   def gen_map(self):
+      #if self.map_arr is not None and self.multi_hot is not None:
+      #    return self.map_arr, self.multi_hot
 
-        return map_arr, multi_hot
+      # cppn = neat.nn.FeedForwardNetwork.create(self, self.neat_config)
+      cppn = create_cppn(self, self.neat_config, ['x_in', 'y_in'], ['tile_{}'.format(i) for i in range(self.n_tiles)])
+      #       if self.config.NET_RENDER:
+      #          with open('nmmo_cppn.pkl', 'wb') a
+
+      self.map_arr, self.multi_hot = DefaultGenome.gen_map_arrs(self.n_tiles, self.map_width, self.map_height, cppn)
 
 
 class PatternGenome(Genome):

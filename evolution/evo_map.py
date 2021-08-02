@@ -318,7 +318,10 @@ class EvolverNMMO(LambdaMuEvolver):
       return policies
 
    def update_fitness(self, individual, ALP):
-      if not self.MAP_TEST:
+      if self.config.PAIRED:
+         protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=i) for i in range(2)]
+         individual.score_hists.append(protaganist_fitness - antagonist_fitness)
+      elif not self.MAP_TEST:
          individual.score_hists.append(self.calc_fitness(individual.stats))
       else:
          individual.score_hists.append(self.calc_fitness(individual=individual, config=self.config))

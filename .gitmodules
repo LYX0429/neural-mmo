@@ -1,0 +1,6 @@
+[submodule "neat-python"]
+	path = neat-python
+	url = git@github.com:smearle/neat-python
+[submodule "pytorch-neat"]
+	path = pytorch-neat
+	url = git@github.com:uber-research/pytorch-neat

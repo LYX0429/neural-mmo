@@ -272,7 +272,7 @@ if __name__ == '__main__':
     init_tiles, probs, skill_names = map_gen.get_init_tiles(yaml_path, write_game_file=True)
 
     try:
-        evolver_path = os.path.join(save_path, 'evolver')
+        evolver_path = os.path.join(save_path, 'evolver.pkl')
         with open(evolver_path, 'rb') as save_file:
             evolver = pickle.load(save_file)
 

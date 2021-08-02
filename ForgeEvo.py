@@ -127,7 +127,7 @@ def main():
 
 
    try:
-      evolver_path = os.path.join(save_path, 'evolver')
+      evolver_path = os.path.join(save_path, 'evolver.pkl')
       with open(evolver_path, 'rb') as save_file:
          evolver = pickle.load(save_file)
 
@@ -141,6 +141,7 @@ def main():
       evolver.config.N_EVO_MAPS = config.N_EVO_MAPS
       evolver.config.N_PROC = config.N_PROC
       evolver.config.EVO_SAVE_INTERVAL = config.EVO_SAVE_INTERVAL
+      evolver.config.N_GENERATIONS = config.N_GENERATIONS
       evolver.reloading = True
       evolver.epoch_reloaded = evolver.n_epoch
       # Running out of RAM depending on size/number of map genomes... try trashing the archive while ray does its
@@ -154,15 +155,16 @@ def main():
       # TODO: properly writing to the log is so time-consuming that HPC GPU jobs get cancelled for not using enough GPU.
       #   move this functionality to a separate batch command that can clean all the csv's at once to allow for proper
       #   rendering of fitness histogram.
-      # evolver.reload_log()
+      evolver.reload_log()
       # evolver.container = container
       if config.RENDER:
          evolver.config.INFER_IDX = config.INFER_IDX
       if evolver.MAP_ELITES:
          evolver.reload_archive()
       if config.VIS_MAPS:
+         logbook = pickle.load(open(evolver.logbook_path, 'rb'))
          print('Plotting histogram of map fitness.')
-         evolver.plot()
+         evolver.plot(logbook=logbook)
          print('Saving and rendering maps from the archive of elites.')
          evolver.saveMaps(evolver.container)
          return

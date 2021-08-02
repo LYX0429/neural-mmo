@@ -163,42 +163,47 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       return a_skill_vals
 
    def get_all_agent_stats(self, verbose=False):
-      skills = {}
+      skills = {i: {} for i in range(self.config.NPOP)}
       a_skills = None
 
-      # Get stats of dead (note the order here)
+      # Get stats of dead (note the order here (wait...what about it?))
       l = 0
-      for player_id, skill_vals in self.agent_skills.items():
-         skills[player_id] = skill_vals
-         l += 1
+      for player_pop, pop_skills in self.agent_skills.items():
+         for player_id, skill_vals in pop_skills.items():
+            skills[player_pop][player_id] = skill_vals
+            l += 1
 
       # Get stats of living
       d = 0
       for player_id, player in self.realm.players.items():
+         player_pop = player.base.population.val
          a_skill_vals = self.get_agent_stats(player)
-         skills[player_id] = a_skill_vals
+         skills[player_pop][player_id] = a_skill_vals
          d += 1
 
 
 #     if a_skills:
-      stats = np.zeros((len(skills), len(self.headers)))
+      stats = {i: np.zeros((len(skills[i]), len(self.headers))) for i in range(self.config.NPOP)}
      #stats = np.zeros((len(skills), 1))
-      lifespans = np.zeros((len(skills)))
+      lifespans = {i: np.zeros((len(skills[i]))) for i in range(self.config.NPOP)}
       if self.ACTION_MATCHING:
-         actions_matched = np.zeros((len(skills)))
+         actions_matched = {i: np.zeros((len(skills[i]))) for i in range(self.config.NPOP)}
 
-      for player_id, a_skills in skills.items():
-         # over agents
+      for player_pop, pop_skills in skills.items():
+         player_n = 0
+         for player_id, a_skills in pop_skills.items():
+            # over agents
 
-         for j, k in enumerate(self.headers):
-            # over skills
-            if k not in ['level', 'cooking', 'smithing']:
-#             if k in ['exploration']:
-               stats[player_id - 1, j] = a_skills[k]
-               j += 1
-         lifespans[player_id - 1] = a_skills['time_alive']
-         if self.ACTION_MATCHING:
-            actions_matched[player_id - 1] = a_skills['actions_matched']
+            for j, k in enumerate(self.headers):
+               # over skills
+               if k not in ['level', 'cooking', 'smithing']:
+   #             if k in ['exploration']:
+                  stats[player_pop][player_n, j] = a_skills[k]
+                  j += 1
+            lifespans[player_pop][player_n] = a_skills['time_alive']
+            if self.ACTION_MATCHING:
+               actions_matched[player_pop][player_n] = a_skills['actions_matched']
+            player_n += 1
 
       # Add lifespans of the living to those of the dead
       stats = {
