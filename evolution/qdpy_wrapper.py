@@ -284,7 +284,7 @@ class meNMMO(EvolverNMMO):
              halloffame.update(container)
          # Append the current generation statistics to the logbook
          record = stats.compile(container) if stats else {}
-         logbook.record(iteration=self.n_gen, containerSize=container.size_str(), evals=len(invalid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
+         logbook.record(iteration=self.n_gen, containerSize=container.size_str(), evals=len(valid_ind), nbUpdated=nb_updated, elapsed=timer()-start_time, **record)
          if verbose:
             print(logbook.stream)
          # Call callback function

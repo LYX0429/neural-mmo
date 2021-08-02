@@ -843,7 +843,6 @@ class EvolverNMMO(LambdaMuEvolver):
 #                 'batch_mode': 'thisgoesnowherehahafuck',
 #                 }
             }
-            num_workers = 0
          else:
             evaluation_config = {
             }
