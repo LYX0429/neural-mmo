@@ -103,7 +103,7 @@ def launch_batch(exp_name, preeval=False):
       else:
          NENT = 3
       N_EVALS = 5
-      N_PROC = 4
+      N_PROC = 12
    else:
       NENT = 16
       N_EVALS = 20

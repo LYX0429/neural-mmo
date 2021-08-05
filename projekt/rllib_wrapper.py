@@ -8,12 +8,12 @@ import shutil
 import os
 import re
 import csv
+from timeit import default_timer as timer
 
 import gym
 from matplotlib import pyplot as plt
 import matplotlib
 from ray.rllib.agents import Trainer
-from ray.rllib.env.normalize_actions import NormalizeActionWrapper
 from ray.rllib.utils import override
 from ray.rllib.utils.from_config import from_config
 from ray.tune import Trainable
@@ -1102,7 +1102,9 @@ class EvoPPOTrainer(ppo.PPOTrainer):
 #     obs = [ob for worker_obs in obs for ob in worker_obs]
 
    def simulate_unfrozen(self):
+      # sim_start = timer()
       stats = super().train()
+      # print('Env simulation time: {}'.format(timer() - sim_start))
 
       # FIXME: switch this off when already saving for other reasons; control from config
       # if self.training_iteration < 100:

@@ -1,4 +1,6 @@
 import copy
+
+# import torch.cuda
 from qdpy.phenotype import Features
 import csv
 import json
@@ -47,7 +49,7 @@ from plot_evo import plot_exp
 from projekt.rllib_wrapper import (EvoPPOTrainer, RLlibLogCallbacks, RLlibEvaluator,
                                    actionSpace, frozen_execution_plan,
                                    observationSpace)
-from pureples.shared.visualize import draw_net
+# from pureples.shared.visualize import draw_net
 
 np.set_printoptions(threshold=sys.maxsize,
                     linewidth=120,
@@ -786,8 +788,7 @@ class EvolverNMMO(LambdaMuEvolver):
                 }}
          griddly_config = {}
          multiagent_config = {
-               "policy_mapping_fn":
-                  self.mapPolicy
+            "policy_mapping_fn": self.mapPolicy,
          }
 
       if self.trainer is None or trash_trainer:
@@ -870,7 +871,7 @@ class EvolverNMMO(LambdaMuEvolver):
             'framework': 'torch',
             'horizon': np.inf,
             'soft_horizon': False,
-            '_use_trajectory_view_api': False,
+            # '_use_trajectory_view_api': False,
             'no_done_at_end': False,
             'callbacks': LogCallbacks,
             'env_config': {
@@ -896,6 +897,7 @@ class EvolverNMMO(LambdaMuEvolver):
 
 #        utils.modelSize(trainer.defaultModel())
          trainer.restore(self.config.MODEL)
+
          TRAINER = trainer
          self.trainer = trainer
 

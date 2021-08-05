@@ -9,7 +9,6 @@ from forge.blade.lib import enums
 from pdb import set_trace as TT
 from qdpy.phenotype import Individual, Fitness, Features
 from evolution.paint_terrain import PRIMITIVE_TYPES
-from opensimplex import OpenSimplex
 import vec_noise
 from pytorch_neat.cppn import create_cppn
 from numba import njit
@@ -520,7 +519,6 @@ class SimplexNoiseGenome(Genome):
       if baseline:
          return self.init_baseline()
       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
-      self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
       self.step_size = np.random.random() * 2
       n_bands = np.random.randint(n_tiles, n_tiles + 3)
       threshes = np.random.random(n_bands)
@@ -531,7 +529,6 @@ class SimplexNoiseGenome(Genome):
 
    def init_baseline(self):
       self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
-      self.noise = OpenSimplex(seed=np.random.randint(0, 1e9))
       self.step_size = 0.125
       # Following the parameters for the baseline simplex noise maps -- see projekt/config
       self.n_bands = 9

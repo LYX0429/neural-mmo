@@ -194,6 +194,7 @@ class TreeOrerock(SmallMaps):
    MULTI_MODEL_EXPERIMENTS = None
    MULTI_MODEL_NAMES = None
    MAX_POP = None  # Maximum number of agents belonging to a given population.
+   GENOME = 'Baseline'
 
 
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
