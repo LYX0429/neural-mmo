@@ -29,10 +29,10 @@ genomes = [
 #  'Simplex',
 #  'CA',
 #  'Random',
-   'CPPN',
+#  'CPPN',
 #  'Pattern',
 #  'LSystem',
-#  'All',
+   'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
@@ -182,6 +182,7 @@ def launch_batch(exp_name, preeval=False):
                         'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
                         'VIS_MAPS': opts.vis_maps,
                         'PAIRED': PAIRED_bool,
+                        'NUM_GPUS': 1 if CUDA else 0,
                         })
                      if gene == 'Baseline':
                         exp_config.update({

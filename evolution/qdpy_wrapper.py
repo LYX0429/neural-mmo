@@ -25,7 +25,7 @@ from qdpy.base import ParallelismManager
 # from qdpy.benchmarks import *
 from qdpy.containers import Grid
 from qdpy.plots import *
-from evolution.evo_map import EvolverNMMO
+from evolution.evo_map import EvolverNMMO, save_maps
 from evolution.individuals import EvoIndividual, NeuralCA
 from evolution.cmaes import EvoCMAES
 import matplotlib.pyplot as plt
@@ -50,6 +50,51 @@ import matplotlib.pyplot as plt
 """A simple example of MAP-elites to illuminate a fitness function based on a normalised rastrigin function. The illumination process is ran with 2 features corresponding to the first 2 values of the genomes. It is possible to increase the difficulty of the illumination process by using problem dimension above 3. This code uses the library DEAP to implement the evolutionary part."""
 
 mpl.use('Agg')
+
+def plot_qdpy_fitness(save_path, evolver=None, logbook=None):
+   if logbook is None:
+      logbook = evolver.algo.logbook
+   gen = logbook.select("iteration")
+   fit_mins = logbook.select("min")
+   fit_avgs = logbook.select("avg")
+   fit_stds = logbook.select("std")
+   fit_maxs = logbook.select("max")
+
+   fig, ax1 = plt.subplots()
+   line0 = ax1.plot(gen, fit_mins, "b--")
+   line1_err = ax1.errorbar(gen, fit_avgs, fit_stds, color='green', mfc='green', mec='green', linestyle="-",
+                            label="Average Fitness",
+                            ms=20, mew=4,
+                            alpha=100 / len(gen),
+                            # alpha=0.9,
+                            )
+   line1 = ax1.plot(gen, fit_avgs, 'b-', label='Average Fitness')
+   line2 = ax1.plot(gen, fit_maxs, "b--")
+   ax1.set_xlabel("Generation")
+   ax1.set_ylabel("Fitness")
+   # FIXME: figure out from logbook if we've got all-1 bin sizes so we don't plot size
+   # if not np.all(self.config.ME_BIN_SIZES == 1):
+   if True:
+      # plot the size of the archive
+      containerSize_avgs = logbook.select('containerSize')
+      for tl in ax1.get_yticklabels():
+         tl.set_color("b")
+      ax2 = ax1.twinx()
+      line2 = ax2.plot(gen, containerSize_avgs, "r-", label="Archive Size")
+      ax2.set_ylabel("Size", color="r")
+      # ax2_ticks = ax2.get_yticklabels()
+      start, end = ax2.get_ylim()
+      ax2.yaxis.set_ticks(np.arange(start, end, (end - start) / 10))
+      for tl in ax2.get_yticklabels():
+         tl.set_color("r")
+      lns = line1 + line2
+      labs = [l.get_label() for l in lns]
+      ax1.legend(lns, labs, loc="bottom right")
+
+   plt.tight_layout()
+   # plt.show()
+   plt.savefig(os.path.join(save_path, 'fitness.png'))
+
 
 class NMMOGrid(Grid):
    def __init__(self, evolver, save_path, config, map_generator, *args, **kwargs):
@@ -291,51 +336,12 @@ class meNMMO(EvolverNMMO):
          if iteration_callback != None:
              iteration_callback(i, batch, container, logbook)
 
-      self.saveMaps(self.container)
-      self.plot()
+      save_maps(save_path=self.save_path, config=self.config, individuals=self.container,
+                map_generator=self.map_generator)
+      plot_qdpy_fitness(save_path=self.save_path, evolver=self)
 
       return batch, logbook
 
-   def plot(self, logbook=None):
-      if logbook is None:
-         logbook = self.algo.logbook
-      gen = logbook.select("iteration")
-      fit_mins = logbook.select("min")
-      fit_avgs = logbook.select("avg")
-      fit_stds = logbook.select("std")
-      fit_maxs = logbook.select("max")
-
-      fig, ax1 = plt.subplots()
-      line0 = ax1.plot(gen, fit_mins, "b--")
-      line1_err = ax1.errorbar(gen, fit_avgs, fit_stds, color='green', mfc='green', mec='green', linestyle="-", label="Average Fitness",
-                               ms=20, mew=4,
-                               alpha=100/len(gen),
-                               # alpha=0.9,
-                              )
-      line1 = ax1.plot(gen, fit_avgs, 'b-', label='Average Fitness')
-      line2 = ax1.plot(gen, fit_maxs, "b--")
-      ax1.set_xlabel("Generation")
-      ax1.set_ylabel("Fitness")
-      if not np.all(self.config.ME_BIN_SIZES == 1):
-         # plot the size of the archive
-         containerSize_avgs = logbook.select('containerSize')
-         for tl in ax1.get_yticklabels():
-            tl.set_color("b")
-         ax2 = ax1.twinx()
-         line2 = ax2.plot(gen, containerSize_avgs, "r-", label="Archive Size")
-         ax2.set_ylabel("Size", color="r")
-         # ax2_ticks = ax2.get_yticklabels()
-         start, end = ax2.get_ylim()
-         ax2.yaxis.set_ticks(np.arange(start, end, (end - start) / 10))
-         for tl in ax2.get_yticklabels():
-            tl.set_color("r")
-         lns = line1 + line2
-         labs = [l.get_label() for l in lns]
-         ax1.legend(lns, labs, loc="center right")
-
-      plt.tight_layout()
-      # plt.show()
-      plt.savefig(os.path.join(self.save_path, 'fitness.png'))
 
    def reset_g_idxs(self):
       self.g_idxs = set(range(self.config.N_EVO_MAPS))

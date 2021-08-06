@@ -8,7 +8,6 @@ from pdb import set_trace as TT
 import re
 import ray
 import torch
-torch.cuda.init()
 from fire import Fire
 from ray import rllib
 
@@ -18,6 +17,8 @@ from projekt import rllib_wrapper
 from evolution.global_actors import Counter, Stats
 from projekt.config import get_experiment_name
 from pcg import get_tile_data
+from evolution.qdpy_wrapper import plot_qdpy_fitness
+from evolution.evo_map import save_maps
 TILE_TYPES, TILE_PROBS = get_tile_data(griddly=False)
 
 '''Main file for the neural-mmo/projekt demo
@@ -81,9 +82,6 @@ def process_config(config, experiment_name):
 
 def main():
    # Setup ray
-#  torch.set_num_threads(1)
-   torch.set_num_threads(torch.get_num_threads())
-   ray.init()
    global config
 
    config = projekt.config.EvoNMMO()
@@ -99,6 +97,12 @@ def main():
       load_args = json.load(
          open('configs/settings_{}.json'.format(config.load_arguments), 'r'))
       [config.set(k, v) for (k, v) in load_args.items()]
+
+   if config.NUM_GPUS > 0:
+      torch.cuda.init()
+      torch.set_num_threads(torch.get_num_threads())
+   #  torch.set_num_threads(1)
+   ray.init()
 
    # on the driver
    counter = Counter.options(name="global_counter").remote(config)
@@ -126,13 +130,21 @@ def main():
 
    config = process_config(config, experiment_name)
 
-
+   if config.VIS_MAPS:
+      archive = pickle.load(open(os.path.join(save_path, 'ME_archive.p'), 'rb'))
+      logbook = pickle.load(open(os.path.join(save_path, 'logbook.pkl'), 'rb'))
+      print('Plotting histogram of map fitness.')
+      plot_qdpy_fitness(save_path=save_path, logbook=logbook, evolver=None)
+      print('Saving and rendering maps from the archive of elites.')
+      save_maps(individuals=archive['container'], save_path=save_path, config=config)
+      return
    try:
+      print('Attempting to load evolver from save file.')
       evolver_path = os.path.join(save_path, 'evolver.pkl')
       with open(evolver_path, 'rb') as save_file:
          evolver = pickle.load(save_file)
+         print('Loaded evolver.')
 
-         print('loading evolver from save file')
       # change params on reload here
       evolver.config.RENDER = config.RENDER
       evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
@@ -162,13 +174,6 @@ def main():
          evolver.config.INFER_IDX = config.INFER_IDX
       if evolver.MAP_ELITES:
          evolver.reload_archive()
-      if config.VIS_MAPS:
-         logbook = pickle.load(open(evolver.logbook_path, 'rb'))
-         print('Plotting histogram of map fitness.')
-         evolver.plot(logbook=logbook)
-         print('Saving and rendering maps from the archive of elites.')
-         evolver.saveMaps(evolver.container)
-         return
       if evolver.MAP_ELITES:
          return evolver.resume()
 

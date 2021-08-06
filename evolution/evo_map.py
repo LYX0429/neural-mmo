@@ -92,6 +92,25 @@ def sigmoid_lifespan(x):
 
    return res
 
+def save_maps(save_path, config, individuals, map_generator=None, mutated=None):
+   if map_generator is None:
+      map_generator = MapGenerator(config)
+   # can't have neat with non-cppn representation
+   #     if self.NEAT:
+   #        if mutated is None:
+   #           mutated = list(maps.keys())
+   #        #FIXME: hack
+   # checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
+   # checkpoint_dir_created = False
+   # checkpointing = False
+   for ind in individuals:
+      i = ind.idx
+      path = os.path.join(save_path, 'maps', 'map' + str(i), '')
+      map_arr = ind.chromosome.map_arr
+      Save.np(map_arr, path)
+      png_path = os.path.join(save_path, 'maps', 'map' + str(i) + '.png')
+      Save.render(map_arr[config.TERRAIN_BORDER:-config.TERRAIN_BORDER, config.TERRAIN_BORDER:-config.TERRAIN_BORDER], map_generator.textures, png_path)
+
 class LogCallbacks(DefaultCallbacks):
    STEP_KEYS = 'env_step realm_step env_stim stim_process'.split()
    EPISODE_KEYS = ['env_reset']
@@ -728,22 +747,6 @@ class EvolverNMMO(LambdaMuEvolver):
       return super().evolve()
 
 
-   def saveMaps(self, individuals, mutated=None):
-      # can't have neat with non-cppn representation
-#     if self.NEAT:
-#        if mutated is None:
-#           mutated = list(maps.keys())
-#        #FIXME: hack
-      # checkpoint_dir_path = os.path.join(self.save_path, 'maps', 'checkpoint_{}'.format(self.n_epoch))
-      # checkpoint_dir_created = False
-      # checkpointing = False
-      for ind in individuals:
-         i = ind.idx
-         path = os.path.join(self.save_path, 'maps', 'map' + str(i), '')
-         map_arr = ind.chromosome.map_arr
-         Save.np(map_arr, path)
-         png_path = os.path.join(self.save_path, 'maps', 'map' + str(i) + '.png')
-         Save.render(map_arr[self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER, self.config.TERRAIN_BORDER:-self.config.TERRAIN_BORDER], self.map_generator.textures, png_path)
 
    def make_game(self, child_map):
       config = self.config

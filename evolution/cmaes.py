@@ -201,7 +201,7 @@ class EvoCMAES(CMAES):
             if i == 1 or i > 0 and i % self.evo.config.EVO_SAVE_INTERVAL == 0:
                 self.evo.plot()
 #               self.evo.log_me()
-                self.evo.saveMaps(individuals)
+                self.evo.save_maps(individuals)
                 container = self.evo.container
                 self.evo.container = None
                 evolver = self.evo
