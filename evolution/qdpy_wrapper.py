@@ -89,7 +89,7 @@ def plot_qdpy_fitness(save_path, evolver=None, logbook=None):
          tl.set_color("r")
       lns = line1 + line2
       labs = [l.get_label() for l in lns]
-      ax1.legend(lns, labs, loc="bottom right")
+      ax1.legend(lns, labs, loc="lower right")
 
    plt.tight_layout()
    # plt.show()
