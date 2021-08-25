@@ -100,7 +100,14 @@ def get_pop_stats(agent_stats, pop=None):
    # Get list of all populations for which we need stats
    pops = agent_stats[0].keys() if pop is None else [pop]
    # Get 1D array of agent stats
-   return np.hstack([stats_i[p] for p in pops for stats_i in agent_stats])
+   stats = [stats_i[p] for p in pops for stats_i in agent_stats]
+   if len(stats[0].shape) == 2:
+      # then rows correspond to agents so we stack them vertically (concatenate along axis 1)
+      return np.vstack(stats)
+   elif len(stats[0].shape) == 1:
+      # then each agent has a scalar value so we concatenate along axis 0
+      return np.hstack(stats)
+   raise Exception("Oy! Dafuk type o' agent data is this?")
 
 def contract_by_lifespan(agent_stats, lifespans):
    '''Pull agents close to their mean according to how short-lived they were. For punishing abundance of premature death
@@ -197,9 +204,9 @@ def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, in
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
    lifespans = get_pop_stats(agent_stats['lifespans'], pop)
 
-   assert len(agent_skills) == len(lifespans)
-   a_skills = np.vstack(agent_skills)
-   a_lifespans = np.hstack(lifespans)
+   a_skills = agent_skills
+   a_lifespans = lifespans
+   assert a_skills.shape[0] == a_lifespans.shape[0]
 
    if verbose:
       print(skill_headers)

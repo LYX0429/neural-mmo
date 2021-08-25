@@ -26,13 +26,13 @@ from evolution.utils import get_genome_name
 
 genomes = [
    'Baseline',
-   'Simplex',
-   'CA',
-   'Random',
-   'CPPN',
-   'Pattern',
-   'LSystem',
-   'All',
+#  'Simplex',
+#  'CA',
+#  'Random',
+#  'CPPN',
+#  'Pattern',
+#  'LSystem',
+#  'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
