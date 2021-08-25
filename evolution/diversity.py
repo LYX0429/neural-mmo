@@ -97,7 +97,9 @@ def calc_local_map_entropy(individual, config):
     return local_ent.item()
 
 def get_pop_stats(agent_stats, pop=None):
+   # Get list of all populations for which we need stats
    pops = agent_stats[0].keys() if pop is None else [pop]
+   # Get 1D array of agent stats
    return np.hstack([stats_i[p] for p in pops for stats_i in agent_stats])
 
 def calc_scores(agent_stats, skill_headers=None, verbose=False):
@@ -131,7 +133,11 @@ def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False):
 
 def sum_lifespans(agent_stats, skill_headers=None, n_policies=1, verbose=False, pop=None):
    lifespans = get_pop_stats(agent_stats['lifespans'], pop=pop)
-   return lifespans.mean()
+   score = lifespans.mean()
+   if verbose:
+      print('Mean lifespan, pop {}: {}'.format(pop, score))
+
+   return score
 
 
 def sum_experience(agent_stats, skill_headers=None, verbose=False):

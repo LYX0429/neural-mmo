@@ -62,7 +62,7 @@ def plot_qdpy_fitness(save_path, evolver=None, logbook=None):
 
    fig, ax1 = plt.subplots()
    line0 = ax1.plot(gen, fit_mins, "b--")
-   line1_err = ax1.errorbar(gen, fit_avgs, fit_stds, color='green', mfc='green', mec='green', linestyle="-",
+   line1_err = ax1.errorbar(gen, fit_avgs, np.hstack(fit_stds), color='green', mfc='green', mec='green', linestyle="-",
                             label="Average Fitness",
                             ms=20, mew=4,
                             alpha=100 / len(gen),
@@ -89,7 +89,7 @@ def plot_qdpy_fitness(save_path, evolver=None, logbook=None):
          tl.set_color("r")
       lns = line1 + line2
       labs = [l.get_label() for l in lns]
-      ax1.legend(lns, labs, loc="lower right")
+      ax1.legend(lns, labs, loc="best")
 
    plt.tight_layout()
    # plt.show()
@@ -378,7 +378,7 @@ class meNMMO(EvolverNMMO):
       self.mutated_idxs = set()
       self.n_gen += 1
 
-      if self.n_gen == 2 or self.n_gen > 0 and self.n_gen % self.config.EVO_SAVE_INTERVAL == 0:
+      if self.n_gen == 1 or self.n_gen > 0 and self.n_gen % self.config.EVO_SAVE_INTERVAL == 0:
          self.save()
       # Remove mutants after each iteration, since they have either been added to the container/archive, or deleted.
       #FIXME: why wouldn't it be?

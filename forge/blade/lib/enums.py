@@ -243,8 +243,8 @@ class Palette:
          return
       if paired:
          self.colors = {
-            'protagonist': Solid.BLUE,
-            'antagonist': Solid.RED,
+            'pro': Solid.BLUE,
+            'ant': Solid.RED,
          }
          return
       if n <= 12:

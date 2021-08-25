@@ -1244,25 +1244,31 @@ class EvolverNMMO(LambdaMuEvolver):
        return reward
 
    def save(self):
-       save_file= open(self.evolver_path, 'wb')
-       population = copy.deepcopy(self.population)
-       for g_hash in self.population:
-           game, score, age= self.population[g_hash]
-           # FIXME: something weird is happening after reload. Not the maps though.
-           #   so for now, trash score history and re-calculate after reload
-           self.population[g_hash]= None, score, age
-          #self.population[g_hash]= None, score, age
-       if not self.MAP_TEST:
-          self.trainer.save()
-       global TRAINER
-       TRAINER = self.trainer
-       self.trainer= None
-       self.game= None
-       # map_arr = self.maps[g_hash]
-       copyfile(self.evolver_path, self.evolver_path + '.bkp')
-       pickle.dump(self, save_file)
-       self.population = population
-       self.restore(trash_trainer=False)
+      population = copy.deepcopy(self.population)
+      self.population = None
+#     for g_hash in self.population:
+#         game, score, age= self.population[g_hash]
+#         # FIXME: something weird is happening after reload. Not the maps though.
+#         #   so for now, trash score history and re-calculate after reload
+#         self.population[g_hash]= None, score, age
+#        #self.population[g_hash]= None, score, age
+      if not self.MAP_TEST:
+         self.trainer.save()
+      global TRAINER
+      TRAINER = self.trainer
+      self.trainer= None
+      self.game= None
+      global_counter = self.global_counter
+      self.global_counter = None
+      # map_arr = self.maps[g_hash]
+      if os.path.exists(self.evolver_path):
+         copyfile(self.evolver_path, self.evolver_path + '.bkp')
+      with open(self.evolver_path, 'wb') as save_file:
+         pickle.dump(self, save_file)
+      self.global_counter = global_counter
+      self.population = population
+      self.restore(trash_trainer=False)
+      raise Exception
 
    def init_pop(self):
        if not self.config.PRETRAINED and not self.reloading:

@@ -26,13 +26,13 @@ from evolution.utils import get_genome_name
 
 genomes = [
 #  'Baseline',
-   'Simplex',
-   'CA',
-   'Random',
+#  'Simplex',
+#  'CA',
+#  'Random',
    'CPPN',
-   'Pattern',
-   'LSystem',
-   'All',
+#  'Pattern',
+#  'LSystem',
+#  'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
@@ -98,7 +98,7 @@ def launch_batch(exp_name, preeval=False):
    global MAP_GENERATOR
    if LOCAL:
       default_config['n_generations'] = 1
-      if EVALUATE:
+      if EVALUATE or opts.render:
          NENT = 16
       else:
          NENT = 3
@@ -108,6 +108,7 @@ def launch_batch(exp_name, preeval=False):
       NENT = 16
       N_EVALS = 20
       N_PROC = 12
+   N_EVO_MAPS = 12
    global EVALUATION_HORIZON
    if opts.multi_policy:
       EVALUATION_HORIZON = 500
@@ -116,8 +117,10 @@ def launch_batch(exp_name, preeval=False):
    launched_baseline = False
    i = 0
    global eval_args
-   eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\" --NENT {}".format(
-      EVALUATION_HORIZON, N_EVALS, NENT)
+   eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', " \
+               "'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\" --NENT {} " \
+               "--FITNESS_METRIC {} ".format(
+      EVALUATION_HORIZON, N_EVALS, NENT, fitness_funcs[0])
 
    for gene in genomes:
       for fit_func in fitness_funcs:
@@ -176,7 +179,7 @@ def launch_batch(exp_name, preeval=False):
                         'ME_BOUNDS': [(0,100),(0,100)],
                         'FEATURE_CALC': feature_calc,
                         'ITEMS_PER_BIN': items_per_bin,
-                        'N_EVO_MAPS': 12,
+                        'N_EVO_MAPS': N_EVO_MAPS,
                         'N_PROC': N_PROC,
                         'TERRAIN_RENDER': False,
                         'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
@@ -189,16 +192,6 @@ def launch_batch(exp_name, preeval=False):
                             'PRETRAIN': True,
                         })
 
-                     if CUDA:
-                        exp_config.update({
-                           'N_EVO_MAPS': 12,
-                           'N_PROC': 12,
-                        })
-
-                     if LOCAL:
-                        exp_config.update({
-                           'N_EVO_MAPS': 12,
-                        })
                      print('Saving experiment config:\n{}'.format(exp_config))
                      with open('configs/settings_{}.json'.format(i), 'w') as f:
                         json.dump(exp_config, f, ensure_ascii=False, indent=4)

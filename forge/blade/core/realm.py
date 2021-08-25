@@ -125,7 +125,7 @@ class PlayerManager(EntityGroup):
          self.models = config.MULTI_MODEL_NAMES
       else:
          if config.PAIRED:
-            self.models = ['protagonist', 'antagonist']
+            self.models = ['pro', 'ant']
          elif config.MODEL is None:
             self.models = [config.GENOME]
          else:

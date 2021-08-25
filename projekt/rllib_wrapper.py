@@ -609,8 +609,8 @@ class RLlibEvaluator(evaluator.Base):
          if self.env.dones['__all__'] == True:
                self.reset_env()
 
-      # stats = self.env.get_all_agent_stats()
-      # score = self.calc_diversity(stats, verbose=False)
+      stats = self.env.get_all_agent_stats()
+      score = self.calc_diversity(stats, verbose=True)
 
       self.i += 1
 
