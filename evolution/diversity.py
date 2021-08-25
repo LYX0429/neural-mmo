@@ -400,7 +400,7 @@ def calc_discrete_entropy(agent_stats, skill_headers=None, pop=None):
 
    return score
 
-def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False):
+def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=True):
    '''Use L2 distance to punish agents for having high mean pairwise distance. Optimal state is all agents at the same
    point in skill-space, with maximal lifespans.'''
    if 'skills' not in agent_stats:
@@ -409,53 +409,44 @@ def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False):
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
    lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    assert len(agent_skills) == len(lifespans)
-   a_skills = np.vstack(agent_skills)
-   a_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(a_lifespans)
-   weight_mat = np.outer(weights, weights)
-   # assert len(agent_skills) == 1
-   a = a_skills
-   n_agents = a.shape[0]
+   if punish_youth:
+      agent_skills = expand_by_lifespan(agent_skills, lifespans)
+   n_agents = agent_skills.shape[0]
+   a = agent_skills
    b = a.reshape(n_agents, 1, a.shape[1])
    # https://stackoverflow.com/questions/43367001/how-to-calculate-euclidean-distance-between-pair-of-rows-of-a-numpy-array
    distances = np.sqrt(np.einsum('ijk, ijk->ij', a - b, a - b))
-   w_dists = (2 - weight_mat) * (distances + 10)
-   score = np.sum(w_dists) / n_agents ** 2
+   score = np.sum(distances) / n_agents ** 2
 
    if verbose:
       #  print(skill_headers)
       print('agent skills:\n{}'.format(a.transpose()))
-      print('lifespans:\n{}'.format(a_lifespans))
+      print('lifespans:\n{}'.format(lifespans))
       print('score:\n{}\n'.format(
          score))
 
    return -score
 
 
-def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None):
+def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=True):
    if 'skills' not in agent_stats:
       return 0
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
    lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    assert len(agent_skills) == len(lifespans)
-   a_skills = np.vstack(agent_skills)
-   a_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(a_lifespans)
-   weight_mat = np.outer(weights, weights)
-  #assert len(agent_skills) == 1
-   a = a_skills
-   n_agents = a.shape[0]
+   if punish_youth:
+      agent_skills = contract_by_lifespan(agent_skills, lifespans)
+   n_agents = agent_skills.shape[0]
+   a = agent_skills
    b = a.reshape(n_agents, 1, a.shape[1])
    # https://stackoverflow.com/questions/43367001/how-to-calculate-euclidean-distance-between-pair-of-rows-of-a-numpy-array
    distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
-   w_dists = weight_mat * distances
-   score = np.sum(w_dists)  # /2
-   score = score / n_agents ** 2
+   score = np.sum(distances) / n_agents ** 2
 
    if verbose:
 #  print(skill_headers)
        print('agent skills:\n{}'.format(a.transpose()))
-       print('lifespans:\n{}'.format(a_lifespans))
+       print('lifespans:\n{}'.format(lifespans))
        print('score:\n{}\n'.format(
        score))
 

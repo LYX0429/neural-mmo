@@ -25,8 +25,8 @@ from evolution.diversity import get_div_calc, get_pop_stats
 from evolution.utils import get_genome_name
 
 genomes = [
-   'Baseline',
-#  'Simplex',
+#  'Baseline',
+   'Simplex',
 #  'CA',
 #  'Random',
 #  'CPPN',
@@ -39,10 +39,10 @@ fitness_funcs = [
 #   'Lifespans',
 #   'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
-#   'InvL2',
+    'InvL2',
 ]
 skills = [
     'ALL',
@@ -59,11 +59,11 @@ algos = [
 ]
 me_bin_sizes = [
 #   [1,1],
-#   [40, 40],
-    [100,100],
+    [50, 50],
+#   [100,100],
 ]
 PAIRED_bools = [
- # True,
+#  True,
    False
 ]
 
