@@ -4,6 +4,6 @@
 [submodule "pytorch-neat"]
 	path = pytorch-neat
 	url = git@github.com:smearle/pytorch-neat
-[submodule "neural-mmo-client"]
-    path = neural-mmo-client
-    url = git@github.com:smearle/neural-mmo-client
+#[submodule "neural-mmo-client"]
+#    path = neural-mmo-client
+#    url = git@github.com:smearle/neural-mmo-client

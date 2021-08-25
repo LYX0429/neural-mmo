@@ -316,6 +316,10 @@ class EvolverNMMO(LambdaMuEvolver):
       else:
          pass
 
+   def load(self):
+      self.global_counter = ray.get_actor("global_counter")
+      self.population = {}
+
    # Map agentID to policyID -- requires config global
    def mapPolicy(self, agentID):
 
@@ -1268,7 +1272,6 @@ class EvolverNMMO(LambdaMuEvolver):
       self.global_counter = global_counter
       self.population = population
       self.restore(trash_trainer=False)
-      raise Exception
 
    def init_pop(self):
        if not self.config.PRETRAINED and not self.reloading:

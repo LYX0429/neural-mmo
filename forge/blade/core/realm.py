@@ -139,7 +139,9 @@ class PlayerManager(EntityGroup):
       self.palette = Palette(config.NPOP, multi_evo=config.MULTI_MODEL_NAMES is not None, paired=config.PAIRED)
       self.reset_pop_counts()
 
-
+   def reset(self):
+      np.random.shuffle(self.models)
+      return super().reset()
 
    def spawn(self):
       for _ in range(self.config.PLAYER_SPAWN_ATTEMPTS):
@@ -199,7 +201,8 @@ class Realm:
 
       Args:
          idx: Map index to load
-      ''' 
+      '''
+      # Shuffle models so that we don't always spawn the same one first
       self.map.reset(self, idx)
       self.players.reset()
       self.npcs.reset()

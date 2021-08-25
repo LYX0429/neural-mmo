@@ -58,8 +58,8 @@ algos = [
 #   'NEAT',
 ]
 me_bin_sizes = [
-#   [1,1],
-    [40, 40],
+    [1,1],
+#   [40, 40],
 #   [100,100],
 ]
 PAIRED_bools = [
@@ -103,11 +103,10 @@ def launch_batch(exp_name, preeval=False):
       else:
          NENT = 3
       N_EVALS = 5
-      N_PROC = 12
    else:
       NENT = 16
       N_EVALS = 20
-      N_PROC = 12
+   N_PROC = opts.n_cpu
    N_EVO_MAPS = 12
    global EVALUATION_HORIZON
    if opts.multi_policy:
@@ -423,6 +422,12 @@ if __name__ == '__main__':
       '--cpu',
       help='Do not use GPU (only applies to SLURM, not recommended for default, big neural networks).',
       action='store_true',
+   )
+   opts.add_argument(
+      '--n_cpu',
+      help='How many parallel processes ray should use.',
+      type=int,
+      default=12,
    )
    opts.add_argument(
       '--vis_cross_eval',

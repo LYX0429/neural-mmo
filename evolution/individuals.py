@@ -11,7 +11,7 @@ from qdpy.phenotype import Individual, Fitness, Features
 from evolution.paint_terrain import PRIMITIVE_TYPES
 import vec_noise
 from pytorch_neat.cppn import create_cppn
-from numba import njit
+# from numba import njit
 from typing import Any
 
 # Not using this

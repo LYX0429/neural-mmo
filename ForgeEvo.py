@@ -8,6 +8,8 @@ from pdb import set_trace as TT
 import re
 import ray
 import torch
+# if torch.cuda.is_available():
+#    torch.cuda.init()
 from fire import Fire
 from ray import rllib
 
@@ -99,7 +101,7 @@ def main():
       [config.set(k, v) for (k, v) in load_args.items()]
 
    if config.NUM_GPUS > 0:
-      torch.cuda.init()
+      # torch.cuda.init()
       torch.set_num_threads(torch.get_num_threads())
    #  torch.set_num_threads(1)
    ray.init()
@@ -145,6 +147,7 @@ def main():
          evolver = pickle.load(save_file)
          print('Loaded evolver.')
 
+      evolver.load()
       # change params on reload here
       evolver.config.RENDER = config.RENDER
       evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
