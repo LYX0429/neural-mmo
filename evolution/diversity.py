@@ -102,6 +102,33 @@ def get_pop_stats(agent_stats, pop=None):
    # Get 1D array of agent stats
    return np.hstack([stats_i[p] for p in pops for stats_i in agent_stats])
 
+def contract_by_lifespan(agent_stats, lifespans):
+   '''Pull agents close to their mean according to how short-lived they were. For punishing abundance of premature death
+   when rewarding diversity.'''
+   weights = sigmoid_lifespan(lifespans)
+   n_agents = lifespans.shape[0]
+   mean_agent = agent_stats.mean(axis=0)
+   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
+   agent_deltas = mean_agents - agent_stats
+   agent_skills = agent_stats + (weights * agent_deltas.T).T
+
+   return agent_skills
+
+def expand_by_lifespan(agent_stats, lifespans):
+   '''Push agents further from their mean according to how short-lived they were. For punishing abundance of premature
+   death when rewarding homogeneity.'''
+   weights = sigmoid_lifespan(lifespans)
+   n_agents = lifespans.shape[0]
+   mean_agent = agent_stats.mean(axis=0)
+   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
+   agent_deltas = mean_agents - agent_stats
+   # Displace agents by at most 100 units (otherwise we will not punish agents at all if they are already perfectly
+   # homogenous, for example.
+   agent_deltas = agent_deltas / np.linalg.norm(agent_deltas) * 100
+   agent_skills = agent_stats - (weights * agent_deltas.T).T
+
+   return agent_skills
+
 def calc_scores(agent_stats, skill_headers=None, verbose=False):
     scores = np.hstack(agent_stats['scores'])
     if verbose:
@@ -121,8 +148,8 @@ def calc_y_deltas(agent_stats, skill_headers=None, verbose=False):
         print('y_deltas: {}'.format(y_deltas))
     return np.mean(y_deltas)
 
-def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False):
-    lifetimes = agent_stats['lifespans']
+def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False, pop=None):
+    lifetimes = get_pop_stats(agent_stats['lifespans'], pop)
     if len(lifetimes) != 0:
         lifetimes = np.hstack(lifetimes)
     else:
@@ -139,17 +166,16 @@ def sum_lifespans(agent_stats, skill_headers=None, n_policies=1, verbose=False, 
 
    return score
 
-
-def sum_experience(agent_stats, skill_headers=None, verbose=False):
-   # No need to weight by lifespan.
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
+def sum_experience(agent_stats, skill_headers=None, verbose=False, pop=None):
+   '''Simply take the sum of XP over skills and agents.'''
+   # No need to weight by lifespan, since high lifespan is a prerequisite for high XP.
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    a_skills = np.vstack(agent_skills)
    a_lifespans = np.hstack(lifespans)
-#  weights = sigmoid_lifespan(a_lifespans)
    n_agents, n_skills = a_skills.shape
-#  avg_skill = (weights * a_skills).sum() / (n_agents * n_skills)
    mean_xp = a_skills.sum() / (n_agents * n_skills)
+
    if verbose:
       print('skills')
       print(a_skills.T)
@@ -161,32 +187,20 @@ def sum_experience(agent_stats, skill_headers=None, verbose=False):
    return mean_xp
 
 def sigmoid_lifespan(x):
+   # This basically assumes max lifespan is at least 100. Larger max lifespans won't really be a problem since this
+   # function converges to 1.
    res = 1 / (1 + np.exp(0.1*(-x+50)))
-#  res = scipy.special.softmax(res)
 
    return res
 
-def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None):
-   # Penalize if under max pop agents living
-  #for i, a_skill in enumerate(agent_skills):
-  #   if a_skill.shape[0] < max_pop:
-  #      a = np.mean(a_skill, axis=0)
-  #      a_skill = np.vstack(np.array([a_skill] + [a for _ in range(max_pop - a_skill.shape[0])]))
-  #      agent_skills[i] = a_skill
-   # if there are stats from multiple simulations, we consider agents from all simulations together
-   #FIXME: why
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
+def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True):
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
 
    assert len(agent_skills) == len(lifespans)
    a_skills = np.vstack(agent_skills)
    a_lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(a_lifespans)
-#  assert len(agent_skills) == 1
-  #a_skills = agent_skills[0]
-   # FIXME: Only applies to exploration-only experiment
-  #print('exploration')
-  #print(a_skills.transpose()[0])
+
    if verbose:
       print(skill_headers)
       print(a_skills.transpose())
@@ -194,42 +208,43 @@ def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, in
       print('lifespans')
       print(a_lifespans)
 
-  #if len(a_lifespans) == 1:
-  #   score = 0
-  #else:
-   mean = np.average(a_skills, axis=0, weights=weights)
-   cov = np.cov(a_skills,rowvar=0, aweights=weights)
-#     cov = np.array([[2,1],[1,2]])
+   if punish_youth:
+      # Below is an alternative way of weighting by lifespan
+      # weights = sigmoid_lifespan(a_lifespans)
+      # mean = np.average(a_skills, axis=0, weights=weights)
+      # cov = np.cov(a_skills,rowvar=0, aweights=weights)
+
+      # Instead, we'll just contract as usual
+      a_skills = contract_by_lifespan(a_skills, a_lifespans)
+   mean = np.average(a_skills, axis=0)
+   cov = np.cov(a_skills,rowvar=0)
    gaussian = scipy.stats.multivariate_normal(mean=mean, cov=cov, allow_singular=True)
    infos['gaussian'] = gaussian
    score = gaussian.entropy()
 
-#  print(np.array(a_skills))
    if verbose:
       print('score:', score)
 
    return score
 
 
-def calc_convex_hull(agent_stats, skill_headers=None, verbose=False, infos={}):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
+def calc_convex_hull(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True):
+   '''Calculate the diversity of a population of agents in skill-space by computing the volume inside the convex hull of
+   the agents when treated as points in this space.'''
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    agent_skills = np.vstack(agent_skills)
    n_skills = agent_skills.shape[1]
 
    lifespans = np.hstack(lifespans)
-   weights = sigmoid_lifespan(lifespans)
    if verbose:
       print('skills:')
       print(agent_skills.transpose())
       print('lifespans:')
       print(lifespans)
       print(len(agent_stats['lifespans']), 'populations')
-   n_agents = lifespans.shape[0]
-   mean_agent = agent_skills.mean(axis=0)
-   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
-   agent_deltas = agent_skills - mean_agents
-   agent_skills = mean_agents + (weights * agent_deltas.T).T
+   if punish_youth:
+      agent_skills = contract_by_lifespan(agent_skills, lifespans)
    if n_skills == 1:
       # Max distance, i.e. a 1D hull
       score = agent_skills.max() - agent_skills.mean()
@@ -247,9 +262,9 @@ def calc_convex_hull(agent_stats, skill_headers=None, verbose=False, infos={}):
 
    return score
 
-def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
+def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=True):
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    agent_skills_0 = agent_skills= np.vstack(agent_skills)
    lifespans = np.hstack(lifespans)
    n_agents = lifespans.shape[0]
@@ -261,25 +276,31 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False):
        print(agent_skills_0.transpose())
        print('lifespans')
        print(lifespans)
-   weights = sigmoid_lifespan(lifespans)
-   agent_skills_1 = agent_skills_0.transpose()
-   # discretize
-   agent_skills = np.where(agent_skills==0, 0.0000001, agent_skills)
-   # contract population toward mean according to lifespan
-   # mean experience level for each agent
-   mean_skill = agent_skills.mean(axis=1)
-   # mean skill vector of an agent
-   mean_agent = agent_skills.mean(axis=0)
-   assert mean_skill.shape[0] == n_agents
-   assert mean_agent.shape[0] == n_skills
-   mean_skills = np.repeat(mean_skill.reshape(mean_skill.shape[0], 1), n_skills, axis=1)
-   mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
-   agent_deltas = agent_skills - mean_agents
-   skill_deltas = agent_skills - mean_skills
-   a_skills_skills = mean_agents + (weights * agent_deltas.transpose()).transpose()
-   a_skills_agents = mean_skills + (weights * skill_deltas.transpose()).transpose()
-   div_agents = skbio.diversity.alpha_diversity('shannon', a_skills_agents).mean()
-   div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
+   agent_skills = np.where(agent_skills == 0, 0.0000001, agent_skills)
+   if punish_youth:
+      # Below is a v funky way of punishing by lifespan
+      # weights = sigmoid_lifespan(lifespans)
+      # # contract population toward mean according to lifespan
+      # # mean experience level for each agent
+      # mean_skill = agent_skills.mean(axis=1)
+      # # mean skill vector of an agent
+      # mean_agent = agent_skills.mean(axis=0)
+      # assert mean_skill.shape[0] == n_agents
+      # assert mean_agent.shape[0] == n_skills
+      # mean_skills = np.repeat(mean_skill.reshape(mean_skill.shape[0], 1), n_skills, axis=1)
+      # mean_agents = np.repeat(mean_agent.reshape(1, mean_agent.shape[0]), n_agents, axis=0)
+      # agent_deltas = agent_skills - mean_agents
+      # skill_deltas = agent_skills - mean_skills
+      # a_skills_skills = mean_agents + (weights * agent_deltas.transpose()).transpose()
+      # a_skills_agents = mean_skills + (weights * skill_deltas.transpose()).transpose()
+      # div_agents = skbio.diversity.alpha_diversity('shannon', a_skills_agents).mean()
+      # div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
+
+      # We'll just do the usual
+      a_skills = contract_by_lifespan(agent_skills, lifespans)
+   div_agents = skbio.diversity.alpha_diversity('shannon', a_skills).mean()
+   div_skills = skbio.diversity.alpha_diversity('shannon', a_skills.transpose()).mean()
+
  # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
    score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
    score = score#* 100  #/ (n_agents * n_skills)
@@ -289,9 +310,9 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False):
    return score
 
 
-def calc_discrete_entropy(agent_stats, skill_headers=None):
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
+def calc_discrete_entropy(agent_stats, skill_headers=None, pop=None):
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    agent_skills_0 = np.vstack(agent_skills)
    agent_lifespans = np.hstack(lifespans)
    weights = sigmoid_lifespan(agent_lifespans)
@@ -378,8 +399,8 @@ def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False):
    if 'skills' not in agent_stats:
       raise Exception('We should be including dead agents in this calculation, so we should get at least some skill '
                       'stats back here')
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    assert len(agent_skills) == len(lifespans)
    a_skills = np.vstack(agent_skills)
    a_lifespans = np.hstack(lifespans)
@@ -404,11 +425,11 @@ def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False):
    return -score
 
 
-def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False):
+def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None):
    if 'skills' not in agent_stats:
       return 0
-   agent_skills = agent_stats['skills']
-   lifespans = agent_stats['lifespans']
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    assert len(agent_skills) == len(lifespans)
    a_skills = np.vstack(agent_skills)
    a_lifespans = np.hstack(lifespans)
@@ -433,4 +454,4 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False):
 
    return score
 
-DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'), (calc_discrete_entropy_2, 'discrete entropy'), (calc_convex_hull, 'convex hull volume')]
+DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'), (calc_discrete_entropy_2, 'discrete entropy'), (calc_convex_hull, 'convex hull volume'), (sum_lifespans, 'lifespans')]

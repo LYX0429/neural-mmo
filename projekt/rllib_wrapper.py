@@ -33,7 +33,7 @@ from forge.blade.lib.log import InkWell
 from forge.blade.core. terrain import Save, MapGenerator
 from forge.blade.io import action
 
-from evolution.diversity import DIV_CALCS, diversity_calc
+from evolution.diversity import DIV_CALCS, diversity_calc, get_pop_stats
 
 from ray.rllib.execution.metric_ops import StandardMetricsReporting
 
@@ -306,6 +306,8 @@ def plot_diversity(x, y, div_names, exp_name, config, render=False):
          ax.set_ylim(20, 57)
       if div_name == 'discrete entropy':
          ax.set_ylim(-13, -7)
+      if div_name == 'lifespans':
+         ax.set_ylim(0, config.EVALUATION_HORIZON)
    ax.set_ylabel('diversity')
    #markers, caps, bars = ax.errorbar(x, avg_scores, yerr=std,
    #                                   ecolor='purple')
@@ -314,12 +316,11 @@ def plot_diversity(x, y, div_names, exp_name, config, render=False):
   #plt.subplots_adjust(top=0.9)
   #plt.legend()
    ax = axs[i+1]
-   ax.errorbar(x, y[:,i+1,:].mean(axis=0), yerr=y[:,i+1,:].std(axis=0), label='lifespans')
+#  ax.errorbar(x, y[:,i+1,:].mean(axis=0), yerr=y[:,i+1,:].std(axis=0), label='lifespans')
   #ax.text(10, 0, '{:.2}'.format(y[:,i+1,:].mean()))
   #plt.ylabel('lifespans')
-   ax.set_ylabel('lifespans')
-   ax.set_ylim(0, config.EVALUATION_HORIZON)
-   plt.text(0.8, 0.8-(i+1)*0.162, '{:.2}'.format(y[:,i+1,:].mean()), fontsize=12, transform=plt.gcf().transFigure)
+#  ax.set_ylabel('lifespans')
+   # plt.text(0.8, 0.8-(i+1)*0.162, '{:.2}'.format(y[:,i+1,:].mean()), fontsize=12, transform=plt.gcf().transFigure)
    plt.xlabel('tick')
    plt.tight_layout()
    ax.legend(loc='upper left')
@@ -443,7 +444,7 @@ class RLlibEvaluator(evaluator.Base):
       assert self.config.EVALUATION_HORIZON % n_stat_calcs == 0
       stat_interval = self.config.EVALUATION_HORIZON // n_stat_calcs
       n_evals = self.config.N_EVAL
-      n_metrics = len(DIV_CALCS) + 1 
+      n_metrics = len(DIV_CALCS)
       n_skills = len(self.config.SKILLS)
       div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON // stat_interval))
 #     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
@@ -457,7 +458,7 @@ class RLlibEvaluator(evaluator.Base):
             self.state = {}
             self.registry = OverlayRegistry(self.config, self.env)
             # array of data: diversity scores, lifespans...
-            divs = np.zeros((len(DIV_CALCS) + 1, self.config.EVALUATION_HORIZON // stat_interval))
+            divs = np.zeros((len(DIV_CALCS), self.config.EVALUATION_HORIZON // stat_interval))
             stat_i = 0
             for t in tqdm(range(self.config.EVALUATION_HORIZON)):
                eval_done = self.tick(None, None)
@@ -466,8 +467,8 @@ class RLlibEvaluator(evaluator.Base):
                   for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
                      diversity = calc_diversity(div_stats, verbose=False)
                      divs[j, stat_i] = diversity
-                  lifespans = div_stats['lifespans']
-                  divs[j + 1, stat_i] = np.mean(lifespans)
+                  # lifespans = div_stats['lifespans']
+                  # divs[j + 1, stat_i] = np.mean(lifespans)
                   div_mat[i] = divs
                   stat_i += 1
                # This is a crazy bit where we construct heatmaps but should we not just use get_agent_stats()?
@@ -525,7 +526,7 @@ class RLlibEvaluator(evaluator.Base):
 #     stds_np = div_mat.mean(axis=-1).std(axis=0)
       means_np = div_mat[:, :, -1].mean(axis=0)
       stds_np = div_mat[:, :, -1].std(axis=0)
-      for j, (_, div_name) in enumerate(DIV_CALCS + [(None, 'lifespans')]):
+      for j, (_, div_name) in enumerate(DIV_CALCS):
          mean_divs[div_name] = {}
          mean_divs[div_name]['mean'] = means_np[j]
          mean_divs[div_name]['std'] = stds_np[j]
@@ -534,12 +535,12 @@ class RLlibEvaluator(evaluator.Base):
 
       from sklearn.manifold import TSNE
       tsne = TSNE(n_components=2, random_state=0)
-      final_agent_skills = np.vstack([stats['skills'][0] for stats in final_stats])
+      final_agent_skills = np.vstack([get_pop_stats(stats['skills'], pop=None) for stats in final_stats])
       X_2d = tsne.fit_transform(final_agent_skills)
       plt.close()
       plt.figure()
       plt.title('TSNE plot of agents')
-      colors = np.hstack([stats['lifespans'] for stats in final_stats])
+#     colors = np.hstack([stats['lifespans'] for stats in final_stats])
      #colors = lifespans
       # FIXME: an issue here
 #     sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
@@ -610,7 +611,7 @@ class RLlibEvaluator(evaluator.Base):
                self.reset_env()
 
       stats = self.env.get_all_agent_stats()
-      score = self.calc_diversity(stats, verbose=True)
+      score = self.calc_diversity(stats, verbose=False)
 
       self.i += 1
 

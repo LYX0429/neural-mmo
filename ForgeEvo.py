@@ -8,8 +8,8 @@ from pdb import set_trace as TT
 import re
 import ray
 import torch
-# if torch.cuda.is_available():
-#    torch.cuda.init()
+if torch.cuda.is_available():
+   torch.cuda.init()
 from fire import Fire
 from ray import rllib
 

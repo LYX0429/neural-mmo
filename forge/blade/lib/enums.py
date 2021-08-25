@@ -236,7 +236,7 @@ class Palette:
             'CPPN': Solid.BLUE,
             'All': Solid.ORANGE,
             'NCA': Solid.GREEN,
-            'LSystem': Solid.PURPLE,
+            'L-System': Solid.PURPLE,
             'Random': Solid.BROWN,
             'Pattern': Solid.PINK,
          }

@@ -21,25 +21,25 @@ from plot_diversity import heatmap, annotate_heatmap
 from projekt import config
 from fire import Fire
 from projekt.config import get_experiment_name
-from evolution.diversity import get_div_calc
+from evolution.diversity import get_div_calc, get_pop_stats
 from evolution.utils import get_genome_name
 
 genomes = [
-#  'Baseline',
-#  'Simplex',
-#  'CA',
-#  'Random',
+   'Baseline',
+   'Simplex',
+   'CA',
+   'Random',
    'CPPN',
-#  'Pattern',
-#  'LSystem',
-#  'All',
+   'Pattern',
+   'LSystem',
+   'All',
 ]
 fitness_funcs = [
 #   'MapTestText',
-    'Lifespans',
+#   'Lifespans',
 #   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
 #   'InvL2',
@@ -58,13 +58,13 @@ algos = [
 #   'NEAT',
 ]
 me_bin_sizes = [
-    [1,1],
+#   [1,1],
 #   [40, 40],
-#   [100,100],
+    [100,100],
 ]
 PAIRED_bools = [
-   True,
-#  False
+ # True,
+   False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
@@ -102,7 +102,7 @@ def launch_batch(exp_name, preeval=False):
          NENT = 16
       else:
          NENT = 3
-      N_EVALS = 5
+      N_EVALS = 1
    else:
       NENT = 16
       N_EVALS = 20
@@ -248,7 +248,7 @@ def launch_batch(exp_name, preeval=False):
 ##        experiment_names.append(get_experiment_name(config))
 
 
-def launch_cross_eval(experiment_names, experiment_configs=[], vis_only=False, render=False):
+def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, render=False):
    n = 0
    model_exp_names = experiment_names
    map_exp_names = experiment_names
@@ -316,7 +316,8 @@ def launch_cross_eval(experiment_names, experiment_configs=[], vis_only=False, r
                model_exp_folder = 'multi_policy'
                model_name = str([get_genome_name(m) for m in model_exp_names])
             else:
-               model_name = model_exp_folder = get_genome_name(model_exp_name)
+               model_name = get_genome_name(model_exp_name)
+               model_exp_folder = model_exp_name
             map_exp_folder = map_exp_name
             eval_data_path = os.path.join(
                'eval_experiment',
@@ -331,10 +332,10 @@ def launch_cross_eval(experiment_names, experiment_configs=[], vis_only=False, r
                ),
             )
             data = np.load(eval_data_path, allow_pickle=True)
-            mean_lifespans[i, j] = np.mean(data[0]['lifespans'])
+            mean_lifespans[i, j] = np.mean(get_pop_stats(data[0]['lifespans'], pop=None))
             # TODO: will this work for more than one episode of evaluation??? No???
             for k in range(len(SKILLS)):
-               mean_skill_arr = np.vstack(data[0]['skills'])
+               mean_skill_arr = np.vstack(get_pop_stats(data[0]['skills'], pop=None))
                mean_skills[k, i, j] = np.mean(mean_skill_arr[:, k])
             for (k, div_calc_name) in enumerate(DIV_CALCS):
               #skill_arr = np.vstack(data[0]['skills'])
@@ -480,7 +481,7 @@ if __name__ == '__main__':
    if EVALUATE or RENDER and not opts.vis_maps:
       experiment_names = []
       experiment_configs = []
-      # just get the names of experiments in which we are interested (no actual evaluations are run)
+      # just get the names and configs of experiments in which we are interested (no actual evaluations are run)
       launch_batch(EXP_NAME, preeval=True)
       if RENDER:
          print('rendering experiments: {}\n KeyboardInterrupt (Ctrl+c) to render next.'.format(experiment_names))
@@ -489,9 +490,9 @@ if __name__ == '__main__':
          if not VIS_CROSS_EVAL:
             print('cross evaluating experiments: {}'.format(experiment_names))
             # only launch these cross evaluations if we need to
-            launch_cross_eval(experiment_names, vis_only=False)
+            launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=False)
          # otherwise just load up old data to visualize results
-         launch_cross_eval(experiment_names, vis_only=True)
+         launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=True)
    else:
       # Launch a batch of joint map-evolution and agent-training experiments (maybe also a baseline agent-training experiment on a fixed set of maps).
       launch_batch(EXP_NAME)
