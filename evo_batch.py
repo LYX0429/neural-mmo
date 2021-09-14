@@ -28,7 +28,7 @@ genomes = [
 #  'Baseline',
    'Simplex',
 #  'NCA',
-   'TileFlip',
+#  'TileFlip',
 #  'CPPN',
 #  'Primitives',
 #  'LSystem',
