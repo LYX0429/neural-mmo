@@ -6,4 +6,4 @@
 	url = git@github.com:smearle/pytorch-neat
 [submodule "neural-mmo-client"]
     path = neural-mmo-client
-    url = git@github.com:smearle/neural-mmo-client
+    url = https://github.com/smearle/neural-mmo-client/tree/mining_woodcutting
