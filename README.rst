@@ -22,13 +22,18 @@ The following map-generator objectives are in development or not yet implemented
 Installation
 #######
 
+Clone this directory, then its submodules. This will download the NMMO Unity client (which may take a while), for rendering gameplay.
+::
+  git submodule init
+  git submodule update
+
 Create a conda environment and install dependencies:
 ::
   conda create -n nmmo python==3.8
   conda activate nmmo
   bash scripts/setup.sh
 
-Instructions
+Training
 ####
 
 The file evo_batch.py runs batches of experiments by iterating through hyperparameters and calling ForgeEvo.py, either sequentially on a local machine, or by queueing batches of parallel experiments on a SLURM cluster. You can run it with:
@@ -42,6 +47,28 @@ If you are attempting to use a GPU (recommended) and you encounter an IndexError
   gpu_ids = [0]
 
 To determine what batch of experiments will be run, (un)comment the appropriate hyperparameters listed in evo_batch.py. We discuss these hyperparamters below.
+
+Experiments will be saved to evo_experiment.
+
+Rendering
+#####
+
+To render trained agents and maps, run:
+::
+  python evo_batch.py --local --render
+  
+  
+Evaluation
+#####
+
+To evaluate trained agents and maps:
+::
+  python evo_batch.py --local --evaluate
+
+Evaluation results are saved to eval_experiment.
+
+Hyperparameters
+#######
 
 genomes
 ********************
