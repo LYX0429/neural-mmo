@@ -48,15 +48,36 @@ If you are attempting to use a GPU (recommended) and you encounter an IndexError
 
 To determine what batch of experiments will be run, (un)comment the appropriate hyperparameters listed in evo_batch.py. We discuss these hyperparamters below.
 
-Experiments will be saved to evo_experiment.
+Experiments will be saved to evo_experiment/EXPERIMENT_NAME.
+
+Visualization
+#####
+
+To save maps as .pngs and plot the fitness of the map-generator over time, run:
+::
+  python evo_batch.py --local --vis_maps
+  
+These will be saved to evo_experiment/EXPERIMENT_NAME, with maps inside the "maps" directory.
 
 Rendering
 #####
 
-To render trained agents and maps, run:
+The Unity client for rendering gameplay should have been downloaded as a submodule during installation. Verify that you can run the executable:
+::
+  ./neural-mmo-client/UnityClient/neural-mmo-resources.x86_64
+
+If you're somehow missing this executable (but *do* see the file neural-mmo-client/UnityCient/neural-mmo.x86_64, for example), you might need to cd into the neural-mmo-client submodule and pull from the mining_woodcutting branch directly:
+::
+  cd neural-mmo-client
+  git pull origin mining_woodcutting
+
+Once the Unity client is running, you can evaluate a policy on a map, using Forge.py as described in the NMMO documentation, and/or using the additional arguments --MODEL and --MAP to specify the location of the trained player model and a map (as an .npy file), which can be found inside evo_experiment/EXPERIMENT_NAME/[models/maps].
+
+Perhaps more simply, you can render trained agents and maps over a set of experiments using the hyperparameters in evo_batch.py, run:
 ::
   python evo_batch.py --local --render
   
+This will automatically launch both the Unity client and a server with the model/map from the experiment with the correct hyperparameters. To stop rendering the current experiment and move onto the next, enter "ctrl+c" to send a KeyboardInterrupt.
   
 Evaluation
 #####
@@ -64,8 +85,12 @@ Evaluation
 To evaluate trained agents and maps:
 ::
   python evo_batch.py --local --evaluate
+  
+This may take a while, and evaluations can also be run in parallel on SLURM. Evaluation generates various stats/visualizations pertaining to individual generator-player pairs. When evaluations are run in sequence, after all evaluations are complete, These results will be compiled into a heatmap that compares the performance of different generator-player pairs. To re-generate these visualizations using previously-generated evaluation data (e.g. when these evaluations were run in parallel), run:
+::
+  python evo_batch.py --local --evaluate --vis_cross_eval
 
-Evaluation results are saved to eval_experiment.
+Evaluation data and visualizations are saved to eval_experiment.
 
 Hyperparameters
 #######
