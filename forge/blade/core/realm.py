@@ -126,6 +126,7 @@ class PlayerManager(EntityGroup):
       else:
          if config.PAIRED:
             self.models = ['pro', 'ant']
+            np.random.shuffle(self.models)
          elif config.MODEL is None:
             self.models = [config.GENOME]
          else:
@@ -161,12 +162,14 @@ class PlayerManager(EntityGroup):
             continue
 
          if self.config.EVALUATE or self.config.PAIRED:
+            pop_name = name
             color = self.palette.colors[name]
-            player    = Player(self.realm, (r, c), self.idx, pop, name+'_', color)
+            player    = Player(self.realm, (r, c), self.idx, pop, pop_name=pop_name, name=name+'_', color=color)
          else:
             # pop, name = self.identify()
+            pop_name = name
             color     = self.palette.colors[pop]
-            player    = Player(self.realm, (r, c), self.idx, pop, name, color)
+            player    = Player(self.realm, (r, c), self.idx, pop, pop_name=pop_name, name=name, color=color)
 
          super().spawn(player)
          self.pop_counts[name] += 1

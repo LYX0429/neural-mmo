@@ -11,9 +11,10 @@ from forge.blade.io.stimulus import Static
 from forge.blade.io import action
 
 class Player(entity.Entity):
-   def __init__(self, realm, pos, iden, pop, name='', color=None):
+   def __init__(self, realm, pos, iden, pop, pop_name='', name='', color=None):
       super().__init__(realm, pos, iden, name, color, pop)
       self.pop    = pop
+      self.pop_name = pop_name
 
       #Scripted hooks
       self.target = None

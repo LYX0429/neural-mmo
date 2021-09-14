@@ -237,8 +237,8 @@ class Palette:
             'All': Solid.ORANGE,
             'NCA': Solid.GREEN,
             'L-System': Solid.PURPLE,
-            'Random': Solid.BROWN,
-            'Pattern': Solid.PINK,
+            'TileFlip': Solid.BROWN,
+            'Primitives': Solid.PINK,
          }
          return
       if paired:

@@ -25,7 +25,7 @@ class SpawnPoints():
         n_spawns = len(self.spawn_points)
         n_delete = np.random.randint(0, 5)
         n_add = np.random.randint(0, 5)
-
+0
 
 MELEE_MIN = 0.4
 MELEE_MAX = 1.4
@@ -61,15 +61,11 @@ RANGE_MAX = 1
 #            return not_equal
 #         return np.random.random() < 0.5
 
-#NOTE: had to move this multiplier stuff outside of the evolver so the CPPN genome could incorporate them
-# without pickling error.
+# Not using this attack-multiplier stuff atm. Different policies will prioritize different attacks now, but still don't
+# observe a single policy learning to use a diversity of attacks...
 #TODO: move these back into evolver class?
 def gen_atk_mults():
     # generate melee, range, and mage attack multipliers for automatic game-balancing
-    #atks = ['MELEE_MULT', 'RANGE_MULT', 'MAGE_MULT']
-    #mults = [(atks[i], 0.2 + np.random.random() * 0.8) for i in range(3)]
-    #atk_mults = dict(mults)
-    # range is way too dominant, always
 
     atk_mults = {
         # b/w 0.2 and 1.0

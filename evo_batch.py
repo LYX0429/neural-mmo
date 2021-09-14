@@ -27,22 +27,22 @@ from evolution.utils import get_genome_name
 genomes = [
 #  'Baseline',
    'Simplex',
-#  'CA',
-#  'Random',
+#  'NCA',
+   'TileFlip',
 #  'CPPN',
-#  'Pattern',
+#  'Primitives',
 #  'LSystem',
 #  'All',
 ]
-fitness_funcs = [
+generator_objectives = [
 #   'MapTestText',
-#   'Lifespans',
+    'Lifespans',
 #   'L2',
 #   'Hull',
 #   'Differential',
 #   'Sum',
 #   'Discrete',
-    'InvL2',
+#   'InvL2',
 ]
 skills = [
     'ALL',
@@ -62,6 +62,9 @@ me_bin_sizes = [
     [50, 50],
 #   [100,100],
 ]
+
+# Are we running a PAIRED-type algorithm? If so, we use two policies, and reward the generator for maximizing the
+# difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
 #  True,
    False
@@ -119,10 +122,10 @@ def launch_batch(exp_name, preeval=False):
    eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', " \
                "'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\" --NENT {} " \
                "--FITNESS_METRIC {} ".format(
-      EVALUATION_HORIZON, N_EVALS, NENT, fitness_funcs[0])
+      EVALUATION_HORIZON, N_EVALS, NENT, generator_objectives[0])
 
    for gene in genomes:
-      for fit_func in fitness_funcs:
+      for fit_func in generator_objectives:
          for skillset in skills:
             if fit_func in ['Lifespans', 'Sum']:
                if skillset != 'ALL':
@@ -273,19 +276,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
             txt_verb = 'Inferring'
          print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, best_ind.age))
       for (i, (model_exp_name, model_config)) in enumerate(zip(model_exp_names, experiment_configs)):
-         # TODO: select best map and from saved archive and evaluate on this one
-#        infer_idx = None
-#        if map_exp_name == 'PCG':
-#           infer_idx = 0
-#        elif 'Pattern' in map_exp_name:
-#           infer_idx = "(10, 6, 0)"
-#        elif 'CPPN' in map_exp_name:
-#           infer_idx = "(10, 8, 0)"
-         # #        elif 'Random' in map_exp_name:
-         # #           infer_idx = "(18, 17, 0)"
-         # #        elif 'Simplex' in map_exp_name:
-         # #           infer_idx = "(10, 5, 0)"
-         #          # get index of most fit map
          l_eval_args = '--config TreeOrerock --MAP {} --INFER_IDX \"{}\" '.format(map_exp_name,
                                                                                           infer_idx)
          if opts.multi_policy:

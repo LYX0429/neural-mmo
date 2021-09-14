@@ -241,9 +241,9 @@ class EvolverNMMO(LambdaMuEvolver):
       self.global_counter = ray.get_actor("global_counter")
       # FIXME: FUCK THIS, PROBABLY UNNECESSARY BY NOW???
       self.CPPN = config.GENOME == 'CPPN'
-      self.CA = config.GENOME == 'CA'
-      self.PRIMITIVES = config.GENOME == 'Pattern'
-      self.TILE_FLIP = config.GENOME == 'Random'
+      self.CA = config.GENOME == 'NCA'
+      self.PRIMITIVES = config.GENOME == 'Primitives'
+      self.TILE_FLIP = config.GENOME == 'TileFlip'
       self.LSYSTEM = config.GENOME == 'LSystem'
       self.SIMPLEX_NOISE = config.GENOME == 'Simplex'
       self.BASELINE_SIMPLEX = config.GENOME == 'Baseline'
@@ -344,7 +344,8 @@ class EvolverNMMO(LambdaMuEvolver):
 
    def update_fitness(self, individual, ALP):
       if self.config.PAIRED:
-         protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=i) for i in range(2)]
+         protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=pop_name) for pop_name in
+                                                    ['pro', 'ant']]
          individual.score_hists.append(protaganist_fitness - antagonist_fitness)
       elif not self.MAP_TEST:
          individual.score_hists.append(self.calc_fitness(individual.stats))

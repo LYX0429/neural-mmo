@@ -163,12 +163,14 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       return a_skill_vals
 
    def get_all_agent_stats(self, verbose=False):
-      skills = {i: {} for i in range(self.config.NPOP)}
+      skills = {}
       a_skills = None
 
       # Get stats of dead (note the order here (wait...what about it?))
       l = 0
       for player_pop, pop_skills in self.agent_skills.items():
+         if player_pop not in skills:
+            skills[player_pop] = {}
          for player_id, skill_vals in pop_skills.items():
             skills[player_pop][player_id] = skill_vals
             l += 1
@@ -176,20 +178,26 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       # Get stats of living
       d = 0
       for player_id, player in self.realm.players.items():
-         player_pop = player.base.population.val
+         # player_pop = player.base.population.val
+         player_pop = player.pop_name
+         if player_pop not in skills:
+            skills[player_pop] = {}
          a_skill_vals = self.get_agent_stats(player)
          skills[player_pop][player_id] = a_skill_vals
          d += 1
 
 
 #     if a_skills:
-      stats = {i: np.zeros((len(skills[i]), len(self.headers))) for i in range(self.config.NPOP)}
+      stats = {}
+      lifespans = {}
      #stats = np.zeros((len(skills), 1))
-      lifespans = {i: np.zeros((len(skills[i]))) for i in range(self.config.NPOP)}
+     #lifespans = {i: np.zeros((len(skills[i]))) for i in range(self.config.NPOP)}
       if self.ACTION_MATCHING:
          actions_matched = {i: np.zeros((len(skills[i]))) for i in range(self.config.NPOP)}
 
       for player_pop, pop_skills in skills.items():
+         stats[player_pop] = np.zeros((len(skills[player_pop]), len(self.headers)))
+         lifespans[player_pop] = np.zeros((len(skills[player_pop])))
          player_n = 0
          for player_id, a_skills in pop_skills.items():
             # over agents
@@ -611,7 +619,10 @@ class RLlibEvaluator(evaluator.Base):
                self.reset_env()
 
       stats = self.env.get_all_agent_stats()
-      score = self.calc_diversity(stats, verbose=False)
+      pop_names = stats['skills'][0].keys()
+      for pop_name in pop_names:
+         pop_score = self.calc_diversity(stats, verbose=False, pop=pop_name)
+         print('pop: {}, score: {}'.format(pop_name, pop_score))
 
       self.i += 1
 

@@ -56,15 +56,15 @@ class Stats:
 def get_genome_name(exp_name):
    if 'CPPN' in exp_name:
       return 'CPPN'
-   elif 'Pattern' in exp_name:
+   elif 'Primitives' in exp_name:
       return 'Pattern'
-   elif 'Random' in exp_name:
-      return 'Random'
+   elif 'TileFlip' in exp_name:
+      return 'TileFlip'
    elif 'Simplex' in exp_name:
       return 'Simplex'
    elif 'Baseline' in exp_name:
       return 'Baseline'
-   elif 'gene-CA' in exp_name:
+   elif 'gene-NCA' in exp_name:
       return 'NCA'
    elif 'gene-All' in exp_name:
       return 'All'

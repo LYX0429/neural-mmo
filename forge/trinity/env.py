@@ -98,7 +98,7 @@ class Env:
 
 #     self.env_reset = time.time()
 
-      self.agent_skills = {i: {} for i in range(self.config.NPOP)}
+      self.agent_skills = {}
       self.lifetimes = {}
       self.actions_matched = {}
 
@@ -266,7 +266,10 @@ class Env:
          for entID, ent in dead.items():
             lifetime = ent.history.timeAlive.val
             self.lifetimes[entID] = lifetime
-            self.agent_skills[ent.base.population.val][entID] = self.get_agent_stats(ent)
+            # self.agent_skills[ent.base.population.val][entID] = self.get_agent_stats(ent)
+            if ent.pop_name not in self.agent_skills:
+               self.agent_skills[ent.pop_name] = {}
+            self.agent_skills[ent.pop_name][entID] = self.get_agent_stats(ent)
             if hasattr(self, 'actions_matched'):
                actions_matched = ent.actions_matched
                self.actions_matched[entID] = actions_matched
