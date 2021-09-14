@@ -26,8 +26,7 @@ Create a conda environment and install dependencies:
 ::
   conda create -n nmmo python==3.8
   conda activate nmmo
-  sh scripts/setup.sh
-
+  bash scripts/setup.sh
 
 Instructions
 ####
@@ -37,6 +36,10 @@ The file evo_batch.py runs batches of experiments by iterating through hyperpara
   python evo_batch.py --local
   
 (dropping the --local argument if you're on a cluster).
+
+If you are attempting to use a GPU (recommended) and you encounter an IndexError in ray/rllib/policy/torch_policy.py when attempting to set self.device, replace the lign assigning gpu_ids in this file with:
+::
+  gpu_ids = [0]
 
 To determine what batch of experiments will be run, (un)comment the appropriate hyperparameters listed in evo_batch.py. We discuss these hyperparamters below.
 
