@@ -32,6 +32,15 @@ Create a conda environment and install dependencies:
   conda create -n nmmo python==3.8
   conda activate nmmo
   bash scripts/setup.sh
+  
+Mac OS X m1 / Apple silicon
+**********
+
+Having the wrong version of tensorflow installed will result in a fatal SIGILL (Illegal instruction) error. You can verify this by opening a python console and attempting to import tensorflow.
+
+You will need to follow Apple's instructions (https://developer.apple.com/metal/tensorflow-plugin/) for installing tensorflow.
+
+It still won't work though :~) #TODO
 
 Training
 ####
