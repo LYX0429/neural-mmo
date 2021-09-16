@@ -5,7 +5,7 @@ Readme: joint generator-player optimization in multi-agent environments
 Overview & current progress
 #####
 
-This is an ongoing project that builds on Neural MMO, an open-ended, artificial life-like environment for multi-agent reinforcement learning (original Readme below). It seeks to implement a training loop that jointly optimizes player(s) and map-generator(s). At present, it uses the original NMMO setup to train RL policies to play as selfish agents (with negative reward for dying, usually learning to forage for food and water, and sometimes fight one another), while simultaneously evolving a population of maps using the MAP-Elites quality diversity algorithm. (We plan to supplant direct optimization of the maps with optimization of map-generators in the near future, where these generators can be implemented as neural networks, like NCAs or generative CPPNs, or similar.) 
+This is an ongoing project that builds on Neural MMO, an open-ended, artificial life-like environment for multi-agent reinforcement learning (original Readme below). It seeks to implement a training loop that jointly optimizes player(s) and map-generator(s). At present, it uses the original NMMO setup to train RL policies to play as selfish agents (with negative reward for dying, usually learning to forage for food and water, and sometimes fight one another), while simultaneously evolving a population of maps using the MAP-Elites quality diversity algorithm. (We plan to supplant direct optimization of the maps with optimization of map-generators in the near future, where these generators can be implemented as neural networks, like NCAs or generative CPPNs, or similar.)
 
 While agents are always trained to survive, maps can be optimized to induce certain behavior in the players during learning, including:
 
@@ -33,13 +33,35 @@ Create a conda environment and install dependencies:
   conda activate nmmo
   bash scripts/setup.sh
 
+
+`venv` Based Installation
+============================
+
+> tested on MacOS (x86_64)
+
+
+Clone repository:
+::
+  git clone --recursive https://github.com/smearle/neural-mmo
+
+Create `venv`:
+::
+  python3 -m venv --python=<PATH TO PYTHON 3.8> nmmo-env # You can use default python version by dropping ``--python``
+  source nmmo-env/bin/activate
+
+Install bazel: https://docs.bazel.build/versions/4.2.1/install.html (For mac at least)
+
+Install dependencies:
+::
+  pip3 install -r scripts/requirments.txt
+
 Training
 ####
 
 The file evo_batch.py runs batches of experiments by iterating through hyperparameters and calling ForgeEvo.py, either sequentially on a local machine, or by queueing batches of parallel experiments on a SLURM cluster. You can run it with:
 ::
   python evo_batch.py --local
-  
+
 (dropping the --local argument if you're on a cluster).
 
 If you are attempting to use a GPU (recommended) and you encounter an IndexError in ray/rllib/policy/torch_policy.py when attempting to set self.device, replace the lign assigning gpu_ids in this file with:
@@ -56,7 +78,7 @@ Visualization
 To save maps as .pngs and plot the fitness of the map-generator over time, run:
 ::
   python evo_batch.py --local --vis_maps
-  
+
 These will be saved to evo_experiment/EXPERIMENT_NAME, with maps inside the "maps" directory.
 
 Rendering
@@ -76,16 +98,16 @@ Once the Unity client is running, you can evaluate a policy on a map, using Forg
 Perhaps more simply, you can render trained agents and maps over a set of experiments using the hyperparameters in evo_batch.py, run:
 ::
   python evo_batch.py --local --render
-  
+
 This will automatically launch both the Unity client and a server with the model/map from the experiment with the correct hyperparameters. To stop rendering the current experiment and move onto the next, enter "ctrl+c" to send a KeyboardInterrupt.
-  
+
 Evaluation
 #####
 
 To evaluate trained agents and maps:
 ::
   python evo_batch.py --local --evaluate
-  
+
 This may take a while, and evaluations can also be run in parallel on SLURM. Evaluation generates various stats/visualizations pertaining to individual generator-player pairs. When evaluations are run in sequence, after all evaluations are complete, These results will be compiled into a heatmap that compares the performance of different generator-player pairs. To re-generate these visualizations using previously-generated evaluation data (e.g. when these evaluations were run in parallel), run:
 ::
   python evo_batch.py --local --evaluate --vis_cross_eval
@@ -98,7 +120,7 @@ Hyperparameters
 genomes
 ********************
 
-How map-generators are represented. Each genome defines an individual that implemente gen_map() and mutate(). At the beginning (and/or throughout generator optimization), the genome is initialized randomly, corresponding to some random map, then cloned and mutated, with each mutation (generally) leading to some change in the map produced by the individual's map-generation function. 
+How map-generators are represented. Each genome defines an individual that implemente gen_map() and mutate(). At the beginning (and/or throughout generator optimization), the genome is initialized randomly, corresponding to some random map, then cloned and mutated, with each mutation (generally) leading to some change in the map produced by the individual's map-generation function.
 
 * Simplex
 * NCA
@@ -111,7 +133,7 @@ How map-generators are represented. Each genome defines an individual that imple
 generator objectives
 *********************
 
-The objective that map-generators seek to maximize during optimization. 
+The objective that map-generators seek to maximize during optimization.
 
 ************************
 Readme: Neural MMO

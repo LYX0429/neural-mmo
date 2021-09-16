@@ -10,3 +10,8 @@ eval_experiment/*
 configs/*
 docs/source/autodoc/
 docs/build/
+!evo_experiment/.gitkeep
+.DS_Store
+.vscode
+env/*
+nmmo-env/*
