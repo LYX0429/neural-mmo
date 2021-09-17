@@ -1,3 +1,4 @@
+numpy
 neat-python
 scikit-bio
 scikit-image
@@ -19,4 +20,8 @@ vec-noise==1.1.4
 bokeh==2.2.3
 imageio==2.8.0
 sphinx-rtd-theme==0.5.1
-tensorflow==2.4.1
+tensorflow==2.6.0
+ray[rllib]==1.5.1
+torch==1.9.0
+./pytorch-neat
+gputil
