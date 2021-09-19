@@ -183,7 +183,7 @@ def rand_features(individual, config):
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None, n_epochs=10000):
       self.config = config
-      if config.PAIRED:
+      if config.PAIRED and not config.EVALUATE:
          config.NPOLICIES = 2
          config.NPOP = 2
       if config.PRETRAIN:
@@ -244,7 +244,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.CA = config.GENOME == 'NCA'
       self.PRIMITIVES = config.GENOME == 'Primitives'
       self.TILE_FLIP = config.GENOME == 'TileFlip'
-      self.LSYSTEM = config.GENOME == 'LSystem'
+      self.LSYSTEM = config.GENOME == 'L-System'
       self.SIMPLEX_NOISE = config.GENOME == 'Simplex'
       self.BASELINE_SIMPLEX = config.GENOME == 'Baseline'
       self.ALL_GENOMES = config.GENOME == 'All'

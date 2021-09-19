@@ -57,7 +57,7 @@ def get_genome_name(exp_name):
    if 'CPPN' in exp_name:
       return 'CPPN'
    elif 'Primitives' in exp_name:
-      return 'Pattern'
+      return 'Primitives'
    elif 'TileFlip' in exp_name:
       return 'TileFlip'
    elif 'Simplex' in exp_name:
@@ -68,7 +68,7 @@ def get_genome_name(exp_name):
       return 'NCA'
    elif 'gene-All' in exp_name:
       return 'All'
-   elif 'gene-LSystem' in exp_name:
+   elif 'gene-L-System' in exp_name:
       return 'L-System'
    else:
       return exp_name

@@ -125,8 +125,11 @@ class PlayerManager(EntityGroup):
          self.models = config.MULTI_MODEL_NAMES
       else:
          if config.PAIRED:
-            self.models = ['pro', 'ant']
-            np.random.shuffle(self.models)
+            if not config.EVALUATE:
+               self.models = ['pro', 'ant']
+               np.random.shuffle(self.models)
+            else:
+               self.models = ['pro']
          elif config.MODEL is None:
             self.models = [config.GENOME]
          else:

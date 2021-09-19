@@ -50,7 +50,7 @@ def loadTrainer(config):
       load_args = json.load(
          open('configs/settings_{}.json'.format(config.load_arguments), 'r'))
       [config.set(k, v) for (k, v) in load_args.items()]
-   if config.PAIRED:
+   if config.PAIRED and not config.EVALUATE:
       config.set('NPOP', 2)
       config.set('NPOLICIES', 2)
 
