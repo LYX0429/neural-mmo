@@ -25,19 +25,19 @@ from evolution.diversity import get_div_calc, get_pop_stats
 from evolution.utils import get_genome_name
 
 genomes = [
-#  'Baseline',
+   'Baseline',
    'Simplex',
-#  'NCA',
-#  'TileFlip',
-#  'CPPN',
-#  'Primitives',
-#  'LSystem',
-#  'All',
+   'CA',
+   'Random',
+   'CPPN',
+   'Pattern',
+   'LSystem',
+   'All',
 ]
 generator_objectives = [
 #   'MapTestText',
-    'Lifespans',
-#   'L2',
+#   'Lifespans',
+    'L2',
 #   'Hull',
 #   'Differential',
 #   'Sum',

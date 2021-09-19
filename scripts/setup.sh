@@ -7,7 +7,7 @@ fi
 
 #Install python packages
 echo "Installing conda pip packages"
-pip install -r scripts/requirements.txt
+python -m pip install -r scripts/requirements.txt
 
 echo "Installing rllib"
 # there is a bug with gpu_ids in torch_policy.py that requires manual fix after re-install, but still, this is the only
