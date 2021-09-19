@@ -275,7 +275,7 @@ class meNMMO(EvolverNMMO):
          start_time = timer()
          # Select the next batch individuals
          batch = toolbox.select(container, batch_size)
-         ## Vary the pool of individuals
+         ## Vary the pool of individuals (actually doing this manually)
 #        offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
 #        if self.CPPN:
 #           [self.gen_cppn_map(o.chromosome) for o in offspring]
@@ -732,14 +732,15 @@ class meNMMO(EvolverNMMO):
                   features_domain=features_domain,
                   storage_type=list)
       self.container = grid
-      parallelism_type = 'sequential'
+      # We don't need qdpy's parallelism since RLlib already ensures that evaluation of different maps happens in parallel
+#     parallelism_type = 'sequential'
 #     parallelism_type = 'multiprocessing'
-      with ParallelismManager(parallelism_type,
-                             toolbox=self.toolbox) as pMgr:
-         # Create a QD algorithm
-         self.init_algo(self.qdSimple, pMgr.toolbox, grid, init_batch_size, batch_size, nb_iterations)
+#     with ParallelismManager(parallelism_type,
+#                            toolbox=self.toolbox) as pMgr:
+      # Create a QD algorithm
+      self.init_algo(self.qdSimple, self.toolbox, grid, init_batch_size, batch_size, nb_iterations)
          # Run the illumination process !
-         self.algo.run()
+      self.algo.run()
       self.log_me(grid)
 
 
