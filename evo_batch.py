@@ -42,6 +42,8 @@ generator_objectives = [
 #   'Differential',
 #   'Sum',
 #   'Discrete',
+#   'FarNearestNeighbor',
+#   'CloseNearestNeighbor',
 #   'InvL2',
 ]
 skills = [

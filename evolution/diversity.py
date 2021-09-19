@@ -26,6 +26,10 @@ def get_div_calc(div_calc_name):
       calc_diversity = calc_convex_hull
    elif div_calc_name == 'Sum':
       calc_diversity = sum_experience
+   elif div_calc_name == 'FarNearestNeighbor':
+      calc_diversity = far_nearest_neighbor
+   elif div_calc_name == 'CloseNearestNeighbor':
+      calc_diversity = close_nearest_neighbor
    elif div_calc_name == 'Lifespans':  # or config.FITNESS_METRIC == 'ALP':
       calc_diversity = sum_lifespans
    elif div_calc_name == 'Lifetimes':
@@ -199,6 +203,22 @@ def sigmoid_lifespan(x):
    res = 1 / (1 + np.exp(0.1*(-x+50)))
 
    return res
+
+def far_nearest_neighbor(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=False):
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   a = agent_skills
+   n_agents = agent_skills.shape[0]
+   b = a.reshape(n_agents, 1, a.shape[1])
+   distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
+   # ignore an agent's distance to itself
+   distances += np.where(np.eye(distances.shape[0]) == 1, np.inf, 0)
+   nearest_neighbors = distances.min(0)
+   max_nearest_neighbor = nearest_neighbors.max()
+   return max_nearest_neighbor  # try to maximize this
+
+def close_nearest_neighbor(agent_stats, **kwargs):
+   # TODO: we'll have to do some punish_youth here, or this will incentivize killing everyone ASAP
+   return - far_nearest_neighbor(agent_stats, **kwargs)
 
 def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True):
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
