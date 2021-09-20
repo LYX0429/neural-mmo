@@ -186,7 +186,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
          skills[player_pop][player_id] = a_skill_vals
          d += 1
 
-
 #     if a_skills:
       stats = {}
       lifespans = {}
@@ -225,23 +224,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 
       return stats
 
-     #return {'skills': [0] * len(self.config.SKILLS),
-     #      'lifespans': [],
-     #      'lifetimes': []}
-
-
-#Neural MMO observation space
-#      obs, rewards, dones, infos = super().step(
-#            decisions, omitDead, preprocessActions)
-#
-#      config = self.config
-#      dones['__all__'] = False
-#      test = config.EVALUATE or config.RENDER
-#      if not test and self.realm.tick  >= config.TRAIN_HORIZON:
-#         dones['__all__'] = True
-#
-#      return obs, rewards, dones, infos
-#
 def observationSpace(config):
    if hasattr(config, 'GRIDDLY') and config.GRIDDLY:
       #TODO: this, not manually!
@@ -1039,7 +1021,9 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       return self.model(self.policyID(0))
 
    def train(self, maps):
-      # TODO: pass only the relevant map?
+      ''' Here we've hacked the RLlib trainer object's usual "train", so that each env is initialized to a map in maps,
+      and each env sends us back individual stats. (Was trying to use RLlib API for infos here but it's tricky.)'''
+      # TODO: pass only the relevant map? Or not :)
 #     idxs = iter(maps.keys())
       idxs = list(maps.keys())
 #     if self.config['env_config']['config'].GRIDDLY:
@@ -1054,49 +1038,58 @@ class EvoPPOTrainer(ppo.PPOTrainer):
       if self.nmmo_config.N_PROC == self.nmmo_config.N_EVO_MAPS:
          for worker in [workers.local_worker()] + workers.remote_workers():
             if len(idxs) > 0:
-               fuck_id = idxs[i % len(idxs)]
+               map_id = idxs[i % len(idxs)]
             else:
-               fuck_id = idxs[i]
+               map_id = idxs[i]
             i += 1
-            # FIXME: must have N_PROC = N_EVO_MAPS?
+            # FIXME: must have N_PROC = N_EVO_MAPS? I sure hope not...
          #  worker.foreach_env.remote(lambda env: env.set_map(idx=next(idxs), maps=maps))
             if isinstance(worker, RolloutWorker):
-               worker.foreach_env(lambda env: env.set_map(idx=fuck_id, maps=maps))
+               worker.foreach_env(lambda env: env.set_map(idx=map_id, maps=maps))
             else:
-               worker.foreach_env.remote(lambda env: env.set_map(idx=fuck_id, maps=maps))
+               worker.foreach_env.remote(lambda env: env.set_map(idx=map_id, maps=maps))
       else:
-         # Ha ha what the fuck
+         # FIXME: we hate this
          if 'maps' in maps:
             maps = maps['maps']
+
          workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: env.set_map(idx=None, maps=maps)))
 
-      if self.config['env_config']['config'].FROZEN:
-         stats = self.simulate_frozen()
-      else:
-         stats = self.simulate_unfrozen()
-      if self.config['env_config']['config'].FROZEN and False:
-         global_stats = ray.get_actor('global_stats')
-         stats = ray.get(global_stats.get.remote())
-         global_stats.reset.remote()
-         print('stats keys', stats.keys())
-      else:
-         stats_list = workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: (env.worldIdx, env.send_agent_stats())))
-         stats = {}
-         for worker_stats in stats_list:
-            if not worker_stats: continue
-            for (envID, env_stats) in worker_stats:
-               if not env_stats: continue
-               if envID not in stats:
-                  stats[envID] = env_stats
-               else:
-                  for (k, v) in env_stats.items():
-                     if k not in stats[envID]:
-                        stats[envID][k] = v
-                     else:
-                        stats[envID][k] += v
+      # Not implemented. Anyway, let them learn!
+#     if self.config['env_config']['config'].FROZEN:
+#        stats = self.simulate_frozen()
+#     else:
+
+      stats = self.simulate_unfrozen()  # Call super's train() here
+      # what is stats?
+
+      # We used to go through a global ray actor
+#     if self.config['env_config']['config'].FROZEN and False:
+#        global_stats = ray.get_actor('global_stats')
+#        stats = ray.get(global_stats.get.remote())
+#        global_stats.reset.remote()
+#        print('stats keys', stats.keys())
+#     else:
+
+      # now we just ask the envs directly for their stats
+      stats_list = workers.foreach_worker(lambda worker: worker.foreach_env(lambda env: (env.worldIdx, env.send_agent_stats())))
+      stats = {}
+      for worker_stats in stats_list:
+         if not worker_stats: continue
+         for (envID, env_stats) in worker_stats:
+            if not env_stats: continue
+            if envID not in stats:
+               stats[envID] = env_stats
+            else:
+               for (k, v) in env_stats.items():
+                  if k not in stats[envID]:
+                     stats[envID][k] = v
+                  else:
+                     stats[envID][k] += v
 
       return stats
 
+# Not implemented
 #  def simulate_frozen(self):
 #     stats = super()._evaluate()
 

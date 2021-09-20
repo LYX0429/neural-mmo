@@ -346,34 +346,11 @@ class EvolverNMMO(LambdaMuEvolver):
       if self.config.PAIRED:
          protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=pop_name) for pop_name in
                                                     ['pro', 'ant']]
-         individual.score_hists.append(protaganist_fitness - antagonist_fitness)
+         individual.update_fitness(protaganist_fitness - antagonist_fitness, ALP, self.config)
       elif not self.MAP_TEST:
-         individual.score_hists.append(self.calc_fitness(individual.stats))
+         individual.update_fitness(self.calc_fitness(individual.stats), ALP, self.config)
       else:
-         individual.score_hists.append(self.calc_fitness(individual=individual, config=self.config))
-
-      if ALP:
-         score = individual.score_hists[-2] - individual.score_hists[-1]
-
-         if individual.ALPs is None:
-            assert individual.age == 0
-            individual.ALPs = []
-         individual.ALPs.append(score)
-#        score = abs(np.mean(individual.ALPs))
-         score = np.mean(individual.ALPs)
-         individual.fitness.setValues([-score])
-      else:
-         score = np.mean(individual.score_hists)
-
-         if len(individual.score_hists) >= self.config.ROLLING_FITNESS:
-            individual.score_hists = individual.score_hists[-self.config.ROLLING_FITNESS:]
-
-         if ALP:
-            if len(self.ALPs) >= self.config.ROLLING_FITNESS:
-               individual.ALPs = individual.ALPs[-self.config.ROLLING_FITNESS:]
-
-#        individual.fitness.values = [score]
-      individual.fitness.setValues([-score])
+         individual.update_fitness(self.calc_fitness(individual=individual, config=self.config), ALP, self.config)
 
    def update_features(self, individual):
       #     print('evaluating {}'.format(idx))

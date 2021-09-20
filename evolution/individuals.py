@@ -755,15 +755,43 @@ class EvoIndividual(Individual):
    #     self.multi_hot = None
    #     self.atk_mults = None
 
-   def clone(self, evolver):
-       child = copy.deepcopy(self)
-       child.score_hists = []
-#      child.feature_hists = {}
-       child.age = -1
-       child.idx = None
-       child.ALPs = []
+   def update_fitness(self, new_f, ALP, config):
+      self.score_hists.append(new_f)
 
-       return child
+      if ALP:
+         score = self.score_hists[-2] - self.score_hists[-1]
+
+         if self.ALPs is None:
+            assert self.age == 0
+            self.ALPs = []
+         self.ALPs.append(score)
+         #        score = abs(np.mean(self.ALPs))
+         score = np.mean(self.ALPs)
+         self.fitness.setValues([-score])
+         self.fitness_stds = [np.std([self.ALPS]) for _ in self.fitness.getValues()]
+      else:
+         score = np.mean(self.score_hists)
+         self.fitness_stds = [np.std([self.score_hists]) for _ in self.fitness.getValues()]
+
+      if len(self.score_hists) >= config.ROLLING_FITNESS:
+         self.score_hists = self.score_hists[-config.ROLLING_FITNESS:]
+
+      if ALP:
+         if len(self.ALPs) >= config.ROLLING_FITNESS:
+            self.ALPs = self.ALPs[-config.ROLLING_FITNESS:]
+
+      self.fitness.setValues([-score])
+
+
+   def clone(self, evolver):
+          child = copy.deepcopy(self)
+          child.score_hists = []
+   #      child.feature_hists = {}
+          child.age = -1
+          child.idx = None
+          child.ALPs = []
+
+          return child
 
    def mutate(self):
 #     old_map = self.chromosome.map_arr

@@ -239,13 +239,11 @@ class meNMMO(EvolverNMMO):
          print("No valid maps in initial batch. Re-generating initial batch.")
          invalid_ind = cull_invalid([EvoIndividual([], i, self) for i in range(len(init_batch))])
       self.train_individuals(invalid_ind)
+
       if self.LEARNING_PROGRESS:
          self.train_individuals(invalid_ind)
 #     [self.evaluate(ind) for ind in invalid_ind]
-      fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-      for ind, fit in zip(invalid_ind, fitnesses):
-          ind.fitness.values = fit[0]
-          ind.features = fit[1]
+      # No need for parallelism or toolbox here, we've already evaluated above
       if len(invalid_ind) == 0:
           raise ValueError("No valid individual found !")
       # Update halloffame
@@ -254,11 +252,9 @@ class meNMMO(EvolverNMMO):
       # Store batch in container
       nb_updated = container.update(invalid_ind, issue_warning=show_warnings)
       self.archive_update_hist = np.hstack((self.archive_update_hist[1:], [nb_updated]))
-      # FIXME: we should warn about this when not reloading!
       if nb_updated == 0:
          #NOTE: For reloading.
          print('Warning: nothing added to container/grid. Not good if this is a fresh run.')
-   #     raise
    #     raise ValueError("No individual could be added to the container !")
       else:
          # Compile stats and update logs
@@ -270,6 +266,7 @@ class meNMMO(EvolverNMMO):
       # Call callback function
       if iteration_callback != None:
           iteration_callback(0, init_batch, container, logbook)
+
       # Begin the generational process
       for i in range(self.n_gen + 1, niter + 1):
          start_time = timer()
@@ -277,49 +274,42 @@ class meNMMO(EvolverNMMO):
          batch = toolbox.select(container, batch_size)
          ## Vary the pool of individuals (actually doing this manually)
 #        offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
-#        if self.CPPN:
-#           [self.gen_cppn_map(o.chromosome) for o in offspring]
-     #   offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
          offspring = []
          mutated = []
          maps = {}
          for (j, o) in enumerate(batch):
             rnd = np.random.random()
-            # For every 99 individuals we mutate, we inject a new random one
+            # For every ~99 individuals we mutate, we inject a new random one
             if rnd < 0.01 or self.BASELINE_SIMPLEX:
                 # If running a non-evolved baseline, never mutate, always generate anew
                 newO = EvoIndividual([], j, self)
             else:
                 newO = self.clone(o)
                 newO.mutate()
-                # newO, = self.mutate(newO)
             new_chrom = newO.chromosome
             newO.idx = j
             offspring.append(newO)
 #           self.gen_cppn_map(newO.chromosome)
             self.maps[j] = ((new_chrom.map_arr, new_chrom.multi_hot), new_chrom.atk_mults)
             mutated.append(j)
-#        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
          valid_ind = cull_invalid(offspring)
+
+         # We should never get here?
          while len(valid_ind) == 0:
+             raise Exception
              # FIXME: put this inside our own varAnd function
              self.reset_g_idxs()  # since cloned individuals need new indices
+             # We should be doing this manually, as above, no?
              offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
              valid_ind = cull_invalid(offspring)
-         self.train_individuals(valid_ind)
+         for _ in range(3):
+            self.train_individuals(valid_ind)
+         fitness_stds = [ind.fitness_stds[0] for ind in valid_ind]
+         print('fitness stds: {}'.format(fitness_stds))
          if self.LEARNING_PROGRESS:
              self.train_individuals(valid_ind)
-         # Evaluate the individuals with an invalid fitness
-#        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
 #        print('{} invalid individuals'.format(len(invalid_ind)))
-         fitnesses = toolbox.map(toolbox.evaluate, valid_ind)
-#        fitnesses = [self.evaluate(ind) for ind in invalid_ind]
-         for ind, fit in zip(valid_ind, fitnesses):
-#            ind.fitness.setValues(fit[0])
-#            ind.features.setValues(fit[1])
-             ind.fitness.values = fit[0]
-             ind.features = fit[1]
-         # Replace the current population by the offspring
+         # Replace the current population with the offspring
          if self.MAP_TEST:
              show_warnings = True
          nb_updated = container.update(valid_ind, issue_warning=show_warnings)
@@ -551,23 +541,6 @@ class meNMMO(EvolverNMMO):
 
 
    def evaluate(self, individual, elite=False):
-#     idx = individual.idx
-
-
-
-#     if idx not in self.maps:
-#        chromosome = individual.chromosome
-#        if self.CPPN:
-#           self.maps[idx] = (chromosome.map_arr, chromosome.multi_hot), chromosome.atk_mults
-#        elif self.PRIMITIVES:
-#           self.maps[idx] = individual.chromosome[0].paint_map(), individual.chromosome[1]
-#        else:
-#           raise Exception
-
-#     if idx in self.idxs:
-#        pass
-
-
       return [individual.fitness.getValues(), individual.features]
 
    def init_algo(self,
@@ -800,6 +773,20 @@ class meNMMO(EvolverNMMO):
                           [0, np.max(grid.activity_per_bin)],
                           nbTicks=None)
          print("\nA plot of the activity grid was saved in '%s'." %
+               os.path.abspath(plot_path))
+         # TODO: make this more efficient. Do qdpy archives already store this? extend it if not
+         ages = np.zeros(shape=grid.shape, dtype=np.uint8)
+         for ind in grid:
+            ages[ind.idx[:-1]] = ind.age
+         # Create age-over-archive heatmap(s)
+         plot_path = os.path.join(log_base_path, "ages.pdf")
+         plotGridSubplots(ages,
+                          plot_path,
+                          plt.get_cmap("nipy_spectral"),
+                          grid.features_domain,
+                          [0, np.max(ages)],
+                          nbTicks=None)
+         print("\nA plot of the age grid was saved in '%s'." %
                os.path.abspath(plot_path))
 
          print("All results are available in the '%s' pickle file." %
