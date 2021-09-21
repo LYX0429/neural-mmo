@@ -62,7 +62,7 @@ from forge.ethyr.torch.policy import baseline
 from forge.trinity import Env, evaluator, formatting
 from forge.trinity.dataframe import DataType
 from forge.trinity.overlay import Overlay, OverlayRegistry
-from evolution.utils import get_genome_name
+from evolution.utils import get_exp_shorthand
 
 CKP_LATEST_ONLY = True
 
@@ -410,16 +410,16 @@ class RLlibEvaluator(evaluator.Base):
 
       if self.config.NPOLICIES > 1 or self.config.MODEL.startswith('['):
          # model_name = self.config.MULTI_MODEL_NAMES
-         model_name = [get_genome_name(m) for m in self.config.MODEL.strip('[').strip(']').split(',')]
+         model_name = [get_exp_shorthand(m) for m in self.config.MODEL.strip('[').strip(']').split(',')]
       else:
-         model_name = get_genome_name(self.config.MODEL.split('/')[-1])
+         model_name = get_exp_shorthand(self.config.MODEL.split('/')[-1])
       # model_name = self.config.MODEL.split('/')[-1]
       # if isinstance(model_name, list):
       #    model_name = [get_genome_name(m) for m in model_name]
       # else:
       #    assert isinstance(model_name, str)
       #    model_name = get_genome_name(model_name)
-      map_name = get_genome_name(self.config.MAP.split('/')[-1])
+      map_name = get_exp_shorthand(self.config.MAP.split('/')[-1])
       map_idx = self.config.INFER_IDX
       self.exp_name = exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
       # Render the map in case we hadn't already

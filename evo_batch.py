@@ -11,6 +11,7 @@ import csv
 import re
 import argparse
 import pickle
+import itertools
 import numpy as np
 from pdb import set_trace as TT
 import matplotlib
@@ -22,27 +23,28 @@ from projekt import config
 from fire import Fire
 from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc, get_pop_stats
-from evolution.utils import get_genome_name
+from evolution.utils import get_exp_shorthand
+
 
 genomes = [
-#  'Baseline',
+   'Baseline',
    'Simplex',
-#  'NCA',
-#  'TileFlip',
-#  'CPPN',
-#  'Primitives',
-#  'L-System',
-#  'All',
+   'NCA',
+   'TileFlip',
+   'CPPN',
+   'Primitives',
+   'L-System',
+   'All',
 ]
 generator_objectives = [
 #   'MapTestText',
     'Lifespans',
 #   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
-#   'FarNearestNeighbor',
+    'FarNearestNeighbor',
 #   'CloseNearestNeighbor',
 #   'InvL2',
 ]
@@ -68,7 +70,7 @@ me_bin_sizes = [
 # Are we running a PAIRED-type algorithm? If so, we use two policies, and reward the generator for maximizing the
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
-#  True,
+   True,
    False
 ]
 
@@ -126,106 +128,103 @@ def launch_batch(exp_name, preeval=False):
                "--FITNESS_METRIC {} ".format(
       EVALUATION_HORIZON, N_EVALS, NENT, generator_objectives[0])
 
-   for gene in genomes:
-      for fit_func in generator_objectives:
-         for skillset in skills:
-            if fit_func in ['Lifespans', 'Sum']:
-               if skillset != 'ALL':
-                  continue
-               skillset = 'NONE'
+   settings_tpls = [i for i in itertools.product(genomes, generator_objectives, skills, algos, me_bin_sizes,
+                                                 PAIRED_bools)]
+   for (gene, fit_func, skillset, algo, me_bins, PAIRED_bool) in settings_tpls:
+      if fit_func in ['Lifespans', 'Sum']:
+         if skillset != 'ALL':
+            continue
+         skillset = 'NONE'
 
-            for algo in algos:
-               for me_bins in me_bin_sizes:
-                  for PAIRED_bool in PAIRED_bools:
-                     if gene == 'Baseline':
-                        if launched_baseline:
-                           # Only launch one baseline, these other settings are irrelevant
-                           continue
-                        else:
-                           launched_baseline = True
-                     if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
-                        # If using MAP-Elites, ME bin sizes are irrelevant
-                        continue
-                     if (np.array(me_bins) == 1).all():
-                        # If we're doing a simple evolutionary strategy (lazily, through qdpy ME, then set 12 individuals per bin
-                        items_per_bin = 12
-                        feature_calc = None
-                     else:
-                        items_per_bin = 1
-                        feature_calc = 'map_entropy'
+      if gene == 'Baseline':
+         if launched_baseline:
+            # Only launch one baseline, these other settings are irrelevant
+            continue
+         else:
+            launched_baseline = True
+      if algo != 'MAP-Elites' and not (np.array(me_bins) == 1).all():
+         # If using MAP-Elites, ME bin sizes are irrelevant
+         continue
+      if (np.array(me_bins) == 1).all():
+         # If we're doing a simple evolutionary strategy (lazily, through qdpy ME, then set 12 individuals per bin
+         items_per_bin = 12
+         feature_calc = None
+      else:
+         items_per_bin = 1
+         feature_calc = 'map_entropy'
 
-                     if LOCAL:
-                        if fit_func == 'MapTestText':
-                           N_GENERATIONS = 100000
-                           if gene == 'All':
-                              EVO_SAVE_INTERVAL = 100
-                           else:
-                              EVO_SAVE_INTERVAL = 100
-                        else:
-                           N_GENERATIONS = 10000
-                           EVO_SAVE_INTERVAL = 10
-                     else:
-                        EVO_SAVE_INTERVAL = 500
-                        N_GENERATIONS = 10000
+      if LOCAL:
+         if fit_func == 'MapTestText':
+            N_GENERATIONS = 100000
+            if gene == 'All':
+               EVO_SAVE_INTERVAL = 100
+            else:
+               EVO_SAVE_INTERVAL = 100
+         else:
+            N_GENERATIONS = 10000
+            EVO_SAVE_INTERVAL = 10
+      else:
+         EVO_SAVE_INTERVAL = 500
+         N_GENERATIONS = 10000
 
-                     # Write the config file with the desired settings
-                     exp_config = copy.deepcopy(default_config)
-                     exp_config.update({
-                        'N_GENERATIONS': N_GENERATIONS,
-                        'TERRAIN_SIZE': 70,
-                        'NENT': NENT,
-                        'GENOME': gene,
-                        'FITNESS_METRIC': fit_func,
-                        'EVO_ALGO': algo,
-                        'EVO_DIR': exp_name,
-                        'SKILLS': skillset,
-                        'ME_BIN_SIZES': me_bins,
-                        'ME_BOUNDS': [(0,100),(0,100)],
-                        'FEATURE_CALC': feature_calc,
-                        'ITEMS_PER_BIN': items_per_bin,
-                        'N_EVO_MAPS': N_EVO_MAPS,
-                        'N_PROC': N_PROC,
-                        'TERRAIN_RENDER': False,
-                        'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
-                        'VIS_MAPS': opts.vis_maps,
-                        'PAIRED': PAIRED_bool,
-                        'NUM_GPUS': 1 if CUDA else 0,
-                        })
-                     if gene == 'Baseline':
-                        exp_config.update({
-                            'PRETRAIN': True,
-                        })
+      # Write the config file with the desired settings
+      exp_config = copy.deepcopy(default_config)
+      exp_config.update({
+         'N_GENERATIONS': N_GENERATIONS,
+         'TERRAIN_SIZE': 70,
+         'NENT': NENT,
+         'GENOME': gene,
+         'FITNESS_METRIC': fit_func,
+         'EVO_ALGO': algo,
+         'EVO_DIR': exp_name,
+         'SKILLS': skillset,
+         'ME_BIN_SIZES': me_bins,
+         'ME_BOUNDS': [(0,100),(0,100)],
+         'FEATURE_CALC': feature_calc,
+         'ITEMS_PER_BIN': items_per_bin,
+         'N_EVO_MAPS': N_EVO_MAPS,
+         'N_PROC': N_PROC,
+         'TERRAIN_RENDER': False,
+         'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
+         'VIS_MAPS': opts.vis_maps,
+         'PAIRED': PAIRED_bool,
+         'NUM_GPUS': 1 if CUDA else 0,
+         })
+      if gene == 'Baseline':
+         exp_config.update({
+             'PRETRAIN': True,
+         })
 
-                     print('Saving experiment config:\n{}'.format(exp_config))
-                     with open('configs/settings_{}.json'.format(i), 'w') as f:
-                        json.dump(exp_config, f, ensure_ascii=False, indent=4)
+      print('Saving experiment config:\n{}'.format(exp_config))
+      with open('configs/settings_{}.json'.format(i), 'w') as f:
+         json.dump(exp_config, f, ensure_ascii=False, indent=4)
 
-                     # Edit the sbatch file to load the correct config file
-                     # Launch the experiment. It should load the saved settings
+      # Edit the sbatch file to load the correct config file
+      # Launch the experiment. It should load the saved settings
 
-                     if not preeval:
-                        assert not EVALUATE
-                        new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
-                        launch_cmd(new_cmd, i)
-                        i += 1
+      if not preeval:
+         assert not EVALUATE
+         new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
+         launch_cmd(new_cmd, i)
+         i += 1
 
-                     else:
-                        evo_config = config.EvoNMMO
-                       #sys.argv = sys.argv[:1] + ['override']
-                       #Fire(config)
-                        for (k, v) in exp_config.items():
-                           setattr(evo_config, k, v)
-                       #   config.set(config, k, v)
-                        if TERRAIN_BORDER is None:
-                           TERRAIN_BORDER = evo_config.TERRAIN_BORDER
-                           MAP_GENERATOR = MapGenerator(evo_config)
-                        else:
-                           assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
-                        experiment_name = get_experiment_name(evo_config)
-                        experiment_names.append(experiment_name)
-                        experiment_configs.append({'PAIRED': PAIRED_bool})
+      else:
+         evo_config = config.EvoNMMO
+        #sys.argv = sys.argv[:1] + ['override']
+        #Fire(config)
+         for (k, v) in exp_config.items():
+            setattr(evo_config, k, v)
+        #   config.set(config, k, v)
+         if TERRAIN_BORDER is None:
+            TERRAIN_BORDER = evo_config.TERRAIN_BORDER
+            MAP_GENERATOR = MapGenerator(evo_config)
+         else:
+            assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
+         experiment_name = get_experiment_name(evo_config)
+         experiment_names.append(experiment_name)
+         experiment_configs.append({'PAIRED': PAIRED_bool})
 
-                       #config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
+                    #config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
 
 #   if TRAIN_BASELINE:
 #      # Finally, launch a baseline
@@ -257,26 +256,35 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
    n = 0
    model_exp_names = experiment_names
    map_exp_names = experiment_names
+   # We will use these heatmaps to visualize performance between generator-agent pairs over the set of experiments
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
+   div_scores[:] = np.nan
+   mean_skills[:] = np.nan
+   mean_lifespans[:] = np.nan
    if opts.multi_policy:
       mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names)), dtype=np.float)
    for (j, map_exp_name) in enumerate(map_exp_names):
-      with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
-         archive = pickle.load(f)
-         best_ind = archive['container'].best
-         infer_idx, best_fitness = best_ind.idx, best_ind.fitness
-         map_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx), '')
-         map_arr = best_ind.chromosome.map_arr
-         Save.np(map_arr, map_path)
-         png_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx) + '.png')
-         Save.render(map_arr[TERRAIN_BORDER:-TERRAIN_BORDER, TERRAIN_BORDER:-TERRAIN_BORDER], MAP_GENERATOR.textures, png_path)
-         if vis_only:
-            txt_verb = 'Visualizing past inference'
-         else:
-            txt_verb = 'Inferring'
-         print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, best_ind.age))
+      try:
+         with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
+            archive = pickle.load(f)
+      except FileNotFoundError as fnf:
+         print(fnf)
+         print('skipping eval with map from: {}'.format(map_exp_name))
+         continue
+      best_ind = archive['container'].best
+      infer_idx, best_fitness = best_ind.idx, best_ind.fitness
+      map_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx), '')
+      map_arr = best_ind.chromosome.map_arr
+      Save.np(map_arr, map_path)
+      png_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx) + '.png')
+      Save.render(map_arr[TERRAIN_BORDER:-TERRAIN_BORDER, TERRAIN_BORDER:-TERRAIN_BORDER], MAP_GENERATOR.textures, png_path)
+      if vis_only:
+         txt_verb = 'Visualizing past inference'
+      else:
+         txt_verb = 'Inferring'
+      print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, best_ind.age))
       for (i, (model_exp_name, model_config)) in enumerate(zip(model_exp_names, experiment_configs)):
          l_eval_args = '--config TreeOrerock --MAP {} --INFER_IDX \"{}\" '.format(map_exp_name,
                                                                                           infer_idx)
@@ -306,9 +314,9 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
             global EVALUATION_HORIZON
             if opts.multi_policy:
                model_exp_folder = 'multi_policy'
-               model_name = str([get_genome_name(m) for m in model_exp_names])
+               model_name = str([get_exp_shorthand(m) for m in model_exp_names])
             else:
-               model_name = get_genome_name(model_exp_name)
+               model_name = get_exp_shorthand(model_exp_name)
                model_exp_folder = model_exp_name
             map_exp_folder = map_exp_name
             eval_data_path = os.path.join(
@@ -318,12 +326,17 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                model_exp_folder,
                'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
                   model_name,
-                  get_genome_name(map_exp_name),
+                  get_exp_shorthand(map_exp_name),
                   infer_idx,
                   EVALUATION_HORIZON
                ),
             )
-            data = np.load(eval_data_path, allow_pickle=True)
+            try:
+               data = np.load(eval_data_path, allow_pickle=True)
+            except FileNotFoundError as fnf:
+               print(fnf)
+               print('Skipping. Missing eval data at: {}'.format(eval_data_path))
+               continue
             mean_lifespans[i, j] = np.mean(get_pop_stats(data[0]['lifespans'], pop=None))
             # TODO: will this work for more than one episode of evaluation??? No???
             for k in range(len(SKILLS)):
@@ -335,7 +348,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                div_scores[k, i, j] = get_div_calc(div_calc_name)(data[0])
             n += 1
             if opts.multi_policy:
-               model_name_idxs = {get_genome_name(r): i for (i, r) in enumerate(model_exp_names)}
+               model_name_idxs = {get_exp_shorthand(r): i for (i, r) in enumerate(model_exp_names)}
                multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
                survivors = np.load(multi_eval_data_path, allow_pickle=True).item()
                for survivor_name, n_survivors in survivors.items():
@@ -350,10 +363,10 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
 
 
       for r in model_exp_names:
-         row_labels.append(get_genome_name(r))
+         row_labels.append(get_exp_shorthand(r))
 
       for c in map_exp_names:
-         col_labels.append(get_genome_name(c))
+         col_labels.append(get_exp_shorthand(c))
       cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]")
       for (k, skill_name) in enumerate(SKILLS):
          cross_eval_heatmap(mean_skills[k], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))

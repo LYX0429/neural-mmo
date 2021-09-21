@@ -52,23 +52,46 @@ class Stats:
    def get_mults(self, g_hash):
       return self.mults[g_hash]
 
+# FIXME: avoid this redundancy!
+gen_objective_names = [
+   'MapTestText',
+   'Lifespans',
+   'L2',
+   'Hull',
+   'Differential',
+   'Sum',
+   'Discrete',
+   'FarNearestNeighbor',
+   'CloseNearestNeighbor',
+   'InvL2',
+]
+genome_names = [
+   'Baseline',
+   'Simplex',
+   'NCA',
+   'TileFlip',
+   'CPPN',
+   'Primitives',
+   'L-System',
+   'All',
+]
 
-def get_genome_name(exp_name):
-   if 'CPPN' in exp_name:
-      return 'CPPN'
-   elif 'Primitives' in exp_name:
-      return 'Primitives'
-   elif 'TileFlip' in exp_name:
-      return 'TileFlip'
-   elif 'Simplex' in exp_name:
-      return 'Simplex'
-   elif 'Baseline' in exp_name:
-      return 'Baseline'
-   elif 'gene-NCA' in exp_name:
-      return 'NCA'
-   elif 'gene-All' in exp_name:
-      return 'All'
-   elif 'gene-L-System' in exp_name:
-      return 'L-System'
-   else:
-      return exp_name
+def get_exp_shorthand(exp_name):
+   '''A disgusting function for getting a shorthand for experiment names.'''
+   # TODO: Do this in a nicer way, using dictionaries of experiment settings directly (?)
+   exp_shorthand = ''
+   found_genome_name = False
+   for genome_name in genome_names:
+      if genome_name in exp_name:
+         exp_shorthand += genome_name
+         assert not found_genome_name
+         found_genome_name = True
+   found_obj_name = False
+   for obj_name in gen_objective_names:
+      if obj_name in exp_name:
+         exp_shorthand += ' ' + obj_name
+         assert not found_obj_name
+         found_obj_name = True
+   if 'PAIRED' in exp_name:
+      exp_shorthand += ' PAIRED'
+   return exp_shorthand

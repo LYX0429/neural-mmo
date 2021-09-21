@@ -239,7 +239,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.epoch_reloaded = None
 #     self.global_stats = ray.get_actor("global_stats")
       self.global_counter = ray.get_actor("global_counter")
-      # FIXME: FUCK THIS, PROBABLY UNNECESSARY BY NOW???
+      # FIXME: WE ARE NOT A FAN? AT ALL ???
       self.CPPN = config.GENOME == 'CPPN'
       self.CA = config.GENOME == 'NCA'
       self.PRIMITIVES = config.GENOME == 'Primitives'

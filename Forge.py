@@ -26,7 +26,7 @@ from forge.trinity.evaluator import Evaluator
 import projekt
 from projekt import rllib_wrapper as wrapper
 from forge.blade.core import terrain
-from evolution.utils import get_genome_name
+from evolution.utils import get_exp_shorthand
 
 
 def createPolicies(config, mapPolicy):
@@ -105,11 +105,11 @@ def loadEvaluator(config):
       # Randomize order of models to randomize spawn order for fair evaluation over multiple trials
       np.random.shuffle(models)
       config.set('MULTI_MODEL_EXPERIMENTS', models)
-      model_names = [get_genome_name(m) for m in models]
+      model_names = [get_exp_shorthand(m) for m in models]
       config.set('MULTI_MODEL_NAMES', model_names)
       return wrapper.RLlibMultiEvaluator(config, loadModels(config))
    else:
-      config.set('MULTI_MODEL_NAMES', [get_genome_name(config.MODEL)])
+      config.set('MULTI_MODEL_NAMES', [get_exp_shorthand(config.MODEL)])
    if config.MODEL not in ('scripted-forage', 'scripted-combat'):
       return wrapper.RLlibEvaluator(config, loadModel(config))
 
