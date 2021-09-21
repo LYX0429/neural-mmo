@@ -5,18 +5,18 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time=48:00:00
 #SBATCH --mem=64GB
-#SBATCH --job-name=nmmo14
+#SBATCH --job-name=nmmo21
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=sam.earle@nyu.edu
-#SBATCH --output=nmmo14_%j.out
+#SBATCH --output=nmmo21_%j.out
 
 cd /scratch/se2161/neural-mmo || exit
 
 conda init bash
-conda activate nmmo0
+conda activate nmmo21
 
 export TUNE_RESULT_DIR='./evo_experiment/'
-python ForgeEvo.py --load_arguments 14
+python ForgeEvo.py --load_arguments 21
 
 # gotta leave a trailing line here apparently
 

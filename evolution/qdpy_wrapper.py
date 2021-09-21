@@ -49,6 +49,8 @@ import matplotlib.pyplot as plt
 #    License along with qdpy. If not, see <http://www.gnu.org/licenses/>.
 """A simple example of MAP-elites to illuminate a fitness function based on a normalised rastrigin function. The illumination process is ran with 2 features corresponding to the first 2 values of the genomes. It is possible to increase the difficulty of the illumination process by using problem dimension above 3. This code uses the library DEAP to implement the evolutionary part."""
 
+N_TRIALS = 1  # number of episodes run on a newly-generated map or a map being visited during re-evaluation
+
 mpl.use('Agg')
 
 def plot_qdpy_fitness(save_path, evolver=None, logbook=None):
@@ -238,10 +240,12 @@ class meNMMO(EvolverNMMO):
       while len(invalid_ind) == 0:
          print("No valid maps in initial batch. Re-generating initial batch.")
          invalid_ind = cull_invalid([EvoIndividual([], i, self) for i in range(len(init_batch))])
-      self.train_individuals(invalid_ind)
+      for _ in range(N_TRIALS):
+         self.train_individuals(invalid_ind)
 
       if self.LEARNING_PROGRESS:
-         self.train_individuals(invalid_ind)
+         for _ in range(N_TRIALS):
+            self.train_individuals(invalid_ind)
 #     [self.evaluate(ind) for ind in invalid_ind]
       # No need for parallelism or toolbox here, we've already evaluated above
       if len(invalid_ind) == 0:
@@ -302,12 +306,13 @@ class meNMMO(EvolverNMMO):
              # We should be doing this manually, as above, no?
              offspring = deap.algorithms.varAnd(batch, toolbox, cxpb, mutpb)
              valid_ind = cull_invalid(offspring)
-         for _ in range(3):
+         for _ in range(N_TRIALS):
             self.train_individuals(valid_ind)
-         fitness_stds = [ind.fitness_stds[0] for ind in valid_ind]
-         print('fitness stds: {}'.format(fitness_stds))
+#        fitness_stds = [ind.fitness_stds[0] for ind in valid_ind]
+#        print('fitness stds: {}'.format(fitness_stds))
          if self.LEARNING_PROGRESS:
-             self.train_individuals(valid_ind)
+            for _ in range(N_TRIALS):
+               self.train_individuals(valid_ind)
 #        print('{} invalid individuals'.format(len(invalid_ind)))
          # Replace the current population with the offspring
          if self.MAP_TEST:
@@ -356,7 +361,8 @@ class meNMMO(EvolverNMMO):
       if len(container) > 0 and recent_mean_updates < 0.01 and not self.MAP_TEST:
      #   try:
          disrupted_elites = [container[i] for i in np.random.choice(len(container), min(max(1, len(container)-1), self.config.N_EVO_MAPS), replace=False)]
-         self.train_individuals(disrupted_elites)
+         for _ in range(N_TRIALS):
+            self.train_individuals(disrupted_elites)
          # NOTE: We're simply changing individuals in-place for now, since map features will not change
          # nb_updated = container.update(disrupted_elites, issue_warning=True)
          # print('Reinstated {} of {} disturbed elites.'.format(nb_updated, len(disrupted_elites)))

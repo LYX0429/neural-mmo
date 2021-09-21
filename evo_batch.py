@@ -30,21 +30,21 @@ genomes = [
    'Baseline',
    'Simplex',
    'NCA',
-   'TileFlip',
-   'CPPN',
-   'Primitives',
-   'L-System',
-   'All',
+#  'TileFlip',
+#  'CPPN',
+#  'Primitives',
+#  'L-System',
+#  'All',
 ]
 generator_objectives = [
 #   'MapTestText',
     'Lifespans',
 #   'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
-    'FarNearestNeighbor',
+#   'FarNearestNeighbor',
 #   'CloseNearestNeighbor',
 #   'InvL2',
 ]
@@ -71,7 +71,7 @@ me_bin_sizes = [
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
    True,
-   False
+#  False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
