@@ -1,3 +1,4 @@
+vec_noise
 numpy
 neat-python
 scikit-bio
