@@ -166,7 +166,9 @@ class PlayerManager(EntityGroup):
 
          if self.config.EVALUATE or self.config.PAIRED:
             pop_name = name
-            color = self.palette.colors[name]
+            color = self.palette.colors[name.split(' ')[0]]  # hack: we only color-code by map-generator, so here we're
+                                                         # extracting the name of the map-generator from the short-hand
+                                                         # this is atrocious
             player    = Player(self.realm, (r, c), self.idx, pop, pop_name=pop_name, name=name+'_', color=color)
          else:
             # pop, name = self.identify()

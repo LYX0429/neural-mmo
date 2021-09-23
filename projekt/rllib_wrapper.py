@@ -600,11 +600,11 @@ class RLlibEvaluator(evaluator.Base):
          if self.env.dones['__all__'] == True:
                self.reset_env()
 
-      stats = self.env.get_all_agent_stats()
-      pop_names = stats['skills'][0].keys()
-      for pop_name in pop_names:
-         pop_score = self.calc_diversity(stats, verbose=False, pop=pop_name)
-         print('pop: {}, score: {}'.format(pop_name, pop_score))
+#     stats = self.env.get_all_agent_stats()
+#     pop_names = stats['skills'][0].keys()
+#     for pop_name in pop_names:
+#        pop_score = self.calc_diversity(stats, verbose=False, pop=pop_name)
+#        print('pop: {}, score: {}'.format(pop_name, pop_score))
 
       self.i += 1
 
