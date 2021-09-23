@@ -1,9 +1,9 @@
 [submodule "neat-python"]
 	path = neat-python
-	url = git@github.com:smearle/neat-python
+	url = https://github.com/smearle/neat-python
 [submodule "pytorch-neat"]
 	path = pytorch-neat
-	url = git@github.com:smearle/pytorch-neat
+	url = https://github.com/smearle/pytorch-neat
 [submodule "neural-mmo-client"]
     path = neural-mmo-client
     url = https://github.com/smearle/neural-mmo-client
