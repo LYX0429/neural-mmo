@@ -22,8 +22,14 @@ The following map-generator objectives are in development or not yet implemented
 Installation
 #######
 
-Clone this directory, then its submodules. This will download the NMMO Unity client (which may take a while), for rendering gameplay.
+Either simply clone this repository, including its submodules (this will download the NMMO Unity client (which may take a while), for rendering gameplay):
 ::
+  git clone --recurse-submodules -j8 https://github.com/smearle/neural-mmo
+
+
+or clone this directory, then its submodules:
+::
+  git clone https://github.com/smearle/neural-mmo
   git submodule init
   git submodule update
 
@@ -31,6 +37,7 @@ Create a conda environment and install dependencies:
 ::
   conda create -n nmmo python==3.8
   conda activate nmmo
+  cd neural-mmo
   bash scripts/setup.sh
   
 Mac OS X m1 / Apple silicon
@@ -44,7 +51,7 @@ It still won't work though :~) #TODO
 
 
 `venv` Based Installation
-============================
+************************
 
 > tested on MacOS (x86_64)
 
