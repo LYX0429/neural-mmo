@@ -30,11 +30,11 @@ genomes = [
    'Baseline',
    'Simplex',
    'NCA',
-   'TileFlip',
-   'CPPN',
-   'Primitives',
-   'L-System',
-   'All',
+#  'TileFlip',
+#  'CPPN',
+#  'Primitives',
+#  'L-System',
+#  'All',
 ]
 generator_objectives = [
 #   'MapTestText',
@@ -71,7 +71,7 @@ me_bin_sizes = [
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
    True,
-   False
+#  False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
@@ -266,6 +266,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
    map_exp_names = experiment_names
    # We will use these heatmaps to visualize performance between generator-agent pairs over the set of experiments
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
+   std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1))  # also take std of each model's average performance
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
    div_scores[:] = np.nan
@@ -348,23 +349,31 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                print(fnf)
                print('Skipping. Missing eval data at: {}'.format(eval_data_path))
                continue
-            mean_lifespans[i, j] = np.mean(get_pop_stats(data[0]['lifespans'], pop=None))
-            # TODO: will this work for more than one episode of evaluation??? No???
+            # get the mean lifespan of each eval episode
+            evals_mean_lifespans = [np.mean(get_pop_stats(data_i['lifespans'], pop=None)) for data_i in data]
+            # take the mean lifespan over these episodes
+            mean_lifespans[i, j] = np.mean(evals_mean_lifespans)
+            # std over episodes
+            std_lifespans[i, j] = np.std(evals_mean_lifespans)
+            # get the mean agent skill vector of each eval episode
+            evals_mean_skills = np.vstack([get_pop_stats(data_i['skills'],pop=None).mean(axis=0) for data_i in data])
             for k in range(len(SKILLS)):
-               mean_skill_arr = np.vstack(get_pop_stats(data[0]['skills'], pop=None))
-               mean_skills[k, i, j] = np.mean(mean_skill_arr[:, k])
+               mean_skills[k, i, j] = np.mean(evals_mean_skills[:, k])
             for (k, div_calc_name) in enumerate(DIV_CALCS):
-              #skill_arr = np.vstack(data[0]['skills'])
-              #div_scores[k, i, j] = get_div_calc(div_calc_name)(skill_arr)
-               div_scores[k, i, j] = get_div_calc(div_calc_name)(data[0])
+               evals_div_scores = [get_div_calc(div_calc_name)(data_i) for data_i in data]
+               div_scores[k, i, j] = np.mean(evals_div_scores)
             if opts.multi_policy:
                model_name_idxs = {get_exp_shorthand(r): i for (i, r) in enumerate(model_exp_names)}
                multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
                survivors = np.load(multi_eval_data_path, allow_pickle=True).item()
                for survivor_name, n_survivors in survivors.items():
                   mean_survivors[model_name_idxs[survivor_name], j] = n_survivors.mean()
-         if opts.multi_policy:
+         # TODO:
+         # get std of model's mean lifespan over all maps
+#        std_lifespans[i, j+1] =
+         if opts.multi_policy:  # don't need to iterate through models since we pit them against each other during the same episode
             break
+   TT()
    if vis_cross_eval or vis_only:  # might as well do cross-eval vis if visualizing individual evals I guess
       print("Visualizing cross-evaluation.")
       # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" , "generator_objective" and "PAIRED" dimensions exclusively. Expand crappy get_exp_shorthand function if we need more.
@@ -377,7 +386,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
 
       for c in map_exp_names:
          col_labels.append(get_exp_shorthand(c))
-      cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]")
+      cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]", errors=std_lifespans)
       for (k, skill_name) in enumerate(SKILLS):
          cross_eval_heatmap(mean_skills[k], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
       for (k, div_calc_name) in enumerate(DIV_CALCS):
@@ -385,7 +394,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       if opts.multi_policy:
          cross_eval_heatmap(mean_survivors, row_labels, col_labels, "mean survivors", "")
 
-def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
+def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel, errors=None):
    fig, ax = plt.subplots()
    fig.set_figheight(15)
    fig.set_figwidth(15)
