@@ -30,21 +30,21 @@ genomes = [
    'Baseline',
    'Simplex',
    'NCA',
-#  'TileFlip',
-#  'CPPN',
-#  'Primitives',
-#  'L-System',
-#  'All',
+   'TileFlip',
+   'CPPN',
+   'Primitives',
+   'L-System',
+   'All',
 ]
 generator_objectives = [
 #   'MapTestText',
     'Lifespans',
 #   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
-#   'FarNearestNeighbor',
+    'FarNearestNeighbor',
 #   'CloseNearestNeighbor',
 #   'InvL2',
 ]
@@ -71,7 +71,7 @@ me_bin_sizes = [
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
    True,
-#  False
+   False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
@@ -494,7 +494,7 @@ if __name__ == '__main__':
    EVALUATE = opts.evaluate
    LOCAL = opts.local
    TRAIN_BASELINE = opts.train_baseline
-   CUDA = not opts.cpu and not opts.vis_maps
+   CUDA = not opts.cpu and not opts.vis_maps and not EVALUATE
    VIS_CROSS_EVAL = opts.vis_cross_eval
    VIS_EVALS = opts.vis_evals
    RENDER = opts.render
@@ -503,7 +503,8 @@ if __name__ == '__main__':
    elif CUDA:
       JOB_TIME = 48  # NYU HPC Greene limits number of gpu jobs otherwise
    else:
-      JOB_TIME = 120
+      pass
+#     JOB_TIME = 120  # never use CPU-only for training anyway
 
    if CUDA:
       sbatch_file = 'evo_train.sh'
