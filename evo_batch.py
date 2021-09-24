@@ -89,7 +89,7 @@ def launch_cmd(new_cmd, i):
       job_name = 'nmmo_'
       if EVALUATE:
           job_name += 'eval_'
-      job_name += i
+      job_name += str(i)
       content = re.sub('nmmo_(eval_)?\d+', job_name, content)
       content = re.sub('#SBATCH --time=\d+:', '#SBATCH --time={}:'.format(JOB_TIME), content)
       new_content = re.sub('python Forge.*', new_cmd, content)
@@ -320,6 +320,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
             eval_cmd = 'python Forge.py evaluate {} {} --EVO_DIR {}'.format(l_eval_args, eval_args, EXP_NAME)
             print(eval_cmd)
             launch_cmd(eval_cmd, n)
+            n += 1
          else:
             global EVALUATION_HORIZON
             if opts.multi_policy:
@@ -356,7 +357,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
               #skill_arr = np.vstack(data[0]['skills'])
               #div_scores[k, i, j] = get_div_calc(div_calc_name)(skill_arr)
                div_scores[k, i, j] = get_div_calc(div_calc_name)(data[0])
-            n += 1
             if opts.multi_policy:
                model_name_idxs = {get_exp_shorthand(r): i for (i, r) in enumerate(model_exp_names)}
                multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
