@@ -30,21 +30,21 @@ genomes = [
    'Baseline',
    'Simplex',
    'NCA',
-   'TileFlip',
-   'CPPN',
-   'Primitives',
-   'L-System',
-   'All',
+#  'TileFlip',
+#  'CPPN',
+#  'Primitives',
+#  'L-System',
+#  'All',
 ]
 generator_objectives = [
 #   'MapTestText',
     'Lifespans',
 #   'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
-    'FarNearestNeighbor',
+#   'FarNearestNeighbor',
 #   'CloseNearestNeighbor',
 #   'InvL2',
 ]
@@ -71,7 +71,7 @@ me_bin_sizes = [
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
    True,
-   False
+#  False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
@@ -109,7 +109,7 @@ def launch_batch(exp_name, preeval=False):
          NENT = 16
       else:
          NENT = 3
-      N_EVALS = 1
+      N_EVALS = 2
    else:
       NENT = 16
       N_EVALS = 20
@@ -252,7 +252,11 @@ def launch_batch(exp_name, preeval=False):
 ##        experiment_names.append(get_experiment_name(config))
 
 
-def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, render=False):
+def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, render=False, vis_cross_eval=False):
+   """Launch a batch of evaluations, evaluating player models on generated maps from different experiments.
+   If not just visualizing, run each evaluation (cartesian product of set of experiments with itself), then return.
+   Otherwise, load data from past evaluations to generate visualizations of individual evaluations and/or of comparisons
+   between them."""
    n = 0
    model_exp_names = experiment_names
    map_exp_names = experiment_names
@@ -282,6 +286,8 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       Save.render(map_arr[TERRAIN_BORDER:-TERRAIN_BORDER, TERRAIN_BORDER:-TERRAIN_BORDER], MAP_GENERATOR.textures, png_path)
       if vis_only:
          txt_verb = 'Visualizing past inference'
+      elif vis_cross_eval:
+         txt_verb = 'Collecting data for cross-eval visualization'
       else:
          txt_verb = 'Inferring'
       print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, best_ind.age))
@@ -306,7 +312,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
             os.system(client_cmd)
             print(render_cmd)
             os.system(render_cmd)
-         elif not vis_only:
+         elif not (vis_only or vis_cross_eval):
             eval_cmd = 'python Forge.py evaluate {} {} --EVO_DIR {}'.format(l_eval_args, eval_args, EXP_NAME)
             print(eval_cmd)
             launch_cmd(eval_cmd, n)
@@ -355,8 +361,9 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                   mean_survivors[model_name_idxs[survivor_name], j] = n_survivors.mean()
          if opts.multi_policy:
             break
-   if vis_only:
-      # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" dimension exclusively.
+   if vis_cross_eval or vis_only:  # might as well do cross-eval vis if visualizing individual evals I guess
+      print("Visualizing cross-evaluation.")
+      # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" , "generator_objective" and "PAIRED" dimensions exclusively. Expand crappy get_exp_shorthand function if we need more.
       # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
       row_labels = []
       col_labels = []
@@ -394,6 +401,11 @@ def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
          data = (np.vstack((data.T[:i], data.T[i + 1:]))).T
          continue
       i += 1
+
+   # Add col. with averages over each row (each model)
+   col_labels += ['mean']
+   data = np.hstack((data, np.expand_dims(data.mean(axis=1), 1)))
+
    im, cbar = heatmap(data, row_labels, col_labels, ax=ax,
                       cmap="YlGn", cbarlabel=cbarlabel)
    texts = annotate_heatmap(im, valfmt="{x:.1f}")
@@ -457,6 +469,11 @@ if __name__ == '__main__':
       action='store_true',
    )
    opts.add_argument(
+      '--vis_evals',
+      help='Visualize the results of individual evaluations and cross-evaluation. (No new evaluations.)',
+      action='store_true',
+   )
+   opts.add_argument(
       '--vis_maps',
       help='Save and visualize evolved maps, and plot their fitness.',
       action='store_true'
@@ -479,6 +496,7 @@ if __name__ == '__main__':
    TRAIN_BASELINE = opts.train_baseline
    CUDA = not opts.cpu and not opts.vis_maps
    VIS_CROSS_EVAL = opts.vis_cross_eval
+   VIS_EVALS = opts.vis_evals
    RENDER = opts.render
    if EVALUATE or opts.vis_maps:
       JOB_TIME = 12
@@ -508,12 +526,17 @@ if __name__ == '__main__':
          print('rendering experiments: {}\n KeyboardInterrupt (Ctrl+c) to render next.'.format(experiment_names))
          launch_cross_eval(experiment_names, vis_only=False, render=True, experiment_configs=experiment_configs)
       else:
-         if not VIS_CROSS_EVAL:
+         if not (VIS_CROSS_EVAL or VIS_EVALS):
             print('cross evaluating experiments: {}'.format(experiment_names))
             # only launch these cross evaluations if we need to
             launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=False)
          # otherwise just load up old data to visualize results
-         launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=True)
+         if VIS_EVALS:
+            # visualize individual evaluations.
+            launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=True)
+         elif VIS_CROSS_EVAL or LOCAL:  # elif since vis_only also prompts cross-eval visualization
+            # visualize cross-evaluation tables
+            launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=False, vis_cross_eval=True)
    else:
       # Launch a batch of joint map-evolution and agent-training experiments (maybe also a baseline agent-training experiment on a fixed set of maps).
       launch_batch(EXP_NAME)

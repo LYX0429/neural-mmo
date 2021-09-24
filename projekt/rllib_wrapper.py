@@ -272,7 +272,7 @@ def actionSpace(config, n_act_i=3, n_act_j=5):
 
    return atns
 
-def plot_diversity(x, y, div_names, exp_name, config, render=False):
+def plot_diversity(x, y, err, div_names, exp_name, config, render=False):
    colors = ['darkgreen', 'm', 'g', 'y', 'salmon', 'darkmagenta', 'orchid', 'darkolivegreen', 'mediumaquamarine',
             'mediumturquoise', 'cadetblue', 'slategrey', 'darkblue', 'slateblue', 'rebeccapurple', 'darkviolet', 'violet',
             'fuchsia', 'deeppink', 'olive', 'orange', 'maroon', 'lightcoral', 'firebrick', 'black', 'dimgrey', 'tomato',
@@ -285,9 +285,9 @@ def plot_diversity(x, y, div_names, exp_name, config, render=False):
    plt.subplots_adjust(right=0.78)
    for i, div_name in enumerate(div_names):
       ax = axs[i]
-      markers, caps, bars = ax.errorbar(x, y[:,i,:].mean(axis=0), yerr=y[:,i,:].std(axis=0), label=div_name, alpha=1)
+      markers, caps, bars = ax.errorbar(x, y[i,:], yerr=err[i,:], label=div_name, alpha=1)
       [bar.set_alpha(0.2) for bar in bars]
-      plt.text(0.8, 0.8-i*0.162, '{:.2}'.format(y[:,i,:].mean()), fontsize=12, transform=plt.gcf().transFigure)
+      plt.text(0.8, 0.8-i*0.162, '{:.2}'.format(y[i,-1]), fontsize=12, transform=plt.gcf().transFigure)
      #ax.text(0.8, 0.2, '{:.2}'.format(y[:,i,:].mean()))
       ax.legend(loc='upper left')
 #     if div_name == 'mean pairwise L2':
@@ -450,16 +450,18 @@ class RLlibEvaluator(evaluator.Base):
             # array of data: diversity scores, lifespans...
             divs = np.zeros((len(DIV_CALCS), self.config.EVALUATION_HORIZON // stat_interval))
             stat_i = 0
+            # Actually do the evaluation lol
             for t in tqdm(range(self.config.EVALUATION_HORIZON)):
                eval_done = self.tick(None, None)
-               div_stats = self.env.get_all_agent_stats()
                if (t + 1) % stat_interval == 0 or eval_done:
+                  div_stats = self.env.get_all_agent_stats()
                   for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
                      diversity = calc_diversity(div_stats, verbose=False)
                      divs[j, stat_i] = diversity
                   # lifespans = div_stats['lifespans']
                   # divs[j + 1, stat_i] = np.mean(lifespans)
                   div_mat[i] = divs
+                  final_stats.append(div_stats)
                   stat_i += 1
                # This is a crazy bit where we construct heatmaps but should we not just use get_agent_stats()?
                for _, ent in self.env.realm.players.entities.items():
@@ -471,12 +473,13 @@ class RLlibEvaluator(evaluator.Base):
                         xp = getattr(ent.skills, skill).exp
 #                    heatmaps[i, t, si, r, c] = xp
                      heatmaps[i, si, r, c] += xp
-                  # What is this doing?
+                  # "visited"
                   heatmaps[i, si+1, r, c] += 1
                if eval_done:
                   break
-            self.count_survivors()
-            final_stats.append(div_stats)
+            self.count_survivors()  # no-op if we're not the MultiEvaluator. This is #FIXME gross!!
+         heatmaps = heatmaps.mean(0)  # take mean of heatmaps over separate evals
+         div_mat = np.vstack((div_mat.mean(0, keepdims=True), div_mat.std(0, keepdims=True)))  # take mean and std over evals
          with open(data_path, 'wb') as f:
             np.save(f, np.array(final_stats))
             np.save(f, div_mat)
@@ -488,13 +491,10 @@ class RLlibEvaluator(evaluator.Base):
             heatmaps = np.load(f)
 
       plot_name = 'diversity {}'.format(exp_name)
-      plot_diversity(np.where(ts % stat_interval == 0)[0], div_mat, [d[1] for d in DIV_CALCS], exp_name, self.config)
+      plot_diversity(np.where(ts % stat_interval == 0)[0], div_mat[0], div_mat[1], [d[1] for d in DIV_CALCS], exp_name, self.config)
       plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
       plt.close()
-#     heat_out = heatmaps.mean(axis=0).mean(axis=0)
-      # mean over evals
-      heat_out = heatmaps.mean(axis=0)
-      for s_heat, s_name in zip(heat_out, self.config.SKILLS + ['visited']):
+      for s_heat, s_name in zip(heatmaps, self.config.SKILLS + ['visited']):
          fig, ax = plt.subplots()
          ax.title.set_text('{} heatmap'.format(s_name))
          map_arr = self.env.realm.map.inds()
