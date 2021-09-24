@@ -86,7 +86,11 @@ TERRAIN_BORDER = None
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
       content = f.read()
-      content = re.sub('nmmo\d*', 'nmmo{}'.format(i), content)
+      job_name = 'nmmo_'
+      if EVALUATE:
+          job_name += 'eval_'
+      job_name += i
+      content = re.sub('nmmo_(eval_)?\d+', job_name, content)
       content = re.sub('#SBATCH --time=\d+:', '#SBATCH --time={}:'.format(JOB_TIME), content)
       new_content = re.sub('python Forge.*', new_cmd, content)
 
