@@ -30,21 +30,21 @@ genomes = [
    'Baseline',
    'Simplex',
    'NCA',
-#  'TileFlip',
-#  'CPPN',
-#  'Primitives',
-#  'L-System',
-#  'All',
+   'TileFlip',
+   'CPPN',
+   'Primitives',
+   'L-System',
+   'All',
 ]
 generator_objectives = [
 #   'MapTestText',
     'Lifespans',
 #   'L2',
 #   'Hull',
-#   'Differential',
+    'Differential',
 #   'Sum',
 #   'Discrete',
-#   'FarNearestNeighbor',
+    'FarNearestNeighbor',
 #   'CloseNearestNeighbor',
 #   'InvL2',
 ]
@@ -71,7 +71,7 @@ me_bin_sizes = [
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
    True,
-#  False
+   False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
@@ -361,7 +361,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       row_labels = []
       col_labels = []
 
-
       for r in model_exp_names:
          row_labels.append(get_exp_shorthand(r))
 
@@ -377,7 +376,24 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
 
 def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
    fig, ax = plt.subplots()
+   fig.set_figheight(15)
+   fig.set_figwidth(15)
 
+   # Remove empty rows and columns
+   i = 0
+   for (row_label, data_row) in zip(row_labels, data):
+      if np.isnan(data_row).all():
+         row_labels = row_labels[:i] + row_labels[i+1:]
+         data = np.vstack((data[:i], data[i+1:]))
+         continue
+      i += 1
+   i = 0
+   for (col_label, data_col) in zip(col_labels, data.T):
+      if np.isnan(data_col).all():
+         col_labels = col_labels[:i] + col_labels[i + 1:]
+         data = (np.vstack((data.T[:i], data.T[i + 1:]))).T
+         continue
+      i += 1
    im, cbar = heatmap(data, row_labels, col_labels, ax=ax,
                       cmap="YlGn", cbarlabel=cbarlabel)
    texts = annotate_heatmap(im, valfmt="{x:.1f}")
