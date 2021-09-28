@@ -7,10 +7,10 @@
 #SBATCH --mem=64GB
 #SBATCH --job-name=nmmo_0
 #SBATCH --mail-type=BEGIN,END
-#SBATCH --mail-user=sam.earle@nyu.edu
+#SBATCH --mail-user=yl8616@nyu.edu
 #SBATCH --output=nmmo_0_%j.out
 
-cd /scratch/se2161/neural-mmo || exit
+#cd /scratch/se2161/neural-mmo || exit
 
 conda init bash
 conda activate nmmo
