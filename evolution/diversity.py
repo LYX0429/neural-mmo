@@ -509,7 +509,7 @@ def calc_evenly_spread(agent_stats, pop=None, punish_youth=True):
    score = 0
    # Find the farest agent
    greatest_distance = 0
-   for distance in distacnes:
+   for distance in distances:
       if -np.sum(distance) < greatest_distance:
          greatest_distance = -np.sum(distance)
 
