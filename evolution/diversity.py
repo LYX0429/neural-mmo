@@ -16,6 +16,7 @@ def diversity_calc(config):
 def get_div_calc(objective_name):
    if objective_name in env_objectives:
       return env_objectives[objective_name]
+
    else:
        raise Exception('Unsupported fitness function: {}'.format(div_calc_name))
    return calc_diversity
@@ -489,7 +490,33 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, 
        score))
 
    return score
+   
+def calc_evenly_spread(agent_stats, pop=None, punish_youth=True):
+   if 'skills' not in agent_stats:
+      return 0
+   agent_skills = get_pop_stats(agent_stats['skills'], pop)
+   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
+   assert len(agent_skills) == len(lifespans)
+   if punish_youth:
+      agent_skills = contract_by_lifespan(agent_skills, lifespans)
 
+   # For each agent. Get the distances to other agents and save in distances
+   n_agents = agent_skills.shape[0]
+   a = agent_skills
+   b = a.reshape(n_agents, 1, a.shape[1])
+   distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
+
+   score = 0
+   # Find the farest agent
+   greatest_distance = 0
+   for distance in distacnes:
+      if -np.sum(distance) < greatest_distance:
+         greatest_distance = -np.sum(distance)
+
+   # Find the average skills of all agents
+   average_skills = np.sum(agent_skills) // agent_skills.shape[0] // agent_skills.shape[1]
+   score = greatest_distance + average_skills
+   return score
 env_objectives = {
    'L2': calc_diversity_l2,
    'InvL2': calc_homogeneity_l2,
@@ -507,9 +534,14 @@ env_objectives = {
    'MapTest': calc_local_map_entropy,
    'MapTestText': ham_text,
    'y_deltas': calc_y_deltas,
+   'Even': calc_evenly_spread,
 }
 
 DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'),
 #            (calc_discrete_entropy_2, 'discrete entropy'),
              (calc_convex_hull, 'convex hull volume'), (sum_lifespans, 'lifespans'),
              (far_nearest_neighbor, 'MinMax neighbor')]
+
+# fitness = -max(distances between agents)).
+
+
