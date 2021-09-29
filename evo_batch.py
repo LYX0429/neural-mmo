@@ -25,7 +25,6 @@ from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc, get_pop_stats
 from evolution.utils import get_exp_shorthand, get_eval_map_inds
 
-#
 
 genomes = [
    'Baseline',
