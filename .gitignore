@@ -11,6 +11,7 @@ configs/*
 docs/source/autodoc/
 docs/build/
 !evo_experiment/.gitkeep
+!eval_experiment/.gitkeep
 .DS_Store
 .vscode
 env/*
