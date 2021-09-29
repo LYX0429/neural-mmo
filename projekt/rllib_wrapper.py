@@ -434,144 +434,146 @@ class RLlibEvaluator(evaluator.Base):
       assert self.config.EVALUATION_HORIZON % n_stat_calcs == 0
       stat_interval = self.config.EVALUATION_HORIZON // n_stat_calcs
       n_evals = self.config.N_EVAL
+      n_eval_maps = self.config.N_EVAL_MAPS
       n_metrics = len(DIV_CALCS)
       n_skills = len(self.config.SKILLS)
-      div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON // stat_interval))
-#     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
-      heatmaps = np.zeros((n_evals, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
-      final_stats = []
-      data_path = os.path.join(self.eval_path_model, '{} eval.npy'.format(exp_name))
-      if self.config.NEW_EVAL:
-         for i in range(n_evals):
-            self.env.reset(idx=self.config.INFER_IDX)
-            self.obs = self.env.step({})[0]
-            self.state = {}
-            self.registry = OverlayRegistry(self.config, self.env)
-            # array of data: diversity scores, lifespans...
-            divs = np.zeros((len(DIV_CALCS), self.config.EVALUATION_HORIZON // stat_interval))
-            stat_i = 0
-            # Actually do the evaluation lol
-            for t in tqdm(range(self.config.EVALUATION_HORIZON)):
-               eval_done = self.tick(None, None)
-               if (t + 1) % stat_interval == 0 or eval_done:
-                  div_stats = self.env.get_all_agent_stats()
-                  for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
-                     diversity = calc_diversity(div_stats, verbose=False)
-                     divs[j, stat_i] = diversity
-                  # lifespans = div_stats['lifespans']
-                  # divs[j + 1, stat_i] = np.mean(lifespans)
-                  div_mat[i] = divs
-                  final_stats.append(div_stats)
-                  stat_i += 1
-               # This is a crazy bit where we construct heatmaps but should we not just use get_agent_stats()?
-               for _, ent in self.env.realm.players.entities.items():
-                  r, c = ent.pos
-                  for si, skill in enumerate(self.config.SKILLS):
-                     if skill == 'exploration':
-                        xp = len(ent.explored) * 20
-                     else:
-                        xp = getattr(ent.skills, skill).exp
-#                    heatmaps[i, t, si, r, c] = xp
-                     heatmaps[i, si, r, c] += xp
-                  # "visited"
-                  heatmaps[i, si+1, r, c] += 1
-               if eval_done:
-                  break
-            self.count_survivors()  # no-op if we're not the MultiEvaluator. This is #FIXME gross!!
-         heatmaps = heatmaps.mean(0)  # take mean of heatmaps over separate evals
-         div_mat = np.vstack((div_mat.mean(0, keepdims=True), div_mat.std(0, keepdims=True)))  # take mean and std over evals
-         with open(data_path, 'wb') as f:
-            np.save(f, np.array(final_stats))
-            np.save(f, div_mat)
-            np.save(f, heatmaps)
-      else:
-         with open(data_path, 'rb') as f:
-            final_stats = np.load(f, allow_pickle=True)
-            div_mat = np.load(f)
-            heatmaps = np.load(f)
+      for j in range(n_eval_maps):
+         div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON // stat_interval))
+   #     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
+         heatmaps = np.zeros((n_evals, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
+         final_stats = []
+         data_path = os.path.join(self.eval_path_model, '{} eval.npy'.format(exp_name))
+         if self.config.NEW_EVAL:
+            for i in range(n_evals):
+               self.env.reset(idx=self.config.INFER_IDX)
+               self.obs = self.env.step({})[0]
+               self.state = {}
+               self.registry = OverlayRegistry(self.config, self.env)
+               # array of data: diversity scores, lifespans...
+               divs = np.zeros((len(DIV_CALCS), self.config.EVALUATION_HORIZON // stat_interval))
+               stat_i = 0
+               # Actually do the evaluation lol
+               for t in tqdm(range(self.config.EVALUATION_HORIZON)):
+                  eval_done = self.tick(None, None)
+                  if (t + 1) % stat_interval == 0 or eval_done:
+                     div_stats = self.env.get_all_agent_stats()
+                     for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
+                        diversity = calc_diversity(div_stats, verbose=False)
+                        divs[j, stat_i] = diversity
+                     # lifespans = div_stats['lifespans']
+                     # divs[j + 1, stat_i] = np.mean(lifespans)
+                     div_mat[i] = divs
+                     final_stats.append(div_stats)
+                     stat_i += 1
+                  # This is a crazy bit where we construct heatmaps but should we not just use get_agent_stats()?
+                  for _, ent in self.env.realm.players.entities.items():
+                     r, c = ent.pos
+                     for si, skill in enumerate(self.config.SKILLS):
+                        if skill == 'exploration':
+                           xp = len(ent.explored) * 20
+                        else:
+                           xp = getattr(ent.skills, skill).exp
+   #                    heatmaps[i, t, si, r, c] = xp
+                        heatmaps[i, si, r, c] += xp
+                     # "visited"
+                     heatmaps[i, si+1, r, c] += 1
+                  if eval_done:
+                     break
+               self.count_survivors()  # no-op if we're not the MultiEvaluator. This is #FIXME gross!!
+            heatmaps = heatmaps.mean(0)  # take mean of heatmaps over separate evals
+            div_mat = np.vstack((div_mat.mean(0, keepdims=True), div_mat.std(0, keepdims=True)))  # take mean and std over evals
+            with open(data_path, 'wb') as f:
+               np.save(f, np.array(final_stats))
+               np.save(f, div_mat)
+               np.save(f, heatmaps)
+         else:
+            with open(data_path, 'rb') as f:
+               final_stats = np.load(f, allow_pickle=True)
+               div_mat = np.load(f)
+               heatmaps = np.load(f)
 
-      plot_name = 'diversity {}'.format(exp_name)
-      plot_diversity(np.where(ts % stat_interval == 0)[0], div_mat[0], div_mat[1], [d[1] for d in DIV_CALCS], exp_name, self.config)
-      plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
-      plt.close()
-      for s_heat, s_name in zip(heatmaps, self.config.SKILLS + ['visited']):
-         fig, ax = plt.subplots()
-         ax.title.set_text('{} heatmap'.format(s_name))
-         map_arr = self.env.realm.map.inds()
-         mask = (map_arr == Water.index ) + (map_arr == Lava.index) + (map_arr == Stone.index)
-         s_heat = np.ma.masked_where((mask==True), s_heat)
-         s_heat = np.flip(s_heat, 0)
-#        s_heat = np.log(s_heat + 1)
-         im = ax.imshow(s_heat, cmap='cool')
-         ax.set_xlim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
-         ax.set_ylim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
-         cbar = ax.figure.colorbar(im, ax=ax)
-         cbar.ax.set_ylabel('{} (log(xp)/tick)'.format(s_name))
-         plt.savefig(os.path.join(self.eval_path_model, '{} heatmap {}.png'.format(s_name, exp_name)))
+         plot_name = 'diversity {}'.format(exp_name)
+         plot_diversity(np.where(ts % stat_interval == 0)[0], div_mat[0], div_mat[1], [d[1] for d in DIV_CALCS], exp_name, self.config)
+         plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
+         plt.close()
+         for s_heat, s_name in zip(heatmaps, self.config.SKILLS + ['visited']):
+            fig, ax = plt.subplots()
+            ax.title.set_text('{} heatmap'.format(s_name))
+            map_arr = self.env.realm.map.inds()
+            mask = (map_arr == Water.index ) + (map_arr == Lava.index) + (map_arr == Stone.index)
+            s_heat = np.ma.masked_where((mask==True), s_heat)
+            s_heat = np.flip(s_heat, 0)
+   #        s_heat = np.log(s_heat + 1)
+            im = ax.imshow(s_heat, cmap='cool')
+            ax.set_xlim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
+            ax.set_ylim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
+            cbar = ax.figure.colorbar(im, ax=ax)
+            cbar.ax.set_ylabel('{} (log(xp)/tick)'.format(s_name))
+            plt.savefig(os.path.join(self.eval_path_model, '{} heatmap {}.png'.format(s_name, exp_name)))
 
-      mean_divs = {}
-      # Originally we were taking the mean of diversity and lifespan stats over various timesteps, then calculating mean
-      # and stddev over different episodes/trials. Instead, let's just look at the last step.
-#     means_np = div_mat.mean(axis=-1).mean(axis=0)
-#     stds_np = div_mat.mean(axis=-1).std(axis=0)
-      means_np = div_mat[:, :, -1].mean(axis=0)
-      stds_np = div_mat[:, :, -1].std(axis=0)
-      for j, (_, div_name) in enumerate(DIV_CALCS):
-         mean_divs[div_name] = {}
-         mean_divs[div_name]['mean'] = means_np[j]
-         mean_divs[div_name]['std'] = stds_np[j]
-      with open(os.path.join(self.eval_path_model, 'stats.json'), 'w') as outfile:
-         json.dump(mean_divs, outfile, indent=2)
+         mean_divs = {}
+         # Originally we were taking the mean of diversity and lifespan stats over various timesteps, then calculating mean
+         # and stddev over different episodes/trials. Instead, let's just look at the last step.
+   #     means_np = div_mat.mean(axis=-1).mean(axis=0)
+   #     stds_np = div_mat.mean(axis=-1).std(axis=0)
+         means_np = div_mat[:, :, -1].mean(axis=0)
+         stds_np = div_mat[:, :, -1].std(axis=0)
+         for j, (_, div_name) in enumerate(DIV_CALCS):
+            mean_divs[div_name] = {}
+            mean_divs[div_name]['mean'] = means_np[j]
+            mean_divs[div_name]['std'] = stds_np[j]
+         with open(os.path.join(self.eval_path_model, 'stats.json'), 'w') as outfile:
+            json.dump(mean_divs, outfile, indent=2)
 
-      from sklearn.manifold import TSNE
-      tsne = TSNE(n_components=2, random_state=0)
-      final_agent_skills = np.vstack([get_pop_stats(stats['skills'], pop=None) for stats in final_stats])
-      X_2d = tsne.fit_transform(final_agent_skills)
-      plt.close()
-      plt.figure()
-      plt.title('TSNE plot of agents')
-#     colors = np.hstack([stats['lifespans'] for stats in final_stats])
-     #colors = lifespans
-      # FIXME: an issue here
-#     sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
-#     cbar = plt.colorbar(sc)
-#     cbar.ax.set_ylabel('lifespans')
-#     plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
-#     plt.close()
-      plt.figure()
-      p1 = plt.bar(np.arange(final_agent_skills.shape[0]), final_agent_skills.mean(axis=1), 5, yerr=final_agent_skills.std(axis=1))
-      plt.title('agent bars {}'.format(exp_name))
-      plt.close()
-      plt.figure()
-      p1 = plt.bar(np.arange(final_agent_skills.shape[1]), final_agent_skills.mean(axis=0), 1, yerr=final_agent_skills.std(axis=0))
-      plt.xticks(np.arange(final_agent_skills.shape[1]), self.config.SKILLS)
-      plt.ylabel('experience points')
-      plt.title('skill bars {}'.format(exp_name))
-      plt.savefig(os.path.join(self.eval_path_model, 'skill bars {}.png'.format(exp_name)))
-      plt.close()
-      plt.figure()
-      plt.title('agent-skill matrix {}'.format(exp_name))
-      im, cbar = heatmap(final_agent_skills, {}, self.config.SKILLS)
-      plt.savefig(os.path.join(self.eval_path_model, 'agent-skill matrix {}'.format(exp_name)))
-#     if final_agent_skills.shape[1] == 2:
-#        plot_div_2d(final_stats)
-#        plt.figure()
-#        plt.title('Agents')
-#        sc = plt.scatter(final_agent_skills[:, 0], final_agent_skills[:, 1], c=colors)
-#        cbar = plt.colorbar(sc)
-#        cbar.ax.set_ylabel('lifespans')
-#        plt.ylabel('woodcutting')
-#        plt.xlabel('mining')
-#        plt.savefig(os.path.join(self.eval_path_model, 'agents scatter.png'.format(exp_name)))
+         from sklearn.manifold import TSNE
+         tsne = TSNE(n_components=2, random_state=0)
+         final_agent_skills = np.vstack([get_pop_stats(stats['skills'], pop=None) for stats in final_stats])
+         X_2d = tsne.fit_transform(final_agent_skills)
+         plt.close()
+         plt.figure()
+         plt.title('TSNE plot of agents')
+   #     colors = np.hstack([stats['lifespans'] for stats in final_stats])
+        #colors = lifespans
+         # FIXME: an issue here
+   #     sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
+   #     cbar = plt.colorbar(sc)
+   #     cbar.ax.set_ylabel('lifespans')
+   #     plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
+   #     plt.close()
+         plt.figure()
+         p1 = plt.bar(np.arange(final_agent_skills.shape[0]), final_agent_skills.mean(axis=1), 5, yerr=final_agent_skills.std(axis=1))
+         plt.title('agent bars {}'.format(exp_name))
+         plt.close()
+         plt.figure()
+         p1 = plt.bar(np.arange(final_agent_skills.shape[1]), final_agent_skills.mean(axis=0), 1, yerr=final_agent_skills.std(axis=0))
+         plt.xticks(np.arange(final_agent_skills.shape[1]), self.config.SKILLS)
+         plt.ylabel('experience points')
+         plt.title('skill bars {}'.format(exp_name))
+         plt.savefig(os.path.join(self.eval_path_model, 'skill bars {}.png'.format(exp_name)))
+         plt.close()
+         plt.figure()
+         plt.title('agent-skill matrix {}'.format(exp_name))
+         im, cbar = heatmap(final_agent_skills, {}, self.config.SKILLS)
+         plt.savefig(os.path.join(self.eval_path_model, 'agent-skill matrix {}'.format(exp_name)))
+   #     if final_agent_skills.shape[1] == 2:
+   #        plot_div_2d(final_stats)
+   #        plt.figure()
+   #        plt.title('Agents')
+   #        sc = plt.scatter(final_agent_skills[:, 0], final_agent_skills[:, 1], c=colors)
+   #        cbar = plt.colorbar(sc)
+   #        cbar.ax.set_ylabel('lifespans')
+   #        plt.ylabel('woodcutting')
+   #        plt.xlabel('mining')
+   #        plt.savefig(os.path.join(self.eval_path_model, 'agents scatter.png'.format(exp_name)))
 
-#     print('Diversity: {}'.format(diversity))
+   #     print('Diversity: {}'.format(diversity))
 
-      log = InkWell()
-      log.update(self.env.terminal())
+         log = InkWell()
+         log.update(self.env.terminal())
 
-#     fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
-      fpath = os.path.join(self.eval_path_model, 'evaluation.npy')
-      np.save(fpath, log.packet)
+   #     fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
+         fpath = os.path.join(self.eval_path_model, 'evaluation.npy')
+         np.save(fpath, log.packet)
 
 
    def tick(self, pos, cmd):

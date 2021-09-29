@@ -23,25 +23,26 @@ from projekt import config
 from fire import Fire
 from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc, get_pop_stats
-from evolution.utils import get_exp_shorthand
+from evolution.utils import get_exp_shorthand, get_eval_map_inds
 
+#
 
 genomes = [
    'Baseline',
    'Simplex',
    'NCA',
-#  'TileFlip',
-#  'CPPN',
-#  'Primitives',
-#  'L-System',
-#  'All',
+   'TileFlip',
+   'CPPN',
+   'Primitives',
+   'L-System',
+   'All',
 ]
 generator_objectives = [
 #   'MapTestText',
-    'Lifespans',
+#   'Lifespans',
 #   'L2',
 #   'Hull',
-    'Differential',
+#   'Differential',
 #   'Sum',
 #   'Discrete',
     'FarNearestNeighbor',
@@ -70,8 +71,8 @@ me_bin_sizes = [
 # Are we running a PAIRED-type algorithm? If so, we use two policies, and reward the generator for maximizing the
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
-   True,
-#  False
+#  True,
+   False
 ]
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
@@ -81,6 +82,8 @@ global eval_args
 global EVALUATION_HORIZON
 global TERRAIN_BORDER  # Assuming this is the same for all experiments!
 global MAP_GENERATOR  # Also tile-set
+global N_EVAL_MAPS
+global N_MAP_EVALS
 TERRAIN_BORDER = None
 
 def launch_cmd(new_cmd, i):
@@ -107,16 +110,21 @@ def launch_cmd(new_cmd, i):
 def launch_batch(exp_name, preeval=False):
    global TERRAIN_BORDER
    global MAP_GENERATOR
+   global N_EVAL_MAPS
+   global N_MAP_EVALS
    if LOCAL:
       default_config['n_generations'] = 1
       if EVALUATE or opts.render:
          NENT = 16
       else:
          NENT = 3
-      N_EVALS = 2
+      #FIXME: we're overwriting a variable from original NMMO here. Will this be a problem?
+      N_EVAL_MAPS = 2  # How many maps to evaluate on. This must always be divisible by 2
+      N_MAP_EVALS = 2  # How many times to evaluate on each map
    else:
       NENT = 16
-      N_EVALS = 20
+      N_EVAL_MAPS = 10
+      N_MAP_EVALS = 10
    N_PROC = opts.n_cpu
    N_EVO_MAPS = 12
    global EVALUATION_HORIZON
@@ -127,10 +135,10 @@ def launch_batch(exp_name, preeval=False):
    launched_baseline = False
    i = 0
    global eval_args
-   eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', " \
+   eval_args = "--EVALUATION_HORIZON {} --N_EVAL {} --N_EVAL_MAPS {} --NEW_EVAL --SKILLS \"['constitution', 'fishing', 'hunting', " \
                "'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]\" --NENT {} " \
                "--FITNESS_METRIC {} ".format(
-      EVALUATION_HORIZON, N_EVALS, NENT, generator_objectives[0])
+      EVALUATION_HORIZON, N_MAP_EVALS, N_EVAL_MAPS, NENT, generator_objectives[0])
 
    settings_tpls = [i for i in itertools.product(genomes, generator_objectives, skills, algos, me_bin_sizes,
                                                  PAIRED_bools)]
@@ -194,10 +202,10 @@ def launch_batch(exp_name, preeval=False):
          'PAIRED': PAIRED_bool,
          'NUM_GPUS': 1 if CUDA else 0,
          })
-      if gene == 'Baseline':
-         exp_config.update({
-             'PRETRAIN': True,
-         })
+#     if gene == 'Baseline':
+#        exp_config.update({
+#            'PRETRAIN': True,
+#        })
 
       print('Saving experiment config:\n{}'.format(exp_config))
       with open('configs/settings_{}.json'.format(i), 'w') as f:
@@ -265,119 +273,141 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
    model_exp_names = experiment_names
    map_exp_names = experiment_names
    # We will use these heatmaps to visualize performance between generator-agent pairs over the set of experiments
-   mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names)))
-   std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1))  # also take std of each model's average performance
-   mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names)))
-   div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names)))
+   mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
+#  std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1, N_EVALS, N_EVAL_MAPS))  # also take std of each model's average performance
+   mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
+   div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
    div_scores[:] = np.nan
    mean_skills[:] = np.nan
    mean_lifespans[:] = np.nan
    if opts.multi_policy:
-      mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names)), dtype=np.float)
-   for (j, map_exp_name) in enumerate(map_exp_names):
+      mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names), N_EVALS, N_EVAL_MAPS), dtype=np.float)
+   if vis_only:
+      txt_verb = 'Visualizing past inference'
+   elif vis_cross_eval:
+      txt_verb = 'Collecting data for cross-eval visualization'
+   else:
+      txt_verb = 'Inferring'
+   for (gen_i, map_exp_name) in enumerate(map_exp_names):
+      # For each experiment from which we are evaluating generated maps, load up its map archive in order to select
+      # these evaluation maps
+      print('{} from evaluation on maps from experiment: {}'.format(txt_verb, map_exp_name))
       try:
          with open(os.path.join('evo_experiment', map_exp_name, 'ME_archive.p'), "rb") as f:
-            archive = pickle.load(f)
+            map_archive = pickle.load(f)
       except FileNotFoundError as fnf:
          print(fnf)
          print('skipping eval with map from: {}'.format(map_exp_name))
          continue
-      best_ind = archive['container'].best
-      infer_idx, best_fitness = best_ind.idx, best_ind.fitness
-      map_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx), '')
-      map_arr = best_ind.chromosome.map_arr
-      Save.np(map_arr, map_path)
-      png_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx) + '.png')
-      Save.render(map_arr[TERRAIN_BORDER:-TERRAIN_BORDER, TERRAIN_BORDER:-TERRAIN_BORDER], MAP_GENERATOR.textures, png_path)
-      if vis_only:
-         txt_verb = 'Visualizing past inference'
-      elif vis_cross_eval:
-         txt_verb = 'Collecting data for cross-eval visualization'
-      else:
-         txt_verb = 'Inferring'
-      print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, best_ind.age))
-      for (i, (model_exp_name, model_config)) in enumerate(zip(model_exp_names, experiment_configs)):
-         l_eval_args = '--config TreeOrerock --MAP {} --INFER_IDX \"{}\" '.format(map_exp_name,
-                                                                                          infer_idx)
-         if opts.multi_policy:
-            NPOLICIES = len(experiment_names)
-            l_eval_args += '--MODEL {} '.format(str(model_exp_names).replace(' ', ''))
-         else:
-            NPOLICIES = 1
-            l_eval_args += '--MODEL {} '.format(model_exp_name)
-         NPOP = NPOLICIES
-         #TODO: deal with PAIRED, and combinations of PAIRED and non-PAIRED experiments
-         l_eval_args += '--NPOLICIES {} --NPOP {} --PAIRED {}'.format(NPOLICIES, NPOP, model_config['PAIRED'])
-
-         if render:
-            render_cmd = 'python Forge.py render {} {}'.format(l_eval_args, eval_args)
-            assert LOCAL  # cannot render on SLURM
-            assert not vis_only
-            client_cmd = 'cd ../neural-mmo-client && ./UnityClient/neural-mmo-resources.x86_64&'
-            os.system(client_cmd)
-            print(render_cmd)
-            os.system(render_cmd)
-         elif not (vis_only or vis_cross_eval):
-            eval_cmd = 'python Forge.py evaluate {} {} --EVO_DIR {}'.format(l_eval_args, eval_args, EXP_NAME)
-            print(eval_cmd)
-            launch_cmd(eval_cmd, n)
-            n += 1
-         else:
-            global EVALUATION_HORIZON
+      # best_ind = archive['container'].best
+      eval_inds = get_eval_map_inds(map_archive, n_inds=N_EVAL_MAPS)
+      # Evaluate on maps from each best map generator individual
+      for map_i, eval_map in enumerate(eval_inds):
+         infer_idx, best_fitness = eval_map.idx, eval_map.fitness
+         map_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx), '')
+         map_arr = eval_map.chromosome.map_arr
+         # Saving just in case we haven't already
+         Save.np(map_arr, map_path)
+         png_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx) + '.png')
+         Save.render(map_arr[TERRAIN_BORDER:-TERRAIN_BORDER, TERRAIN_BORDER:-TERRAIN_BORDER], MAP_GENERATOR.textures, png_path)
+         print('{} on map {}, with fitness {}, and age {}.'.format(txt_verb, infer_idx, best_fitness, eval_map.age))
+         for (mdl_i, (model_exp_name, model_config)) in enumerate(zip(model_exp_names, experiment_configs)):
+            l_eval_args = '--config TreeOrerock --MAP {} --INFER_IDX \"{}\" '.format(map_exp_name,
+                                                                                             infer_idx)
             if opts.multi_policy:
-               model_exp_folder = 'multi_policy'
-               model_name = str([get_exp_shorthand(m) for m in model_exp_names])
+               NPOLICIES = len(experiment_names)
+               l_eval_args += '--MODEL {} '.format(str(model_exp_names).replace(' ', ''))
             else:
-               model_name = get_exp_shorthand(model_exp_name)
-               model_exp_folder = model_exp_name
-            map_exp_folder = map_exp_name
-            eval_data_path = os.path.join(
-               'eval_experiment',
-               map_exp_folder,
-               str(infer_idx),
-               model_exp_folder,
-               'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
-                  model_name,
-                  get_exp_shorthand(map_exp_name),
-                  infer_idx,
-                  EVALUATION_HORIZON
-               ),
-            )
-            try:
-               data = np.load(eval_data_path, allow_pickle=True)
-            except FileNotFoundError as fnf:
-               print(fnf)
-               print('Skipping. Missing eval data at: {}'.format(eval_data_path))
-               continue
-            # get the mean lifespan of each eval episode
-            evals_mean_lifespans = [np.mean(get_pop_stats(data_i['lifespans'], pop=None)) for data_i in data]
-            # take the mean lifespan over these episodes
-            mean_lifespans[i, j] = np.mean(evals_mean_lifespans)
-            # std over episodes
-            std_lifespans[i, j] = np.std(evals_mean_lifespans)
-            # get the mean agent skill vector of each eval episode
-            evals_mean_skills = np.vstack([get_pop_stats(data_i['skills'],pop=None).mean(axis=0) for data_i in data])
-            for k in range(len(SKILLS)):
-               mean_skills[k, i, j] = np.mean(evals_mean_skills[:, k])
-            for (k, div_calc_name) in enumerate(DIV_CALCS):
-               evals_div_scores = [get_div_calc(div_calc_name)(data_i) for data_i in data]
-               div_scores[k, i, j] = np.mean(evals_div_scores)
-            if opts.multi_policy:
-               model_name_idxs = {get_exp_shorthand(r): i for (i, r) in enumerate(model_exp_names)}
-               multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
-               survivors = np.load(multi_eval_data_path, allow_pickle=True).item()
-               for survivor_name, n_survivors in survivors.items():
-                  mean_survivors[model_name_idxs[survivor_name], j] = n_survivors.mean()
-         # TODO:
-         # get std of model's mean lifespan over all maps
-#        std_lifespans[i, j+1] =
-         if opts.multi_policy:  # don't need to iterate through models since we pit them against each other during the same episode
-            break
-   TT()
+               NPOLICIES = 1
+               l_eval_args += '--MODEL {} '.format(model_exp_name)
+            NPOP = NPOLICIES
+            #TODO: deal with PAIRED, and combinations of PAIRED and non-PAIRED experiments
+            l_eval_args += '--NPOLICIES {} --NPOP {} --PAIRED {}'.format(NPOLICIES, NPOP, model_config['PAIRED'])
+
+            if render:
+               render_cmd = 'python Forge.py render {} {}'.format(l_eval_args, eval_args)
+               assert LOCAL  # cannot render on SLURM
+               assert not vis_only
+               # Launch the client as a background process
+               client_cmd = './neural-mmo-client/UnityClient/neural-mmo-resources.x86_64&'
+               os.system(client_cmd)
+               print(render_cmd)
+               os.system(render_cmd)
+            elif not (vis_only or vis_cross_eval):
+               eval_cmd = 'python Forge.py evaluate {} {} --EVO_DIR {}'.format(l_eval_args, eval_args, EXP_NAME)
+               print(eval_cmd)
+               launch_cmd(eval_cmd, n)
+               n += 1
+            else:
+               global EVALUATION_HORIZON
+               if opts.multi_policy:
+                  model_exp_folder = 'multi_policy'
+                  model_name = str([get_exp_shorthand(m) for m in model_exp_names])
+               else:
+                  model_name = get_exp_shorthand(model_exp_name)
+                  model_exp_folder = model_exp_name
+               map_exp_folder = map_exp_name
+               eval_data_path = os.path.join(
+                  'eval_experiment',
+                  map_exp_folder,
+                  str(infer_idx),
+                  model_exp_folder,
+                  'MODEL_{}_MAP_{}_ID{}_{}steps eval.npy'.format(
+                     model_name,
+                     get_exp_shorthand(map_exp_name),
+                     infer_idx,
+                     EVALUATION_HORIZON
+                  ),
+               )
+               try:
+                  data = np.load(eval_data_path, allow_pickle=True)
+               except FileNotFoundError as fnf:
+                  print(fnf)
+                  print('Skipping. Missing eval data at: {}'.format(eval_data_path))
+                  continue
+               # get the mean lifespan of each eval episode
+               evals_mean_lifespans = [np.mean(get_pop_stats(data_i['lifespans'], pop=None)) for data_i in data]
+               # take the mean lifespan over these episodes
+               mean_lifespans[mdl_i, gen_i, :, map_i] = evals_mean_lifespans
+               # std over episodes
+               # std_lifespans[mdl_i, gen_i, map_i] = np.std(evals_mean_lifespans)
+               # get the mean agent skill vector of each eval episode
+               evals_mean_skills = np.vstack([get_pop_stats(data_i['skills'],pop=None).mean(axis=0) for data_i in data])
+               for s_i in range(len(SKILLS)):
+                  mean_skills[s_i, mdl_i, gen_i, :, map_i] = evals_mean_skills[:, s_i]
+               for (s_i, div_calc_name) in enumerate(DIV_CALCS):
+                  evals_div_scores = [get_div_calc(div_calc_name)(data_i) for data_i in data]
+                  div_scores[s_i, mdl_i, gen_i, :, map_i] = evals_div_scores
+               if opts.multi_policy:
+                  model_name_idxs = {get_exp_shorthand(r): i for (i, r) in enumerate(model_exp_names)}
+                  multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
+                  survivors = np.load(multi_eval_data_path, allow_pickle=True).item()
+                  for survivor_name, n_survivors in survivors.items():
+                     mean_survivors[model_name_idxs[survivor_name], gen_i, :, map_i] = n_survivors
+            # TODO: get std of model's mean lifespan over all maps
+   #        std_lifespans[i, j+1] =
+            if opts.multi_policy:  # don't need to iterate through models since we pit them against each other during the same episode
+               break
    if vis_cross_eval or vis_only:  # might as well do cross-eval vis if visualizing individual evals I guess
       print("Visualizing cross-evaluation.")
       # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" , "generator_objective" and "PAIRED" dimensions exclusively. Expand crappy get_exp_shorthand function if we need more.
       # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
+
+      # get mean  model performance over maps/generators during a given eval
+      mean_aggr_lifespan = mean_lifespans.mean(axis=-1).mean(axis=1)
+      # get standard deviation of this aggregate score across evals
+      std_aggr_lifespan = mean_aggr_lifespan.std(axis=-1)
+      # get mean lifespan over evals on each map
+      mean_lifespans = mean_lifespans.mean(axis=-2)
+      # mean and standard deviation of lifespans over maps
+      mean_lifespans = mean_lifespans.mean(axis=-1)
+      std_lifespans = mean_lifespans.std(axis=-1)
+      # Repeat this averaging logic for other stats
+      div_scores = div_scores.mean(axis=-2).mean(axis=-1)
+      mean_skills = mean_skills.mean(axis=-1).mean(axis=-1)
+      if opts.multi_policy:
+         mean_survivors = mean_survivors.mean(axis=-2).mean(axis=-1)
+
       row_labels = []
       col_labels = []
 
@@ -387,10 +417,10 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       for c in map_exp_names:
          col_labels.append(get_exp_shorthand(c))
       cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]", errors=std_lifespans)
-      for (k, skill_name) in enumerate(SKILLS):
-         cross_eval_heatmap(mean_skills[k], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
-      for (k, div_calc_name) in enumerate(DIV_CALCS):
-         cross_eval_heatmap(div_scores[k], row_labels, col_labels, "{} diversity".format(div_calc_name), "{} diversity".format(div_calc_name))
+      for (s_i, skill_name) in enumerate(SKILLS):
+         cross_eval_heatmap(mean_skills[s_i], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
+      for (s_i, div_calc_name) in enumerate(DIV_CALCS):
+         cross_eval_heatmap(div_scores[s_i], row_labels, col_labels, "{} diversity".format(div_calc_name), "{} diversity".format(div_calc_name))
       if opts.multi_policy:
          cross_eval_heatmap(mean_survivors, row_labels, col_labels, "mean survivors", "")
 
