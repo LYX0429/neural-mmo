@@ -217,7 +217,8 @@ class EvolverNMMO(LambdaMuEvolver):
       self.SIMPLEX_NOISE = config.GENOME == 'Simplex'
       self.BASELINE_SIMPLEX = config.GENOME == 'Baseline'
       self.ALL_GENOMES = config.GENOME == 'All'
-      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES or self.BASELINE_SIMPLEX):
+      self.RIVER_BOTTLENECK_BASELINE = config.GENOME == 'RiverBottleneckBaseline'
+      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES or self.BASELINE_SIMPLEX or self.RIVER_BOTTLENECK_BASELINE):
          raise Exception('Invalid genome')
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'

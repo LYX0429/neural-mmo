@@ -29,14 +29,15 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 ##### HYPER-PARAMETERS #####
 
 genomes = [
-   'Baseline',
-#  'Simplex',
-#  'NCA',
-#  'TileFlip',
-#  'CPPN',
-#  'Primitives',
-#  'L-System',
-#  'All',
+   #'Baseline',
+   #'Simplex',
+   #'NCA',
+   #'TileFlip',
+   #'CPPN',
+   #'Primitives',
+   #'L-System',
+   #'All',
+   'RiverBottleneckBaseline'
 ]
 generator_objectives = [
 #  'MapTestText',
@@ -195,7 +196,9 @@ def launch_batch(exp_name, preeval=False):
       def launch_experiment(i):
          # Write the config file with the desired settings
          exp_config = copy.deepcopy(default_config)
+         root = os.path.dirname(os.path.abspath(__file__)) + "/evo_experiment/experiment-name_0/maps/map"
          exp_config.update({
+            'ROOT': root,
             'N_GENERATIONS': N_GENERATIONS,
             'TERRAIN_SIZE': 70,
             'NENT': NENT,

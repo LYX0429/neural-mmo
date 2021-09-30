@@ -136,7 +136,7 @@ def main():
       archive = pickle.load(open(os.path.join(save_path, 'ME_archive.p'), 'rb'))
       logbook = pickle.load(open(os.path.join(save_path, 'logbook.pkl'), 'rb'))
       print('Plotting histogram of map fitness.')
-      plot_qdpy_fitness(save_path=save_path, logbook=logbook, evolver=None)
+      #plot_qdpy_fitness(save_path=save_path, logbook=logbook, evolver=None)
       print('Saving and rendering maps from the archive of elites.')
       save_maps(individuals=archive['container'], save_path=save_path, config=config)
       return
