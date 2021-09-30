@@ -509,5 +509,7 @@ env_objectives = {
    'y_deltas': calc_y_deltas,
 }
 
-DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'), (calc_discrete_entropy_2, 'discrete entropy'), (calc_convex_hull, 'convex hull volume'), (sum_lifespans, 'lifespans'),
+DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'),
+#            (calc_discrete_entropy_2, 'discrete entropy'),
+             (calc_convex_hull, 'convex hull volume'), (sum_lifespans, 'lifespans'),
              (far_nearest_neighbor, 'MinMax neighbor')]

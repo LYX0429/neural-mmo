@@ -31,13 +31,13 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 genomes = [
 #  'Baseline',
    'RiverBottleneckBaseline',
-#   'Simplex',
-#   'NCA',
-#   'TileFlip',
-#   'CPPN',
-#   'Primitives',
-#   'L-System',
-#   'All',
+#  'Simplex',
+#  'NCA',
+#  'TileFlip',
+#  'CPPN',
+#  'Primitives',
+#  'L-System',
+#  'All',
 ]
 generator_objectives = [
 #  'MapTestText',
@@ -90,7 +90,10 @@ adv_div_trgs = itertools.product(adv_div_trgs, adv_div_trgs)
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
 SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
-DIV_CALCS = ['L2', 'Differential', 'Hull', 'Discrete', 'Sum']
+DIV_CALCS = ['L2', 'Differential', 'Hull',
+             #'Discrete',
+             'FarNearestNeighbor',
+            'Sum']
 global eval_args
 global EVALUATION_HORIZON
 global TERRAIN_BORDER  # Assuming this is the same for all experiments!
@@ -98,6 +101,7 @@ global MAP_GENERATOR  # Also tile-set
 global N_EVAL_MAPS
 global N_MAP_EVALS
 TERRAIN_BORDER = None
+MAP_GENERATOR = None
 
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
@@ -120,7 +124,9 @@ def launch_cmd(new_cmd, i):
       os.system('sbatch {}'.format(sbatch_file))
 
 
-def launch_batch(exp_name, preeval=False):
+def launch_batch(exp_name, get_exp_info_only=False):
+   exp_names = []
+   exp_configs = []
    global TERRAIN_BORDER
    global MAP_GENERATOR
    global N_EVAL_MAPS
@@ -217,6 +223,8 @@ def launch_batch(exp_name, preeval=False):
             'TERRAIN_RENDER': False,
             'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
             'VIS_MAPS': opts.vis_maps,
+            'RENDER': RENDER,
+            'EVALUATE': EVALUATE,
             'PAIRED': PAIRED_bool,
             'NUM_GPUS': 1 if CUDA else 0,
             'ADVERSITY_DIVERSITY_RATIO': adv_div_ratio,
@@ -234,7 +242,9 @@ def launch_batch(exp_name, preeval=False):
          # Edit the sbatch file to load the correct config file
          # Launch the experiment. It should load the saved settings
          new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
-         launch_cmd(new_cmd, i)
+         exp_configs.append(exp_config)
+         if not get_exp_info_only:
+            launch_cmd(new_cmd, i)
 
       adv_div_ratio = 0.5  # dummi var
       adv_div_trg = (1, 1)  # dummi var
@@ -250,6 +260,7 @@ def launch_batch(exp_name, preeval=False):
       else:
          launch_experiment(i)
          i += 1
+   return exp_configs
 
 
 def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, render=False, vis_cross_eval=False):
@@ -257,9 +268,10 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
    If not just visualizing, run each evaluation (cartesian product of set of experiments with itself), then return.
    Otherwise, load data from past evaluations to generate visualizations of individual evaluations and/or of comparisons
    between them."""
+   global MAP_GENERATOR
    n = 0
-   model_exp_names = experiment_names
-   map_exp_names = experiment_names
+   model_exp_names, model_exp_configs = experiment_names, experiment_configs
+   map_exp_names, map_exp_configs = experiment_names, experiment_configs
    # We will use these heatmaps to visualize performance between generator-agent pairs over the set of experiments
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
 #  std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1, N_EVALS, N_EVAL_MAPS))  # also take std of each model's average performance
@@ -276,7 +288,11 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       txt_verb = 'Collecting data for cross-eval visualization'
    else:
       txt_verb = 'Inferring'
-   for (gen_i, map_exp_name) in enumerate(map_exp_names):
+   # FIXME: why tf is this breaking if I move inside the loop?
+   if MAP_GENERATOR is None:
+      MAP_GENERATOR = MapGenerator(map_exp_configs[0])
+   for (gen_i, (map_exp_name, map_exp_config)) in enumerate(zip(map_exp_names, map_exp_configs)):
+      TERRAIN_BORDER = map_exp_config.TERRAIN_BORDER
       # For each experiment from which we are evaluating generated maps, load up its map archive in order to select
       # these evaluation maps
       print('{} from evaluation on maps from experiment: {}'.format(txt_verb, map_exp_name))
@@ -310,7 +326,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                l_eval_args += '--MODEL {} '.format(model_exp_name)
             NPOP = NPOLICIES
             #TODO: deal with PAIRED, and combinations of PAIRED and non-PAIRED experiments
-            l_eval_args += '--NPOLICIES {} --NPOP {} --PAIRED {}'.format(NPOLICIES, NPOP, model_config['PAIRED'])
+            l_eval_args += '--NPOLICIES {} --NPOP {} --PAIRED {}'.format(NPOLICIES, NPOP, model_config.PAIRED)
 
             if render:
                render_cmd = 'python Forge.py render {} {}'.format(l_eval_args, eval_args)
@@ -549,11 +565,12 @@ if __name__ == '__main__':
       default_config = json.load(f)
    print('Loaded default config:\n{}'.format(default_config))
 
-   if EVALUATE or RENDER and not opts.vis_maps:
-      experiment_names = []
-      experiment_configs = []
+   if (EVALUATE or RENDER or VIS_EVALS or VIS_CROSS_EVAL) and not opts.vis_maps:
       # just get the names and configs of experiments in which we are interested (no actual evaluations are run)
-      launch_batch(EXP_NAME, preeval=True)
+      exp_dicts = launch_batch(EXP_NAME, get_exp_info_only=True)
+      experiment_configs = [config.EvoNMMO() for ec in exp_dicts]
+      [ec.set(*i) for ec, ecd in zip(experiment_configs, exp_dicts) for i in ecd.items()]
+      experiment_names = [get_experiment_name(ec) for ec in experiment_configs]
       if RENDER:
          print('rendering experiments: {}\n KeyboardInterrupt (Ctrl+c) to render next.'.format(experiment_names))
          launch_cross_eval(experiment_names, vis_only=False, render=True, experiment_configs=experiment_configs)

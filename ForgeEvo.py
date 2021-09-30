@@ -182,16 +182,22 @@ def main():
 
    except FileNotFoundError as e:
       print(e)
-      print('Cannot load; missing evolver and/or model checkpoint. Evolving from scratch.')
+      print('Cannot load; missing evolver and/or model checkpoint.')
 
-      evolver = init_evolver(save_path,
-                            createEnv,
-                            None,  # init the trainer in evolution script
-                            config,
-                            n_proc=   config.N_PROC,
-                            n_pop=    config.N_EVO_MAPS,
-                            n_epochs= config.N_GENERATIONS,
-                            )
+      if not (config.EVALUATE or config.VIS_MAPS or config.RENDER):
+         print('Evolving from scratch.')
+
+         evolver = init_evolver(save_path,
+                               createEnv,
+                               None,  # init the trainer in evolution script
+                               config,
+                               n_proc=   config.N_PROC,
+                               n_pop=    config.N_EVO_MAPS,
+                               n_epochs= config.N_GENERATIONS,
+                               )
+      else:
+         print('Failed to do evaluation thingy(?)')
+         raise Exception
 #  print(torch.__version__)
 
 #  print(torch.cuda.current_device())
