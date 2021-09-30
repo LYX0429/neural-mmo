@@ -26,27 +26,30 @@ from evolution.diversity import get_div_calc, get_pop_stats
 from evolution.utils import get_exp_shorthand, get_eval_map_inds
 
 
+##### HYPER-PARAMETERS #####
+
 genomes = [
    'Baseline',
-   'Simplex',
-   'NCA',
-   'TileFlip',
-   'CPPN',
-   'Primitives',
-   'L-System',
-   'All',
+#  'Simplex',
+#  'NCA',
+#  'TileFlip',
+#  'CPPN',
+#  'Primitives',
+#  'L-System',
+#  'All',
 ]
 generator_objectives = [
-#   'MapTestText',
-#   'Lifespans',
-#   'L2',
-#   'Hull',
-#   'Differential',
-#   'Sum',
-#   'Discrete',
-    'FarNearestNeighbor',
-#   'CloseNearestNeighbor',
-#   'InvL2',
+#  'MapTestText',
+#  'Lifespans',
+#  'L2',
+#  'Hull',
+#  'Differential',
+#  'Sum',
+#  'Discrete',
+#  'FarNearestNeighbor',
+#  'CloseNearestNeighbor',
+#  'InvL2',
+   'AdversityDiversity',
 ]
 skills = [
     'ALL',
@@ -73,6 +76,17 @@ PAIRED_bools = [
 #  True,
    False
 ]
+# TODO: really, these are just ratios/fractions that can be arranged along a line.
+#  - visualize these as such, find a cleaner way to divide up this line
+#  - find adversity/diversity hyperparams that it would actually make sense to visualiza over a grid? E.g. specific
+#    target values in both metrics?
+#adv_div_weights = np.arange(0.0,1.01, 0.25)
+#adv_div_weights = itertools.product(adv_div_weights, adv_div_weights)
+adv_div_weights = [(1,1)]
+
+##########################
+
+
 
 # TODO: use this variable in the eval command string. Formatting might be weird.
 SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
@@ -141,8 +155,8 @@ def launch_batch(exp_name, preeval=False):
 
    settings_tpls = [i for i in itertools.product(genomes, generator_objectives, skills, algos, me_bin_sizes,
                                                  PAIRED_bools)]
-   for (gene, fit_func, skillset, algo, me_bins, PAIRED_bool) in settings_tpls:
-      if fit_func in ['Lifespans', 'Sum']:
+   for (gene, gen_obj, skillset, algo, me_bins, PAIRED_bool) in settings_tpls:
+      if gen_obj in ['Lifespans', 'Sum']:
          if skillset != 'ALL':
             continue
          skillset = 'NONE'
@@ -165,7 +179,7 @@ def launch_batch(exp_name, preeval=False):
          feature_calc = 'map_entropy'
 
       if LOCAL:
-         if fit_func == 'MapTestText':
+         if gen_obj == 'MapTestText':
             N_GENERATIONS = 100000
             if gene == 'All':
                EVO_SAVE_INTERVAL = 100
@@ -178,64 +192,76 @@ def launch_batch(exp_name, preeval=False):
          EVO_SAVE_INTERVAL = 500
          N_GENERATIONS = 10000
 
-      # Write the config file with the desired settings
-      exp_config = copy.deepcopy(default_config)
-      exp_config.update({
-         'N_GENERATIONS': N_GENERATIONS,
-         'TERRAIN_SIZE': 70,
-         'NENT': NENT,
-         'GENOME': gene,
-         'FITNESS_METRIC': fit_func,
-         'EVO_ALGO': algo,
-         'EVO_DIR': exp_name,
-         'SKILLS': skillset,
-         'ME_BIN_SIZES': me_bins,
-         'ME_BOUNDS': [(0,100),(0,100)],
-         'FEATURE_CALC': feature_calc,
-         'ITEMS_PER_BIN': items_per_bin,
-         'N_EVO_MAPS': N_EVO_MAPS,
-         'N_PROC': N_PROC,
-         'TERRAIN_RENDER': False,
-         'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
-         'VIS_MAPS': opts.vis_maps,
-         'PAIRED': PAIRED_bool,
-         'NUM_GPUS': 1 if CUDA else 0,
+      def launch_experiment(i):
+         # Write the config file with the desired settings
+         exp_config = copy.deepcopy(default_config)
+         exp_config.update({
+            'N_GENERATIONS': N_GENERATIONS,
+            'TERRAIN_SIZE': 70,
+            'NENT': NENT,
+            'GENOME': gene,
+            'FITNESS_METRIC': gen_obj,
+            'EVO_ALGO': algo,
+            'EVO_DIR': exp_name,
+            'SKILLS': skillset,
+            'ME_BIN_SIZES': me_bins,
+            'ME_BOUNDS': [(0, 100), (0, 100)],
+            'FEATURE_CALC': feature_calc,
+            'ITEMS_PER_BIN': items_per_bin,
+            'N_EVO_MAPS': N_EVO_MAPS,
+            'N_PROC': N_PROC,
+            'TERRAIN_RENDER': False,
+            'EVO_SAVE_INTERVAL': EVO_SAVE_INTERVAL,
+            'VIS_MAPS': opts.vis_maps,
+            'PAIRED': PAIRED_bool,
+            'NUM_GPUS': 1 if CUDA else 0,
+            'ADVERSITY_DIVERSITY_WEIGHTS': adv_div_coeffs,
          })
-#     if gene == 'Baseline':
-#        exp_config.update({
-#            'PRETRAIN': True,
-#        })
+         #     if gene == 'Baseline':
+         #        exp_config.update({
+         #            'PRETRAIN': True,
+         #        })
 
-      print('Saving experiment config:\n{}'.format(exp_config))
-      with open('configs/settings_{}.json'.format(i), 'w') as f:
-         json.dump(exp_config, f, ensure_ascii=False, indent=4)
+         print('Saving experiment config:\n{}'.format(exp_config))
+         with open('configs/settings_{}.json'.format(i), 'w') as f:
+            json.dump(exp_config, f, ensure_ascii=False, indent=4)
 
-      # Edit the sbatch file to load the correct config file
-      # Launch the experiment. It should load the saved settings
+         # Edit the sbatch file to load the correct config file
+         # Launch the experiment. It should load the saved settings
 
-      if not preeval:
-         assert not EVALUATE
+#        if not preeval:
+#           assert not EVALUATE
          new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
          launch_cmd(new_cmd, i)
-         i += 1
 
+#        else:
+#           evo_config = config.EvoNMMO
+#           # sys.argv = sys.argv[:1] + ['override']
+#           # Fire(config)
+#           for (k, v) in exp_config.items():
+#              setattr(evo_config, k, v)
+#           #   config.set(config, k, v)
+#           if TERRAIN_BORDER is None:
+#              TERRAIN_BORDER = evo_config.TERRAIN_BORDER
+#              MAP_GENERATOR = MapGenerator(evo_config)
+#           else:
+#              assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
+#           experiment_name = get_experiment_name(evo_config)
+#           experiment_names.append(experiment_name)
+#           experiment_configs.append({'PAIRED': PAIRED_bool})
+
+            # config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
+
+      if gen_obj == 'AdversityDiversity':
+         for adv_div_coeffs in adv_div_weights:
+            if adv_div_coeffs == (0,0):
+               continue
+            launch_experiment(i)
+            i += 1
       else:
-         evo_config = config.EvoNMMO
-        #sys.argv = sys.argv[:1] + ['override']
-        #Fire(config)
-         for (k, v) in exp_config.items():
-            setattr(evo_config, k, v)
-        #   config.set(config, k, v)
-         if TERRAIN_BORDER is None:
-            TERRAIN_BORDER = evo_config.TERRAIN_BORDER
-            MAP_GENERATOR = MapGenerator(evo_config)
-         else:
-            assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
-         experiment_name = get_experiment_name(evo_config)
-         experiment_names.append(experiment_name)
-         experiment_configs.append({'PAIRED': PAIRED_bool})
-
-                    #config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
+         adv_div_coeffs = (0,0)  # does nothing
+         launch_experiment(i)
+         i += 1
 
 #   if TRAIN_BASELINE:
 #      # Finally, launch a baseline

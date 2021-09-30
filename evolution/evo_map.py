@@ -1,24 +1,16 @@
 import copy
 
-# import torch.cuda
-from qdpy.phenotype import Features
-import csv
-import json
+import math
 import os
 import pickle
-import random
 import sys
 import time
-from pathlib import Path
 from pdb import set_trace as TT
 from shutil import copyfile
 from typing import Dict
-import skimage
-from skimage.morphology import disk
 
 import numpy as np
 import ray
-import scipy
 from ray import rllib
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.agents.trainer_template import build_trainer
@@ -30,22 +22,17 @@ from ray.rllib.policy.sample_batch import SampleBatch
 import projekt
 import neat
 from evolution.diversity import diversity_calc
-from evolution.diversity import calc_map_entropies, calc_global_map_entropy
+from evolution.diversity import calc_map_entropies
 from evolution.lambda_mu import LambdaMuEvolver
 from evolution.individuals import EvoIndividual
-#from evolution.individuals import CPPNGenome as DefaultGenome
 from evolution.individuals import DefaultGenome
-from evolution.individuals import CAGenome
 from forge.blade.core.terrain import MapGenerator, Save
 from forge.blade.lib import enums
 from forge.blade.lib import material
-from forge.ethyr.torch import utils
 from forge.trinity.overlay import OverlayRegistry
 
 from pcg import get_tile_data
 from plot_evo import plot_exp
-#from projekt import rlutils
-#from projekt.evaluator import Evaluator
 from projekt.rllib_wrapper import (EvoPPOTrainer, RLlibLogCallbacks, RLlibEvaluator,
                                    actionSpace, frozen_execution_plan,
                                    observationSpace)
@@ -61,24 +48,6 @@ np.set_printoptions(threshold=sys.maxsize,
 global TRAINER
 TRAINER = None
 
-# # FIXME: backward compatability, we point to correct function on restore()
-# def calc_convex_hull():
-#    pass
-#
-# def calc_differential_entropy():
-#    pass
-#
-# def calc_discrete_entropy_2():
-#    pass
-#
-# def calc_convex_hull():
-#    pass
-#
-# def calc_fitness_l2():
-#    pass
-#
-# def calc_map_diversity():
-#    pass
 
 def k_largest_index_argsort(a, k):
     idx = np.argsort(a.ravel())[:-k-1:-1]
@@ -250,8 +219,6 @@ class EvolverNMMO(LambdaMuEvolver):
       self.ALL_GENOMES = config.GENOME == 'All'
       if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES or self.BASELINE_SIMPLEX):
          raise Exception('Invalid genome')
-      if self.BASELINE_SIMPLEX:
-          assert config.PRETRAIN
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
       self.MAP_TEST = 'MapTest' in config.FITNESS_METRIC
@@ -343,12 +310,16 @@ class EvolverNMMO(LambdaMuEvolver):
       return policies
 
    def update_fitness(self, individual, ALP):
+      gen_obj_infos = {
+         'adv_div_coeffs': self.config.ADVERSITY_DIVERSITY_WEIGHTS,
+      }
       if self.config.PAIRED:
-         protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=pop_name) for pop_name in
+         protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=pop_name,
+                                                                      infos=gen_obj_infos) for pop_name in
                                                     ['pro', 'ant']]
          individual.update_fitness(protaganist_fitness - antagonist_fitness, ALP, self.config)
       elif not self.MAP_TEST:
-         individual.update_fitness(self.calc_fitness(individual.stats), ALP, self.config)
+         individual.update_fitness(self.calc_fitness(individual.stats, infos=gen_obj_infos), ALP, self.config)
       else:
          individual.update_fitness(self.calc_fitness(individual=individual, config=self.config), ALP, self.config)
 
@@ -382,24 +353,35 @@ class EvolverNMMO(LambdaMuEvolver):
       plot_exp(self.config.EVO_DIR)
 
    def train_individuals(self, individuals):
+      # Here we were saving maps and plotting map quality/archive, commented-out to save time during training. Can do
+      # this manually mid-training using `python evo_batch.py --vis_maps`
       # if self.n_epoch % self.config.EVO_SAVE_INTERVAL == 0:
       #    self.saveMaps(self.container)
       #    if self.n_epoch > 0:
       #        self.plot()
       maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in individuals])
-#     if self.config.FROZEN and False:
-#        stats = self.train_and_log_frozen(maps)
-#     else:
-      stats = self.train_and_log(maps)
+
+      # TODO: train "frozen" i.e. non-learning agents?
+      # if self.config.FROZEN and False:
+      #    stats = self.train_and_log_frozen(maps)
+      # else:
+
+      # Train on candidate maps in batches according to number of parallel processes
+      n_proc = self.config.N_PROC
+      map_idxs = list(maps.keys())
+      map_batch_idxs = [map_idxs[n_proc*i: n_proc*(i+1)] for i in range(math.ceil(len(map_idxs) / n_proc))]
+      stats = {}
+      for batch_idxs in map_batch_idxs:
+         maps_batch = {i: maps[i] for i in batch_idxs}
+         stats.update(self.train_and_log(maps_batch))
 
       for ind in individuals:
          if not self.MAP_TEST and not ind.idx in stats:
-            print('missing individual {} from training stats!'.format(ind.idx))
+            print('missing individual {} from training stats! THIS SHOULD NOT BE HAPPENING!!! >:('.format(ind.idx))
 #           print(maps.keys())
 #           print(stats.keys())
 #           #FIXME: We'll try again for now.
             stats = self.train_and_log(maps)
-#           stats = ray.get(self.global_stats.get.remote())
 
          if self.LEARNING_PROGRESS and len(ind.score_hists) < 2:
             stats = self.train_and_log(maps)
@@ -410,10 +392,9 @@ class EvolverNMMO(LambdaMuEvolver):
          ind.stats = stats[ind.idx]
          self.update_fitness(ind, ALP=self.LEARNING_PROGRESS)
          self.update_features(ind)
-#        ind.fitness.valid = True
          ind.age += 1
 #        if not len(ind.score_hists) == ind.age:
-#           T()
+#           TT()
          #FIXME: what for?
 #        self.idxs.add(idx)
 #        if self.CPPN or self.CA or self.ALL_GENOMES:
@@ -512,54 +493,6 @@ class EvolverNMMO(LambdaMuEvolver):
 
       if gi in self.population:
          self.population.pop(gi)
-#     self.maps.pop(gi)
-#     self.score_hists.pop(gi)
-
-#     if gi in self.chromosomes:
-#        self.chromosomes.pop(gi)
-
-#     if self.LEARNING_PROGRESS:
-#        self.ALPs.pop(gi)
-
-
-#  def gen_cppn_map(self, genome):
-#     if genome.map_arr is not None and genome.multi_hot is not None:
-#        return genome.map_arr, genome.multi_hot
-
-#     cppn = neat.nn.FeedForwardNetwork.create(genome, self.neat_config)
-#       if self.config.NET_RENDER:
-#          with open('nmmo_cppn.pkl', 'wb') a
-#     multi_hot = np.zeros((self.n_tiles, self.map_width, self.map_height), dtype=np.float)
-#     map_arr = np.zeros((self.map_width, self.map_height), dtype=np.uint8)
-
-#     for x in range(self.map_width):
-#        for y in range(self.map_height):
-#           # a decent scale for NMMO
-#           x_i, y_i = x * 2 / self.map_width - 1, y * 2 / self.map_width - 1
-#           x_i, y_i = x_i * 2, y_i * 2
-#           v = cppn.activate((x_i, y_i))
-
-#           if self.config.THRESHOLD:
-#              # use NMMO's threshold logic
-#              assert len(v) == 1
-#              v = v[0]
-#              v = self.map_generator.material_evo(self.config, v)
-#           else:
-#              # CPPN has output channel for each tile type; take argmax over channels
-#              # also a spawn-point tile
-#              assert len(v) == self.n_tiles
-#              multi_hot[:, x, y] = v
-#              # Shuffle before selecting argmax to prevent bias for certain tile types in case of ties
-#              v = np.array(v)
-#              v = np.random.choice(np.flatnonzero(v == v.max()))
-#              v = np.argmax(v)
-#              map_arr[x, y] = v
-#     map_arr = self.validate_map(map_arr, multi_hot)
-#     genome.map_arr = map_arr
-#     genome.multi_hot = multi_hot
-
-#     return map_arr, multi_hot
-
 
 
    def neat_eval_fitness(self, genomes, neat_config):

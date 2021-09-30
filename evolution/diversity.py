@@ -32,7 +32,9 @@ def get_div_calc(div_calc_name):
       calc_diversity = close_nearest_neighbor
    elif div_calc_name == 'Lifespans':  # or config.FITNESS_METRIC == 'ALP':
       calc_diversity = sum_lifespans
-   elif div_calc_name == 'Lifetimes':
+   elif div_calc_name == 'AdversityDiversity':
+      calc_diversity = adversity_diversity
+   elif div_calc_name == 'Lifetimes':  # FIXME: is this any different than Lifespans??
        calc_diversity = calc_mean_lifetime
    elif div_calc_name == 'Actions':
        calc_diversity = calc_mean_actions_matched
@@ -43,10 +45,11 @@ def get_div_calc(div_calc_name):
        get_trg_image()
    elif div_calc_name == 'y_deltas':
        calc_diversity = calc_y_deltas
-   elif div_calc_name == 'Scores' or config.FITNESS_METRIC == 'ALP':
-       calc_diversity = calc_scores
+   # FIXME: dust off map objective that takes Absolute Learning Progress of policy along a given metric?
+   # elif div_calc_name == 'Scores' or config.FITNESS_METRIC == 'ALP':
+   #     calc_diversity = calc_scores
    else:
-       raise Exception('Unsupported fitness function: {}'.format(config.FITNESS_METRIC))
+       raise Exception('Unsupported fitness function: {}'.format(div_calc_name))
    return calc_diversity
 
 def get_trg_image():
@@ -169,7 +172,7 @@ def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False, pop=None)
 
     return mean_lifetime
 
-def sum_lifespans(agent_stats, skill_headers=None, n_policies=1, verbose=False, pop=None):
+def sum_lifespans(agent_stats, skill_headers=None, verbose=False, pop=None, infos={}):
    lifespans = get_pop_stats(agent_stats['lifespans'], pop=pop)
    score = lifespans.mean()
    if verbose:
@@ -219,6 +222,27 @@ def far_nearest_neighbor(agent_stats, skill_headers=None, verbose=False, infos={
 def close_nearest_neighbor(agent_stats, **kwargs):
    # TODO: we'll have to do some punish_youth here, or this will incentivize killing everyone ASAP
    return - far_nearest_neighbor(agent_stats, **kwargs)
+
+def adversity_diversity(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=False):
+   adv_coeff, div_coeff = infos.pop('adv_div_coeffs')
+   adv_score, div_score = 0, 0
+   if adv_coeff != 0:
+      adv_score = sum_lifespans(agent_stats, skill_headers=skill_headers, verbose=verbose, infos=infos, pop=pop)
+      adv_score *= adv_coeff
+   if div_coeff != 0:
+      # important not to punish youth here! Since we're already addressing adversity above
+      div_score = calc_differential_entropy(agent_stats, skill_headers=skill_headers, verbose=verbose, infos=infos,
+                                            pop=pop, punish_youth=False)
+      # lifespans are in the range [0, 100]
+      # differential diversity scores are in the range of about [20, 60]
+      div_score = (div_score - 20) * 100 / 40
+      div_score *= div_coeff
+      # TODO: we assume 100 episode steps here, and that if we increase this, adv and div scores will scale at the
+      #  same rate, which is almost certainly wrong
+
+   print(adv_score, div_score)
+
+   return adv_score + div_score
 
 def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True):
    agent_skills = get_pop_stats(agent_stats['skills'], pop)

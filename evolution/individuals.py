@@ -25,8 +25,8 @@ class SpawnPoints():
         n_spawns = len(self.spawn_points)
         n_delete = np.random.randint(0, 5)
         n_add = np.random.randint(0, 5)
-0
 
+# Not using these currently
 MELEE_MIN = 0.4
 MELEE_MAX = 1.4
 MAGE_MIN = 0.6

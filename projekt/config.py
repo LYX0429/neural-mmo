@@ -5,8 +5,12 @@ import os
 
 def get_experiment_name(config):
    #  assert len(config.SKILLS) == 1
+   map_obj_name = config.FITNESS_METRIC
+   if config.FITNESS_METRIC == 'AdversityDiversity':
+      map_obj_name += str(config.ADVERSITY_DIVERSITY_WEIGHTS).replace('[', '').replace(']', '').replace(
+         ',', '').replace(' ', '-')
    experiment_name = 'fit-{}_skills-{}_gene-{}_algo-{}'.format(
-      config.FITNESS_METRIC,
+      map_obj_name,
       config.SKILLS,
       config.GENOME,
       config.EVO_ALGO,
