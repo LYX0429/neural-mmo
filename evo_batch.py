@@ -29,14 +29,15 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 ##### HYPER-PARAMETERS #####
 
 genomes = [
-#  'Baseline',
-#  'Simplex',
-#  'NCA',
-#  'TileFlip',
-#  'CPPN',
-#  'Primitives',
-#  'L-System',
-   'All',
+   #'Baseline',
+   'RiverBottleneckBaseline'
+   #'Simplex',
+   #'NCA',
+   #'TileFlip',
+   #'CPPN',
+   #'Primitives',
+   #'L-System',
+   #'All',
 ]
 generator_objectives = [
 #  'MapTestText',
@@ -77,10 +78,11 @@ PAIRED_bools = [
 #  True,
    False
 ]
-adv_div_ratios = np.arange(0, 1.01, 1/6)  # this gets stretched to [-1, 1] and used to shrink one agent or the either
+adv_div_ratios = [.5]
+# adv_div_ratios = np.arange(0, 1.01, 1/6)  # this gets stretched to [-1, 1] and used to shrink one agent or the either
 
 adv_div_trgs = np.arange(0, 1.01, 1/5)
-adv_div_trgs = np.meshgrid(adv_div_trgs, adv_div_trgs)
+adv_div_trgs = itertools.product(adv_div_trgs, adv_div_trgs)
 
 ##########################
 
@@ -193,7 +195,9 @@ def launch_batch(exp_name, preeval=False):
       def launch_experiment(i):
          # Write the config file with the desired settings
          exp_config = copy.deepcopy(default_config)
+         root = os.path.dirname(os.path.abspath(__file__)) + "/evo_experiment/experiment-name_0/maps/map"
          exp_config.update({
+            'ROOT': root,
             'N_GENERATIONS': N_GENERATIONS,
             'TERRAIN_SIZE': 70,
             'NENT': NENT,
@@ -232,7 +236,7 @@ def launch_batch(exp_name, preeval=False):
 
       adv_div_ratio = 0.5  # dummi var
       adv_div_trg = (1, 1)  # dummi var
-      if gen_obj in ['AdversityDiversity', 'AdversityTrg']:
+      if gen_obj in ['AdversityDiversity', 'AdversityDiversityTrgs']:
          for adv_div_ratio in adv_div_ratios:
             if gen_obj == 'AdversityDiversityTrgs':
                for adv_div_trg in adv_div_trgs:

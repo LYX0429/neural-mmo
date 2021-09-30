@@ -13,6 +13,7 @@ import vec_noise
 from pytorch_neat.cppn import create_cppn
 # from numba import njit
 from typing import Any
+import itertools
 
 # Not using this
 class SpawnPoints():
@@ -609,6 +610,158 @@ class SimplexNoiseGenome(Genome):
             map_arr[i, j] = self.thresh_tiles[t]
          self.map_arr = map_arr.astype(np.uint8)
 
+class RiverBottleneckGenome(Genome):
+   def __init__(self, n_tiles, map_width, lava_border_width):
+      super().__init__(n_tiles, map_width)
+      self.lava_border_width = lava_border_width
+      return self.init_baseline()
+
+   def init_baseline(self):
+      self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
+      self.step_size = 0.125
+      # Following the parameters for the baseline simplex noise maps -- see projekt/config
+      self.n_bands = 9
+      self.threshes = np.array([
+         0.25,
+         0.4,
+         0.45,
+         0.5,
+         0.715,
+         #              0.35,
+         0.75,
+         0.8,
+         0.85,
+      ])
+      self.thresh_tiles = np.array([
+         enums.MaterialEnum.WATER.value.index,
+         enums.MaterialEnum.GRASS.value.index,
+         enums.MaterialEnum.LAVA.value.index,
+         enums.MaterialEnum.SPAWN.value.index,
+         enums.MaterialEnum.GRASS.value.index,
+         #              enums.MaterialEnum.FOREST.value.index,
+         enums.MaterialEnum.FOREST.value.index,
+         enums.MaterialEnum.TREE.value.index,
+         enums.MaterialEnum.OREROCK.value.index,
+         enums.MaterialEnum.STONE.value.index,
+      ])
+      self.n_bridges = 2
+      self.starter_food_thresh = (0.25, 0.26)
+      return
+
+   def mutate(self):
+      return self.init_baseline()
+
+   def gen_map(self):
+      map_width = self.map_width
+      s = np.arange(map_width)
+      X, Y = np.meshgrid(s, s)
+      val = np.zeros((map_width, map_width), dtype=float)
+      map_arr = np.zeros((map_width, map_width), dtype=np.uint8)
+      val = vec_noise.snoise2(self.x0 + X * self.step_size, self.y0 + Y * self.step_size)
+      full_threshes = np.concatenate((self.threshes, [1]))
+      if full_threshes.shape[0] != self.thresh_tiles.shape[0]:
+         raise Exception('Number of thresholds ({}) does not match number of tile "bands" ({}).'.format(full_threshes.shape[0], self.thresh_tiles.shape[0]))
+      for i in range(map_arr.shape[0]):
+         for j in range(map_arr.shape[1]):
+            t = np.where(0.5 + 0.5 * val[i, j] <= full_threshes)[0][0]
+            if t >= self.thresh_tiles.shape[0]:
+               raise Exception("Selected tile is out of bounds in list of tiles for simplex genome.")
+            map_arr[i, j] = self.thresh_tiles[t]
+         self.map_arr = map_arr.astype(np.uint8)
+
+      #WHAT DEFINES BORDER SIZE FOR THE LAVA?
+      self.map_arr = self.apply_river_features(self.map_arr, self.lava_border_width, num_bridges=self.n_bridges)
+
+   def apply_river_features(self, matl, border_size, num_bridges=1, bridge_width=5):
+      # Utility function to count the number of spawns to assess map validitity
+      def count_spawns(matl):
+         spawn_count = 0
+         for i in range(matl.shape[0]):
+            for j in range(matl.shape[1]):
+               if matl[i, j] == enums.MaterialEnum.SPAWN.value.index:
+                  spawn_count += 1
+         return spawn_count
+
+      # Create a bisecting river that follows the path x=y
+      def create_river(self, matl):
+         sz = matl.shape[0]
+         for y in range(2, sz, 2):
+            for x in range(2, sz, 2):
+               if y == x:
+                  for e in itertools.product(list(range(y - 2, y +2 )), list(range(x - 2, x + 2))):
+                     matl[e] = enums.MaterialEnum.WATER.value.index
+         return matl
+
+      # Select num_bridges locations (from uniform distribution) on the line x=y to create bridges spanning the river
+      def create_bridges(self, matl, border_size, num_bridges, bridge_width):
+         locs = np.random.randint(0, matl.shape[0], num_bridges)
+         for loc in locs:
+            y_range = range(max(border_size, loc - (bridge_width // 2)), min(matl.shape[0] - border_size, loc + (bridge_width // 2)))
+            x_range = range(max(border_size, loc - (bridge_width // 2)), min(matl.shape[0] - border_size, loc + (bridge_width // 2)))
+            for e in itertools.product(list(y_range), list(x_range)):
+               matl[e] = enums.MaterialEnum.GRASS.value.index
+
+         return matl
+
+      # Despawn spawn points and resources from different halves of the maps
+      def depopulate_halves(self, matl):
+         # Remove all resources from either all points where x > y or x < y depending on below_x_eq_y
+         def remove_all_except_spawns(self, matl, below_x_eq_y=False):
+            for y in range(matl.shape[0]):
+               for x in range(matl.shape[1]):
+                  if (x < y and below_x_eq_y) or (x > y and not below_x_eq_y):
+                     if matl[y, x] not in [enums.MaterialEnum.WATER.value.index,
+                                           enums.MaterialEnum.GRASS.value.index,
+                                           enums.MaterialEnum.STONE.value.index,
+                                           enums.MaterialEnum.SPAWN.value.index]:
+                        matl[y, x] = enums.MaterialEnum.GRASS.value.index
+            return matl
+
+         # Remove all spawn points from either all points where x > y or x < y depending on below_x_eq_y
+         def remove_spawns(self, matl, below_x_eq_y=True):
+            #print("pre_removal: " + str(count_spawns(matl)))
+            for y in range(matl.shape[0]):
+               for x in range(matl.shape[1]):
+                  if (x < y and below_x_eq_y) or (x > y and not below_x_eq_y):
+                     if matl[y, x] == enums.MaterialEnum.SPAWN.value.index:
+                        matl[y, x] = enums.MaterialEnum.GRASS.value.index
+            #print("post_removal: " + str(count_spawns(matl)))
+            return matl
+
+         # Add back food on the spawn side to give agents enough resources to get started
+         def add_starter_food(self, matl, below_x_eq_y=True):
+            map_width = self.map_width
+            s = np.arange(map_width)
+            X, Y = np.meshgrid(s, s)
+            val = np.zeros((map_width, map_width), dtype=float)
+            val = vec_noise.snoise2(self.x0 + X * self.step_size, self.y0 + Y * self.step_size)
+            full_threshes = np.concatenate((self.threshes, [1]))
+            if full_threshes.shape[0] != self.thresh_tiles.shape[0]:
+               raise Exception('Number of thresholds ({}) does not match number of tile "bands" ({}).'.format(full_threshes.shape[0], self.thresh_tiles.shape[0]))
+            for i in range(matl.shape[0]):
+               for j in range(matl.shape[1]):
+                  if (j < i and below_x_eq_y) or (j > i and not below_x_eq_y):
+                     # SHOULD IT BE GREATER THAN OR LESS THAN?
+                     if (0.5 + 0.5 * val[i, j] >= self.starter_food_thresh[0]) and (0.5 + 0.5 * val[i, j] < self.starter_food_thresh[1]):
+                        matl[i, j] = enums.MaterialEnum.FOREST.value.index
+            return matl.astype(np.uint8)
+
+         # Coin flip to select if the resources will be on the bottom half or the top half
+         resource_half_is_bot = np.random.randint(0, 2, 1)
+
+         matl = remove_all_except_spawns(self, matl, below_x_eq_y=resource_half_is_bot)
+         matl = remove_spawns(self, matl, below_x_eq_y=(not resource_half_is_bot))
+         matl = add_starter_food(self, matl, below_x_eq_y=resource_half_is_bot)
+
+         return matl
+
+      matl = create_river(self, matl)
+      matl = create_bridges(self, matl, border_size, num_bridges, bridge_width)
+      matl = depopulate_halves(self, matl)
+
+      return matl
+
+
 
 class LSystemGenome(Genome):
    def __init__(self, n_tiles, map_width):
@@ -745,6 +898,9 @@ class EvoIndividual(Individual):
                                            enums.MaterialEnum.GRASS.value.index)
        elif evolver.SIMPLEX_NOISE:
            self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
+       elif evolver.RIVER_BOTTLENECK_BASELINE:
+           self.chromosome = RiverBottleneckGenome(self.n_tiles, evolver.map_width, lava_border_width=self.TERRAIN_BORDER)
+
        self.chromosome.gen_map()
        self.validate_map()
        self.score_hists = []

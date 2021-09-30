@@ -152,14 +152,13 @@ def rand_features(individual, config):
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None, n_epochs=10000):
       self.config = config
+      # This will allow the archive to be filled out quite rapidly, so that we cannot be accused of giving baseline models too few maps on which to train as compared to the jointly-optimized maps
+      # FIXME: supper shoddy to use string like this
       if config.PAIRED and not config.EVALUATE:
          config.NPOLICIES = 2
          config.NPOP = 2
-      if config.PRETRAIN:
-          # assert self.BASELINE_SIMPLEX
-          assert config.GENOME == 'Baseline'
-          # This will allow the archive to be filled out quite rapidly, so that we cannot be accused of giving baseline models too few maps on which to train as compared to the jointly-optimized maps
-          self.calc_features = rand_features
+      if 'Baseline' in config.GENOME:
+         self.calc_features = rand_features
       elif config.FEATURE_CALC == "map_entropy":
          config.ME_DIMS = 'map_entropy'
          self.calc_features = calc_map_entropies
@@ -217,7 +216,8 @@ class EvolverNMMO(LambdaMuEvolver):
       self.SIMPLEX_NOISE = config.GENOME == 'Simplex'
       self.BASELINE_SIMPLEX = config.GENOME == 'Baseline'
       self.ALL_GENOMES = config.GENOME == 'All'
-      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES or self.BASELINE_SIMPLEX):
+      self.RIVER_BOTTLENECK_BASELINE = config.GENOME == 'RiverBottleneckBaseline'
+      if not (self.CA or self.LSYSTEM or self.CPPN or self.PRIMITIVES or self.TILE_FLIP or self.SIMPLEX_NOISE or self.ALL_GENOMES or self.BASELINE_SIMPLEX or self.RIVER_BOTTLENECK_BASELINE):
          raise Exception('Invalid genome')
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
