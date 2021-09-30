@@ -29,19 +29,19 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 ##### HYPER-PARAMETERS #####
 
 genomes = [
-   #'Baseline',
-   'RiverBottleneckBaseline'
-   #'Simplex',
-   #'NCA',
-   #'TileFlip',
-   #'CPPN',
-   #'Primitives',
-   #'L-System',
-   #'All',
+#  'Baseline',
+   'RiverBottleneckBaseline',
+#   'Simplex',
+#   'NCA',
+#   'TileFlip',
+#   'CPPN',
+#   'Primitives',
+#   'L-System',
+#   'All',
 ]
 generator_objectives = [
 #  'MapTestText',
-#  'Lifespans',
+   'Lifespans',
 #  'L2',
 #  'Hull',
 #  'Differential',
@@ -51,7 +51,7 @@ generator_objectives = [
 #  'CloseNearestNeighbor',
 #  'InvL2',
 #  'AdversityDiversity',
-   'AdversityDiversityTrgs',
+#  'AdversityDiversityTrgs',
 ]
 skills = [
     'ALL',
@@ -164,6 +164,8 @@ def launch_batch(exp_name, preeval=False):
       if gene == 'Baseline':
          if launched_baseline:
             # Only launch one baseline, these other settings are irrelevant
+            # FIXME: but now you're going to get redundant baselines with different names across batch runs if you're
+            #  not careful (and I am not careful)
             continue
          else:
             launched_baseline = True
