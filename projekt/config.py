@@ -9,6 +9,13 @@ def get_experiment_name(config):
    if config.FITNESS_METRIC == 'AdversityDiversity':
       map_obj_name += str(config.ADVERSITY_DIVERSITY_WEIGHTS).replace('[', '').replace(']', '').replace(
          ',', '').replace(' ', '-')
+   if config.FITNESS_METRIC == 'AdversityDiversityTrgs':
+      # label ratio
+      map_obj_name += '_r_' + str(config.ADVERSITY_DIVERSITY_RATIO).replace('[', '').replace(']', '').replace(
+         ',', '').replace(' ', '-')
+      # label targets
+      map_obj_name += '_t_' + str(config.ADVERSITY_DIVERSITY_TRGS).replace('[', '').replace(']', '').replace(
+         ',', '').replace(' ', '-')
    experiment_name = 'fit-{}_skills-{}_gene-{}_algo-{}'.format(
       map_obj_name,
       config.SKILLS,
@@ -147,7 +154,6 @@ class SmallMaps(Base):
    NPC_SPAWN_AGGRESSIVE    = 0.80
 
 
-#<<<<<<< HEAD
 ALL_SKILLS = ['constitution', 'fishing', 'hunting', 'range', 'mage', 'melee', 'defense', 'woodcutting', 'mining', 'exploration',]
 COMBAT_SKILLS = ['range', 'mage', 'melee']
 EXPLORE_SKILLS = ['exploration']

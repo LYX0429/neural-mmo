@@ -310,16 +310,14 @@ class EvolverNMMO(LambdaMuEvolver):
       return policies
 
    def update_fitness(self, individual, ALP):
-      gen_obj_infos = {
-         'adv_div_coeffs': self.config.ADVERSITY_DIVERSITY_WEIGHTS,
-      }
       if self.config.PAIRED:
          protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=pop_name,
-                                                                      infos=gen_obj_infos) for pop_name in
-                                                    ['pro', 'ant']]
+                                                                      infos={}, config=self.config)
+                                                    for pop_name in ['pro', 'ant']]
          individual.update_fitness(protaganist_fitness - antagonist_fitness, ALP, self.config)
       elif not self.MAP_TEST:
-         individual.update_fitness(self.calc_fitness(individual.stats, infos=gen_obj_infos), ALP, self.config)
+         individual.update_fitness(self.calc_fitness(individual.stats, infos={}, config=self.config), ALP,
+                                   self.config)
       else:
          individual.update_fitness(self.calc_fitness(individual=individual, config=self.config), ALP, self.config)
 

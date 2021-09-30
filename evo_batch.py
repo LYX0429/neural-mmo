@@ -29,14 +29,14 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 ##### HYPER-PARAMETERS #####
 
 genomes = [
-   'Baseline',
+#  'Baseline',
 #  'Simplex',
 #  'NCA',
 #  'TileFlip',
 #  'CPPN',
 #  'Primitives',
 #  'L-System',
-#  'All',
+   'All',
 ]
 generator_objectives = [
 #  'MapTestText',
@@ -49,7 +49,8 @@ generator_objectives = [
 #  'FarNearestNeighbor',
 #  'CloseNearestNeighbor',
 #  'InvL2',
-   'AdversityDiversity',
+#  'AdversityDiversity',
+   'AdversityDiversityTrgs',
 ]
 skills = [
     'ALL',
@@ -76,13 +77,10 @@ PAIRED_bools = [
 #  True,
    False
 ]
-# TODO: really, these are just ratios/fractions that can be arranged along a line.
-#  - visualize these as such, find a cleaner way to divide up this line
-#  - find adversity/diversity hyperparams that it would actually make sense to visualiza over a grid? E.g. specific
-#    target values in both metrics?
-#adv_div_weights = np.arange(0.0,1.01, 0.25)
-#adv_div_weights = itertools.product(adv_div_weights, adv_div_weights)
-adv_div_weights = [(1,1)]
+adv_div_ratios = np.arange(0, 1.01, 1/6)  # this gets stretched to [-1, 1] and used to shrink one agent or the either
+
+adv_div_trgs = np.arange(0, 1.01, 1/5)
+adv_div_trgs = np.meshgrid(adv_div_trgs, adv_div_trgs)
 
 ##########################
 
@@ -215,7 +213,8 @@ def launch_batch(exp_name, preeval=False):
             'VIS_MAPS': opts.vis_maps,
             'PAIRED': PAIRED_bool,
             'NUM_GPUS': 1 if CUDA else 0,
-            'ADVERSITY_DIVERSITY_WEIGHTS': adv_div_coeffs,
+            'ADVERSITY_DIVERSITY_RATIO': adv_div_ratio,
+            'ADVERSITY_DIVERSITY_TRGS': adv_div_trg,
          })
          #     if gene == 'Baseline':
          #        exp_config.update({
@@ -228,65 +227,23 @@ def launch_batch(exp_name, preeval=False):
 
          # Edit the sbatch file to load the correct config file
          # Launch the experiment. It should load the saved settings
-
-#        if not preeval:
-#           assert not EVALUATE
          new_cmd = 'python ForgeEvo.py --load_arguments {}'.format(i)
          launch_cmd(new_cmd, i)
 
-#        else:
-#           evo_config = config.EvoNMMO
-#           # sys.argv = sys.argv[:1] + ['override']
-#           # Fire(config)
-#           for (k, v) in exp_config.items():
-#              setattr(evo_config, k, v)
-#           #   config.set(config, k, v)
-#           if TERRAIN_BORDER is None:
-#              TERRAIN_BORDER = evo_config.TERRAIN_BORDER
-#              MAP_GENERATOR = MapGenerator(evo_config)
-#           else:
-#              assert TERRAIN_BORDER == evo_config.TERRAIN_BORDER
-#           experiment_name = get_experiment_name(evo_config)
-#           experiment_names.append(experiment_name)
-#           experiment_configs.append({'PAIRED': PAIRED_bool})
-
-            # config.set(config, 'ROOT', re.sub('evo_experiment/.*/', 'evo_experiment/{}/'.format(experiment_name), config.ROOT))
-
-      if gen_obj == 'AdversityDiversity':
-         for adv_div_coeffs in adv_div_weights:
-            if adv_div_coeffs == (0,0):
-               continue
-            launch_experiment(i)
-            i += 1
+      adv_div_ratio = 0.5  # dummi var
+      adv_div_trg = (1, 1)  # dummi var
+      if gen_obj in ['AdversityDiversity', 'AdversityTrg']:
+         for adv_div_ratio in adv_div_ratios:
+            if gen_obj == 'AdversityDiversityTrgs':
+               for adv_div_trg in adv_div_trgs:
+                  launch_experiment(i)
+                  i += 1
+            else:
+               launch_experiment(i)
+               i += 1
       else:
-         adv_div_coeffs = (0,0)  # does nothing
          launch_experiment(i)
          i += 1
-
-#   if TRAIN_BASELINE:
-#      # Finally, launch a baseline
-#      with open(sbatch_file, 'r') as f:
-#         content = f.read()
-#         if not EVALUATE:
-#            new_cmd = 'python Forge.py train --config TreeOrerock --MODEL current --TRAIN_HORIZON 100 --NUM_WORKERS 12 --NENT 16 #--TERRAIN_SIZE 70'
-#         else:
-#            assert preeval
-#            new_cmd = 'python Forge.py evaluate -la {}'.format(i)
-#         content = re.sub('nmmo\d*', 'nmmo00', content)
-#         new_content = re.sub('python Forge.*', new_cmd, content)
-#
-#      with open(sbatch_file, 'w') as f:
-#         f.write(new_content)
-#
-#      if not preeval:
-#         if LOCAL:
-#            os.system(new_cmd)
-#            os.system('ray stop')
-#         else:
-#            os.system('sbatch {}'.format(sbatch_file))
-#      else:
-#         config = config.EvoNMMO
-##        experiment_names.append(get_experiment_name(config))
 
 
 def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, render=False, vis_cross_eval=False):
