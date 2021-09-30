@@ -152,14 +152,13 @@ def rand_features(individual, config):
 class EvolverNMMO(LambdaMuEvolver):
    def __init__(self, save_path, make_env, trainer, config, n_proc=12, n_pop=12, map_policy=None, n_epochs=10000):
       self.config = config
+      # This will allow the archive to be filled out quite rapidly, so that we cannot be accused of giving baseline models too few maps on which to train as compared to the jointly-optimized maps
+      # FIXME: supper shoddy to use string like this
       if config.PAIRED and not config.EVALUATE:
          config.NPOLICIES = 2
          config.NPOP = 2
-      if config.PRETRAIN:
-          # assert self.BASELINE_SIMPLEX
-          assert config.GENOME == 'Baseline'
-          # This will allow the archive to be filled out quite rapidly, so that we cannot be accused of giving baseline models too few maps on which to train as compared to the jointly-optimized maps
-          self.calc_features = rand_features
+      if 'Baseline' in config.GENOME:
+         self.calc_features = rand_features
       elif config.FEATURE_CALC == "map_entropy":
          config.ME_DIMS = 'map_entropy'
          self.calc_features = calc_map_entropies
@@ -311,16 +310,14 @@ class EvolverNMMO(LambdaMuEvolver):
       return policies
 
    def update_fitness(self, individual, ALP):
-      gen_obj_infos = {
-         'adv_div_coeffs': self.config.ADVERSITY_DIVERSITY_WEIGHTS,
-      }
       if self.config.PAIRED:
          protaganist_fitness, antagonist_fitness = [self.calc_fitness(individual.stats, pop=pop_name,
-                                                                      infos=gen_obj_infos) for pop_name in
-                                                    ['pro', 'ant']]
+                                                                      infos={}, config=self.config)
+                                                    for pop_name in ['pro', 'ant']]
          individual.update_fitness(protaganist_fitness - antagonist_fitness, ALP, self.config)
       elif not self.MAP_TEST:
-         individual.update_fitness(self.calc_fitness(individual.stats, infos=gen_obj_infos), ALP, self.config)
+         individual.update_fitness(self.calc_fitness(individual.stats, infos={}, config=self.config), ALP,
+                                   self.config)
       else:
          individual.update_fitness(self.calc_fitness(individual=individual, config=self.config), ALP, self.config)
 

@@ -13,41 +13,9 @@ def diversity_calc(config):
    div_calc_name = config.FITNESS_METRIC
    return get_div_calc(div_calc_name)
 
-def get_div_calc(div_calc_name):
-   if div_calc_name == 'L2':
-      calc_diversity = calc_diversity_l2
-   elif div_calc_name == 'InvL2':
-      calc_diversity = calc_homogeneity_l2
-   elif div_calc_name == 'Differential':
-      calc_diversity = calc_differential_entropy
-   elif div_calc_name == 'Discrete':
-      calc_diversity = calc_discrete_entropy_2
-   elif div_calc_name == 'Hull':
-      calc_diversity = calc_convex_hull
-   elif div_calc_name == 'Sum':
-      calc_diversity = sum_experience
-   elif div_calc_name == 'FarNearestNeighbor':
-      calc_diversity = far_nearest_neighbor
-   elif div_calc_name == 'CloseNearestNeighbor':
-      calc_diversity = close_nearest_neighbor
-   elif div_calc_name == 'Lifespans':  # or config.FITNESS_METRIC == 'ALP':
-      calc_diversity = sum_lifespans
-   elif div_calc_name == 'AdversityDiversity':
-      calc_diversity = adversity_diversity
-   elif div_calc_name == 'Lifetimes':  # FIXME: is this any different than Lifespans??
-       calc_diversity = calc_mean_lifetime
-   elif div_calc_name == 'Actions':
-       calc_diversity = calc_mean_actions_matched
-   elif div_calc_name == 'MapTest':
-       calc_diversity = calc_local_map_entropy
-   elif div_calc_name == 'MapTestText':
-       calc_diversity = ham_text
-       get_trg_image()
-   elif div_calc_name == 'y_deltas':
-       calc_diversity = calc_y_deltas
-   # FIXME: dust off map objective that takes Absolute Learning Progress of policy along a given metric?
-   # elif div_calc_name == 'Scores' or config.FITNESS_METRIC == 'ALP':
-   #     calc_diversity = calc_scores
+def get_div_calc(objective_name):
+   if objective_name in env_objectives:
+      return env_objectives[objective_name]
    else:
        raise Exception('Unsupported fitness function: {}'.format(div_calc_name))
    return calc_diversity
@@ -143,26 +111,26 @@ def expand_by_lifespan(agent_stats, lifespans):
 
    return agent_skills
 
-def calc_scores(agent_stats, skill_headers=None, verbose=False):
+def calc_scores(agent_stats, skill_headers=None, verbose=False, config=None):
     scores = np.hstack(agent_stats['scores'])
     if verbose:
         print('scores: {}'.format(scores))
     return np.mean(scores)
 
-def calc_mean_actions_matched(agent_stats, skill_headers=None, verbose=False):
+def calc_mean_actions_matched(agent_stats, skill_headers=None, verbose=False, config=None):
     actions_matched = np.hstack(agent_stats['actions_matched'])
     if verbose:
         print(actions_matched)
 #       print(agent_stats['lifespans'])
     return np.mean(actions_matched)
 
-def calc_y_deltas(agent_stats, skill_headers=None, verbose=False):
+def calc_y_deltas(agent_stats, skill_headers=None, verbose=False, config=None):
     y_deltas = np.hstack(agent_stats['y_deltas'])
     if verbose:
         print('y_deltas: {}'.format(y_deltas))
     return np.mean(y_deltas)
 
-def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False, pop=None):
+def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False, pop=None, config=None):
     lifetimes = get_pop_stats(agent_stats['lifespans'], pop)
     if len(lifetimes) != 0:
         lifetimes = np.hstack(lifetimes)
@@ -172,7 +140,7 @@ def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False, pop=None)
 
     return mean_lifetime
 
-def sum_lifespans(agent_stats, skill_headers=None, verbose=False, pop=None, infos={}):
+def sum_lifespans(agent_stats, skill_headers=None, verbose=False, pop=None, infos={}, config=None):
    lifespans = get_pop_stats(agent_stats['lifespans'], pop=pop)
    score = lifespans.mean()
    if verbose:
@@ -180,7 +148,7 @@ def sum_lifespans(agent_stats, skill_headers=None, verbose=False, pop=None, info
 
    return score
 
-def sum_experience(agent_stats, skill_headers=None, verbose=False, pop=None):
+def sum_experience(agent_stats, skill_headers=None, verbose=False, pop=None, config=None):
    '''Simply take the sum of XP over skills and agents.'''
    # No need to weight by lifespan, since high lifespan is a prerequisite for high XP.
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
@@ -207,7 +175,8 @@ def sigmoid_lifespan(x):
 
    return res
 
-def far_nearest_neighbor(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=False):
+def far_nearest_neighbor(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=False,
+                         config=None):
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
    a = agent_skills
    n_agents = agent_skills.shape[0]
@@ -223,8 +192,29 @@ def close_nearest_neighbor(agent_stats, **kwargs):
    # TODO: we'll have to do some punish_youth here, or this will incentivize killing everyone ASAP
    return - far_nearest_neighbor(agent_stats, **kwargs)
 
-def adversity_diversity(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=False):
-   adv_coeff, div_coeff = infos.pop('adv_div_coeffs')
+def adversity_diversity_trg(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=False,
+                            config=None):
+   ''' Objective is to reach targets in agent lifespan and differential diversity'''
+   adv_trg, div_trg = config.ADVERSITY_DIVERSITY_TRGS
+   adv_trg *= 100
+   div_trg = div_trg * 40 + 20  # tehe
+   div_score = calc_differential_entropy(agent_stats, skill_headers=skill_headers, verbose=verbose, infos=infos,
+                                         pop=pop, punish_youth=False)
+   adv_score = sum_lifespans(agent_stats, skill_headers=skill_headers, verbose=verbose, infos=infos, pop=pop)
+   div_loss = abs(div_trg - div_score)
+   adv_loss = abs(adv_trg - adv_score)
+
+   return - (div_loss + adv_loss)
+
+def adversity_diversity(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=False,
+                        config=None):
+   '''Coefficients would have redundant pairs supposing scale of the objective does not affect optimization. So we get
+   a point along a parameterized line/curve between the adv/div axes. In the middle of this curve, both skills are evenly-weighted along either axis,
+   the coefficient of the score on the opposite axis is 0.'''
+   adv_div_ratio = config.ADVERSITY_DIVERSITY_RATIO
+   adv_div_ratio = ((adv_div_ratio - 0.5) * 2)  # now this is between [-1,1]
+   adv_coeff = 1 - max(0, adv_div_ratio)
+   div_coeff = 1 - min(adv_div_ratio, 0)
    adv_score, div_score = 0, 0
    if adv_coeff != 0:
       adv_score = sum_lifespans(agent_stats, skill_headers=skill_headers, verbose=verbose, infos=infos, pop=pop)
@@ -240,11 +230,10 @@ def adversity_diversity(agent_stats, skill_headers=None, verbose=False, infos={}
       # TODO: we assume 100 episode steps here, and that if we increase this, adv and div scores will scale at the
       #  same rate, which is almost certainly wrong
 
-   print(adv_score, div_score)
-
    return adv_score + div_score
 
-def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True):
+def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True,
+                              config=None):
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
    lifespans = get_pop_stats(agent_stats['lifespans'], pop)
 
@@ -279,7 +268,8 @@ def calc_differential_entropy(agent_stats, skill_headers=None, verbose=False, in
    return score
 
 
-def calc_convex_hull(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True):
+def calc_convex_hull(agent_stats, skill_headers=None, verbose=False, infos={}, pop=None, punish_youth=True,
+                     config=None):
    '''Calculate the diversity of a population of agents in skill-space by computing the volume inside the convex hull of
    the agents when treated as points in this space.'''
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
@@ -313,7 +303,7 @@ def calc_convex_hull(agent_stats, skill_headers=None, verbose=False, infos={}, p
 
    return score
 
-def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=True):
+def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=True, config=None):
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
    lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    agent_skills_0 = agent_skills= np.vstack(agent_skills)
@@ -329,7 +319,9 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False, pop=
        print(lifespans)
    agent_skills = np.where(agent_skills == 0, 0.0000001, agent_skills)
    if punish_youth:
-      # Below is a v funky way of punishing by lifespan
+
+      # Below is a v funky way of punishing by lifespan :-)
+
       # weights = sigmoid_lifespan(lifespans)
       # # contract population toward mean according to lifespan
       # # mean experience level for each agent
@@ -347,12 +339,14 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False, pop=
       # div_agents = skbio.diversity.alpha_diversity('shannon', a_skills_agents).mean()
       # div_skills = skbio.diversity.alpha_diversity('shannon', a_skills_skills.transpose()).mean()
 
-      # We'll just do the usual
+
+      # But we'll just do the usual :-D
+
       a_skills = contract_by_lifespan(agent_skills, lifespans)
    div_agents = skbio.diversity.alpha_diversity('shannon', a_skills).mean()
    div_skills = skbio.diversity.alpha_diversity('shannon', a_skills.transpose()).mean()
 
- # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
+   # div_lifespans = skbio.diversity.alpha_diversity('shannon', lifespans)
    score = -(div_agents * div_skills)#/ div_lifespans#/ len(agent_skills)**2
    score = score#* 100  #/ (n_agents * n_skills)
    if verbose:
@@ -361,7 +355,7 @@ def calc_discrete_entropy_2(agent_stats, skill_headers=None, verbose=False, pop=
    return score
 
 
-def calc_discrete_entropy(agent_stats, skill_headers=None, pop=None):
+def calc_discrete_entropy(agent_stats, skill_headers=None, pop=None, config=None):
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
    lifespans = get_pop_stats(agent_stats['lifespans'], pop)
    agent_skills_0 = np.vstack(agent_skills)
@@ -444,7 +438,7 @@ def calc_discrete_entropy(agent_stats, skill_headers=None, pop=None):
 
    return score
 
-def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=True):
+def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=True, config=None):
    '''Use L2 distance to punish agents for having high mean pairwise distance. Optimal state is all agents at the same
    point in skill-space, with maximal lifespans.'''
    if 'skills' not in agent_stats:
@@ -472,7 +466,7 @@ def calc_homogeneity_l2(agent_stats, skill_headers=None, verbose=False, pop=None
    return -score
 
 
-def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=False):
+def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, punish_youth=False, config=None):
    if 'skills' not in agent_stats:
       return 0
    agent_skills = get_pop_stats(agent_stats['skills'], pop)
@@ -496,4 +490,24 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, 
 
    return score
 
-DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'), (calc_discrete_entropy_2, 'discrete entropy'), (calc_convex_hull, 'convex hull volume'), (sum_lifespans, 'lifespans')]
+env_objectives = {
+   'L2': calc_diversity_l2,
+   'InvL2': calc_homogeneity_l2,
+   'Differential': calc_differential_entropy,
+   'Discrete': calc_discrete_entropy_2,
+   'Hull': calc_convex_hull,
+   'Sum': sum_experience,
+   'FarNearestNeighbor': far_nearest_neighbor,
+   'CloseNearestNeighbor': close_nearest_neighbor,
+   'Lifespans': sum_lifespans,
+   'AdversityDiversity': adversity_diversity,
+   'AdversityDiversityTrgs': adversity_diversity_trg,
+   'Lifetimes': calc_mean_lifetime,
+   'Actions': calc_mean_actions_matched,
+   'MapTest': calc_local_map_entropy,
+   'MapTestText': ham_text,
+   'y_deltas': calc_y_deltas,
+}
+
+DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'), (calc_discrete_entropy_2, 'discrete entropy'), (calc_convex_hull, 'convex hull volume'), (sum_lifespans, 'lifespans'),
+             (far_nearest_neighbor, 'MinMax neighbor')]
