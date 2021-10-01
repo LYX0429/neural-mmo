@@ -232,6 +232,7 @@ class Palette:
          self.colors = {
             'Neural_': Neon.BLUE,
             'Baseline': Solid.RED,
+            'RiverBottleneckBaseline': Solid.GREY,
             'Simplex': Solid.SKY,
             'CPPN': Solid.BLUE,
             'All': Solid.ORANGE,

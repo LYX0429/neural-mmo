@@ -29,7 +29,7 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 ##### HYPER-PARAMETERS #####
 
 genomes = [
-#  'Baseline',
+   'Baseline',
    'RiverBottleneckBaseline',
 #  'Simplex',
 #  'NCA',
@@ -420,6 +420,8 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
 
       for c in map_exp_names:
          col_labels.append(get_exp_shorthand(c))
+      col_labels.append('mean')
+      TT()
       cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]", errors=std_lifespans)
       for (s_i, skill_name) in enumerate(SKILLS):
          cross_eval_heatmap(mean_skills[s_i], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
@@ -450,7 +452,7 @@ def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel, errors=No
       i += 1
 
    # Add col. with averages over each row (each model)
-   col_labels += ['mean']
+#  col_labels += ['mean']
    data = np.hstack((data, np.expand_dims(data.mean(axis=1), 1)))
 
    im, cbar = heatmap(data, row_labels, col_labels, ax=ax,
