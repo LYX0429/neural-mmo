@@ -403,7 +403,7 @@ class RLlibEvaluator(evaluator.Base):
 #            self.obs, state=self.state, policy_id='policy_0')
 #      super().tick(self.obs, actions, pos, cmd)
 
-   def count_survivors(self):
+   def count_survivors(self, *args, **kwargs):
       return
 
    def evaluate(self, generalize=False):
@@ -437,7 +437,7 @@ class RLlibEvaluator(evaluator.Base):
       n_eval_maps = self.config.N_EVAL_MAPS
       n_metrics = len(DIV_CALCS)
       n_skills = len(self.config.SKILLS)
-      for j in range(n_eval_maps):
+      for map_i in range(n_eval_maps):
          div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON // stat_interval))
    #     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
          heatmaps = np.zeros((n_evals, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
@@ -457,9 +457,9 @@ class RLlibEvaluator(evaluator.Base):
                   eval_done = self.tick(None, None)
                   if (t + 1) % stat_interval == 0 or eval_done:
                      div_stats = self.env.get_all_agent_stats()
-                     for j, (calc_diversity, div_name) in enumerate(DIV_CALCS):
+                     for div_i, (calc_diversity, div_name) in enumerate(DIV_CALCS):
                         diversity = calc_diversity(div_stats, verbose=False)
-                        divs[j, stat_i] = diversity
+                        divs[div_i, stat_i] = diversity
                      # lifespans = div_stats['lifespans']
                      # divs[j + 1, stat_i] = np.mean(lifespans)
                      div_mat[i] = divs
@@ -479,7 +479,7 @@ class RLlibEvaluator(evaluator.Base):
                      heatmaps[i, si+1, r, c] += 1
                   if eval_done:
                      break
-               self.count_survivors()  # no-op if we're not the MultiEvaluator. This is #FIXME gross!!
+               self.count_survivors(map_i)  # no-op if we're not the MultiEvaluator. This is #FIXME gross!!
             heatmaps = heatmaps.mean(0)  # take mean of heatmaps over separate evals
             div_mat = np.vstack((div_mat.mean(0, keepdims=True), div_mat.std(0, keepdims=True)))  # take mean and std over evals
             with open(data_path, 'wb') as f:
@@ -684,27 +684,30 @@ class RLlibMultiEvaluator(RLlibEvaluator):
       # ad hoc dict to keep track of who's who
       self.idx_to_pop = {}
       # self.survivors = np.empty(shape=(self.config.NPOLICIES, self.config.N_EVAL))
-      self.survivors = {i: [] for i in range(self.config.NPOLICIES)}
+      # store survivors per model, per map
+      self.survivors = [{i: [] for i in range(self.config.NPOLICIES)} for _ in range(config.N_EVAL_MAPS)]
 
-   def count_survivors(self):
+   def count_survivors(self, map_idx):
       # for (k, v) in self.pop_living.items():
       #    self.survivors[k] = v
-      [self.survivors.update({k: self.survivors[k] + [v]}) for (k, v) in self.n_pop_living.items()]
+      [self.survivors[map_idx].update({k: self.survivors[map_idx][k] + [v]}) for (k, v) in self.n_pop_living.items()]
 
    def evaluate(self, generalize=False):
       super().evaluate()
       data_path = os.path.join(self.eval_path_model, '{} multi_eval.npy'.format(self.exp_name))
       if self.config.NEW_EVAL:
          model_names = self.config.MULTI_MODEL_NAMES
-         survivors = {model_names[k]: np.array(v) for (k, v) in self.survivors.items()}
+         survivors = [{model_names[k]: np.array(v) for (k, v) in map_survivors.items()} for map_survivors in self.survivors]
          with open(data_path, 'wb') as f:
             np.save(f, survivors)
       else:
          with open(data_path, 'rb') as f:
             survivors = np.load(f, allow_pickle=True)
-      x_pos = np.arange(len(survivors))
-      means = [survivors[k].mean() for k in model_names]
-      stds = [survivors[k].std() for k in model_names]
+      # n models
+      x_pos = np.arange(len(survivors[0]))
+      model_survivors = np.hstack([map_survivors[i] for map_survivors in self.survivors for i in range(len(model_names))])
+      means = [model_survivors[i].mean() for i in range(len(model_names))]
+      stds = [model_survivors[i].std() for i in range(len(model_names))]
       fig, ax = plt.subplots()
       ax.bar(x_pos, means, yerr=stds, align='center', alpha=0.5, ecolor='black', capsize=10)
       ax.set_ylabel('Mean survivors per episode')

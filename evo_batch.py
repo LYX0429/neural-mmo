@@ -274,14 +274,14 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
    map_exp_names, map_exp_configs = experiment_names, experiment_configs
    # We will use these heatmaps to visualize performance between generator-agent pairs over the set of experiments
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
-#  std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1, N_EVALS, N_EVAL_MAPS))  # also take std of each model's average performance
+#  std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1, N_MAP_EVALS, N_EVAL_MAPS))  # also take std of each model's average performance
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
    div_scores[:] = np.nan
    mean_skills[:] = np.nan
    mean_lifespans[:] = np.nan
    if opts.multi_policy:
-      mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names), N_EVALS, N_EVAL_MAPS), dtype=np.float)
+      mean_survivors = np.zeros((len(map_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS), dtype=np.float)
    if vis_only:
       txt_verb = 'Visualizing past inference'
    elif vis_cross_eval:
@@ -385,9 +385,10 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                if opts.multi_policy:
                   model_name_idxs = {get_exp_shorthand(r): i for (i, r) in enumerate(model_exp_names)}
                   multi_eval_data_path = eval_data_path.replace('eval.npy', 'multi_eval.npy')
-                  survivors = np.load(multi_eval_data_path, allow_pickle=True).item()
-                  for survivor_name, n_survivors in survivors.items():
-                     mean_survivors[model_name_idxs[survivor_name], gen_i, :, map_i] = n_survivors
+                  survivors = np.load(multi_eval_data_path, allow_pickle=True)
+                  for map_survivors in survivors:
+                     for model_name, n_survivors in map_survivors.items():
+                        mean_survivors[model_name_idxs[model_name], gen_i, :, map_i] = n_survivors
             # TODO: get std of model's mean lifespan over all maps
    #        std_lifespans[i, j+1] =
             if opts.multi_policy:  # don't need to iterate through models since we pit them against each other during the same episode
@@ -421,7 +422,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       for c in map_exp_names:
          col_labels.append(get_exp_shorthand(c))
       col_labels.append('mean')
-      TT()
       cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]", errors=std_lifespans)
       for (s_i, skill_name) in enumerate(SKILLS):
          cross_eval_heatmap(mean_skills[s_i], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
