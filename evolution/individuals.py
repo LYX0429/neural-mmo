@@ -610,6 +610,245 @@ class SimplexNoiseGenome(Genome):
             map_arr[i, j] = self.thresh_tiles[t]
          self.map_arr = map_arr.astype(np.uint8)
 
+class ResourceNichesGenome(Genome):
+   def __init__(self, n_tiles, map_width, lava_border_width, access_bottleneck=False):
+      super().__init__(n_tiles, map_width)
+      self.niche_zone_radius = 5
+      self.niche_loc_spacing = 25
+      self.num_niche_loc_gen_tries = 30
+      self.wall_width = 2
+      self.resource_wall_buf = 1
+      self.niche_resource_drop_len = 2
+      self.access_bottleneck = access_bottleneck
+      self.lava_border_width = lava_border_width
+
+      self.resource_tiles = np.array([
+         enums.MaterialEnum.FOREST.value.index, # SHOULD WE EQUALLY DISTRIBUTE FOOD AND WATER?
+         enums.MaterialEnum.WATER.value.index,
+         enums.MaterialEnum.TREE.value.index,
+         enums.MaterialEnum.OREROCK.value.index,
+      ])
+
+      self.landscape_tiles = np.array([
+         enums.MaterialEnum.FOREST.value.index,
+         enums.MaterialEnum.WATER.value.index,
+         enums.MaterialEnum.SPAWN.value.index,
+         enums.MaterialEnum.LAVA.value.index,
+         enums.MaterialEnum.STONE.value.index,
+         enums.MaterialEnum.GRASS.value.index
+      ])
+
+      self.niche_locuses = []
+
+      self.init_baseline()
+
+   def init_baseline(self):
+      self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
+      self.step_size = 0.125
+      # Following the parameters for the baseline simplex noise maps -- see projekt/config
+      self.n_bands = 4
+      self.landscape_threshes = np.array([
+         0.05, # STARTER FOOD
+         0.1, # STARTER WATER
+         0.2,  # SPAWNS
+         0.21, # LAVA
+         0.25 if self.access_bottleneck else 0.30, # STONE
+         1,    # GRASS
+      ])
+      return
+
+   def mutate(self):
+      pass
+
+   def gen_map(self):
+      self.layout_base_map()
+      self.select_niche_locuses()
+      self.create_niche_clusters()
+      self.add_basic_resource_near_clusters()
+      self.map_arr = self.map_arr.astype(np.uint8)
+
+   def layout_base_map(self):
+      map_width = self.map_width
+      s = np.arange(map_width)
+      X, Y = np.meshgrid(s, s)
+      val = np.zeros((map_width, map_width), dtype=float)
+      map_arr = np.zeros((map_width, map_width), dtype=np.uint8)
+      val = vec_noise.snoise2(self.x0 + X * self.step_size, self.y0 + Y * self.step_size)
+      if self.landscape_threshes.shape[0] != self.landscape_tiles.shape[0]:
+         raise Exception('Number of thresholds ({}) does not match number of tile "bands" ({}).'.format(self.landscape_threshes.shape[0], self.landscape_tiles.shape[0]))
+      for i in range(map_arr.shape[0]):
+         for j in range(map_arr.shape[1]):
+            t = np.where(0.5 + 0.5 * val[i, j] <= self.landscape_threshes)[0][0]
+            if t >= self.landscape_tiles.shape[0]:
+               raise Exception("Selected tile is out of bounds in list of tiles for niche genome.")
+            map_arr[i, j] = self.landscape_tiles[t]
+      self.map_arr = map_arr.astype(np.uint8)
+
+   def select_niche_locuses(self):
+      niche_rad = self.niche_zone_radius + self.resource_wall_buf + self.wall_width
+
+      rand_pt = lambda: (np.random.randint(low=niche_rad + self.lava_border_width, high=self.map_width - self.lava_border_width - niche_rad, size=1)[0],
+                            np.random.randint(low=niche_rad + self.lava_border_width, high=self.map_width - self.lava_border_width - niche_rad, size=1)[0])
+
+      pop_rand = lambda l: l.pop(np.random.randint(len(l), size=1)[0])
+
+      on_map = lambda pt: (pt[0] > (niche_rad + self.lava_border_width) and pt[0] < self.map_width - self.lava_border_width - niche_rad) \
+                           and (pt[1] > (niche_rad + self.lava_border_width) and pt[1] < self.map_width - self.lava_border_width - niche_rad)
+
+      l2_norm = lambda a, b: np.linalg.norm(np.array(a) - np.array(b))
+
+      in_range = lambda pt, pts, min_dist: any([l2_norm(ept, pt) < min_dist for ept in pts])
+
+      def rand_pt_near(pt, min_dist):
+         (r1, r2) = np.random.uniform(size=2)
+         rad = min_dist * (r1 + 1)
+         ang = 2 * np.pi * r2
+         return (int(pt[0] + rad * np.cos(ang)), int(pt[1] + rad * np.sin(ang)))
+
+      # Select point via poisson disk sampling
+      process_list = []
+      sample_pts = []
+
+      first_pt = rand_pt()
+      process_list.append(first_pt)
+      sample_pts.append(first_pt)
+
+      while len(sample_pts) < self.resource_tiles.shape[0]:
+         while len(process_list) > 0:
+            pt = pop_rand(process_list)
+            for i in range(0, self.num_niche_loc_gen_tries):
+               new_pt = rand_pt_near(pt, self.niche_loc_spacing)
+               if on_map(new_pt) and (not in_range(new_pt, sample_pts, self.niche_loc_spacing)):
+                  process_list.append(new_pt)
+                  sample_pts.append(new_pt)
+
+               if len(sample_pts) >= self.resource_tiles.shape[0]:
+                  break
+            if len(sample_pts) >= self.resource_tiles.shape[0]:
+               break
+
+
+         if len(sample_pts) < self.resource_tiles.shape[0]:
+            process_list = []
+            sample_pts = []
+
+            first_pt = rand_pt()
+            process_list.append(first_pt)
+            sample_pts.append(first_pt)
+
+         pt_pairs = list(itertools.product(sample_pts, sample_pts))
+         pt_pairs = list(filter(lambda p: not(p[0] == p[1]), pt_pairs))
+         if any([l2_norm(p[0], p[1]) < self.niche_loc_spacing for p in pt_pairs]):
+            print("points are too close, resetting")
+            process_list = []
+            sample_pts = []
+
+            first_pt = rand_pt()
+            process_list.append(first_pt)
+            sample_pts.append(first_pt)
+
+      self.niche_locuses = sample_pts
+
+   def create_niche_clusters(self):
+      def create_circular_mask(h, w, center=None, radius=None):
+         if center is None: # use the middle of the image
+            center = (int(w/2), int(h/2))
+
+         Y, X = np.ogrid[:h, :w]
+         dist_from_center = np.sqrt((X - center[1])**2 + (Y-center[0])**2)
+
+         mask = dist_from_center <= radius
+         return mask
+
+      for (resource_idx, loc) in enumerate(self.niche_locuses):
+         if self.access_bottleneck:
+            mask = create_circular_mask(self.map_width, self.map_width, loc, self.niche_zone_radius + self.resource_wall_buf + self.wall_width)
+            self.map_arr[mask] = enums.MaterialEnum.STONE.value.index
+         mask = create_circular_mask(self.map_width, self.map_width, loc, self.niche_zone_radius + self.resource_wall_buf)
+         self.map_arr[mask] = enums.MaterialEnum.GRASS.value.index
+         mask = create_circular_mask(self.map_width, self.map_width, loc, self.niche_zone_radius)
+         self.map_arr[mask] = self.resource_tiles[resource_idx]
+
+   def add_basic_resource_near_clusters(self):
+      niche_wall_rad = self.niche_zone_radius + self.resource_wall_buf + self.wall_width
+      disp = (int(np.sqrt((niche_wall_rad ** 2) / 2)), int(np.sqrt((niche_wall_rad ** 2) / 2)))
+      el_add = lambda a, b: tuple(map(lambda i, j: i + j, a, b))
+      el_mul = lambda a, b: tuple(map(lambda i, j: i * j, a, b))
+
+      def inv_idx(a, i):
+         l_a = list(a)
+         l_a[i] = a[i] * -1
+         return tuple(l_a)
+
+      def layout_resources(self, loc, disp_vec, tbv, bbv, rv):
+         resource_drop_start = el_add(el_mul(disp_vec, rv), loc)
+         print(loc, resource_drop_start, rv)
+         top_band_start = el_add(resource_drop_start, tbv)
+         bot_band_start = el_add(resource_drop_start, bbv)
+         self.map_arr[resource_drop_start] = enums.MaterialEnum.LAVA.value.index
+         for i in range(0, self.niche_resource_drop_len * 2, 2):
+            t = el_add(top_band_start, el_mul((i, i), rv))
+            c = el_add(resource_drop_start, el_mul((i, i), rv))
+            c1 = el_add(resource_drop_start, el_mul((i + 1, i), rv))
+            c2 = el_add(resource_drop_start, el_mul((i, i + 1), rv))
+            b = el_add(bot_band_start, el_mul((i, i), rv))
+            self.map_arr[t] = enums.MaterialEnum.WATER.value.index
+            self.map_arr[b] = enums.MaterialEnum.WATER.value.index
+            self.map_arr[c] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[c1] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[c2] = enums.MaterialEnum.GRASS.value.index
+
+            t = el_add(top_band_start, el_mul((i + 1, i + 1), rv))
+            c = el_add(resource_drop_start, el_mul((i + 1, i + 1), rv))
+            c1 = el_add(resource_drop_start, el_mul((i + 2, i + 1), rv))
+            c2 = el_add(resource_drop_start, el_mul((i + 1, i + 2), rv))
+            b = el_add(bot_band_start, el_mul((i + 1, i + 1), rv))
+            self.map_arr[t] = enums.MaterialEnum.FOREST.value.index
+            self.map_arr[b] = enums.MaterialEnum.FOREST.value.index
+            self.map_arr[c] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[c1] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[c2] = enums.MaterialEnum.GRASS.value.index
+
+         for i in range(self.niche_resource_drop_len * 2, (self.niche_resource_drop_len * 2) + 2):
+            t = el_add(top_band_start, el_mul((i, i), rv))
+            c = el_add(resource_drop_start, el_mul((i, i), rv))
+            c1 = el_add(resource_drop_start, el_mul((i + 1, i), rv))
+            c2 = el_add(resource_drop_start, el_mul((i, i + 1), rv))
+            b = el_add(bot_band_start, el_mul((i, i), rv))
+            self.map_arr[t] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[b] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[c] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[c1] = enums.MaterialEnum.GRASS.value.index
+            self.map_arr[c2] = enums.MaterialEnum.GRASS.value.index
+
+         if self.access_bottleneck:
+            wv = el_mul(rv, (-1, -1))
+            for i in range(self.wall_width):
+               c = el_add(resource_drop_start, el_mul((i, i), wv))
+               c1 = el_add(resource_drop_start, el_mul((i + 1, i), wv))
+               c2 = el_add(resource_drop_start, el_mul((i, i + 1), wv))
+               self.map_arr[c] = enums.MaterialEnum.GRASS.value.index
+               self.map_arr[c1] = enums.MaterialEnum.GRASS.value.index
+               self.map_arr[c2] = enums.MaterialEnum.GRASS.value.index
+
+
+      for loc in self.niche_locuses:
+         if loc[0] < self.map_width // 2 and loc[1] < self.map_width // 2:
+            # TL should go BR
+            layout_resources(self, loc, disp, (-1,1), (1,-1), (1,1))
+
+         elif loc[0] < self.map_width // 2 and loc[1] > self.map_width // 2:
+            # TR -> BL
+            layout_resources(self, loc, disp, (-1,-1), (1,1), (1,-1))
+
+         elif loc[0] > self.map_width // 2 and loc[1] < self.map_width // 2:
+            # BL -> TR
+            layout_resources(self, loc, disp, (-1,-1), (1,1), (-1,1))
+
+         elif loc[0] > self.map_width // 2 and loc[1] > self.map_width // 2:
+            # BR -> TL
+            layout_resources(self, loc, disp, (-1,1), (1,-1), (-1,-1))
+
 class RiverBottleneckGenome(Genome):
    def __init__(self, n_tiles, map_width, lava_border_width):
       super().__init__(n_tiles, map_width)
@@ -665,7 +904,7 @@ class RiverBottleneckGenome(Genome):
          for j in range(map_arr.shape[1]):
             t = np.where(0.5 + 0.5 * val[i, j] <= full_threshes)[0][0]
             if t >= self.thresh_tiles.shape[0]:
-               raise Exception("Selected tile is out of bounds in list of tiles for simplex genome.")
+               raise Exception("Selected tile is out of bounds in list of tiles for river bottleneck genome.")
             map_arr[i, j] = self.thresh_tiles[t]
          self.map_arr = map_arr.astype(np.uint8)
 
@@ -900,6 +1139,11 @@ class EvoIndividual(Individual):
            self.chromosome = SimplexNoiseGenome(self.n_tiles, evolver.map_width)
        elif evolver.RIVER_BOTTLENECK_BASELINE:
            self.chromosome = RiverBottleneckGenome(self.n_tiles, evolver.map_width, lava_border_width=self.TERRAIN_BORDER)
+       elif evolver.RESOURCE_NICHES_BASELINE:
+           self.chromosome = ResourceNichesGenome(self.n_tiles, evolver.map_width, self.TERRAIN_BORDER)
+       elif evolver.BOTTLENECKED_RESOURCE_NICHES_BASELINE:
+           self.chromosome = ResourceNichesGenome(self.n_tiles, evolver.map_width, self.TERRAIN_BORDER, access_bottleneck=True)
+
 
        self.chromosome.gen_map()
        self.validate_map()

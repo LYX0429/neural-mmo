@@ -31,6 +31,8 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 genomes = [
    'Baseline',
    'RiverBottleneckBaseline',
+   'ResourceNichesBaseline',
+   'BottleneckedResourceNichesBaseline',
 #  'Simplex',
 #  'NCA',
 #  'TileFlip',
