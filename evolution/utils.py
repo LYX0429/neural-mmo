@@ -83,6 +83,8 @@ gen_objective_names = [
 genome_names = [
    'Baseline',
    'RiverBottleneckBaseline',
+   'ResourceNichesBaseline',
+   'BottleneckedResourceNichesBaseline',
    'Simplex',
    'NCA',
    'TileFlip',

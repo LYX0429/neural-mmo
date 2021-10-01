@@ -4,10 +4,8 @@ Launch a batch of experiments on a SLURM cluster.
 WARNING: This will kill all ray processes running on the current node after each experiment, to avoid memory issues from dead processes.
 '''
 import os
-import sys
 import copy
 import json
-import csv
 import re
 import argparse
 import pickle
@@ -18,9 +16,8 @@ import matplotlib
 from matplotlib import pyplot as plt
 
 from forge.blade.core.terrain import MapGenerator, Save
-from plot_diversity import heatmap, annotate_heatmap
+from evolution.plot_diversity import heatmap, annotate_heatmap
 from projekt import config
-from fire import Fire
 from projekt.config import get_experiment_name
 from evolution.diversity import get_div_calc, get_pop_stats
 from evolution.utils import get_exp_shorthand, get_eval_map_inds
@@ -31,8 +28,8 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 genomes = [
    'Baseline',
    'RiverBottleneckBaseline',
-   'ResourceNichesBaseline',
-   'BottleneckedResourceNichesBaseline',
+#  'ResourceNichesBaseline',
+#  'BottleneckedResourceNichesBaseline',
 #  'Simplex',
 #  'NCA',
 #  'TileFlip',
@@ -274,6 +271,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
    n = 0
    model_exp_names, model_exp_configs = experiment_names, experiment_configs
    map_exp_names, map_exp_configs = experiment_names, experiment_configs
+   # TODO: The dimensions of these arrays are NOT to be fucked up. Attach them to an enum type class or something
    # We will use these heatmaps to visualize performance between generator-agent pairs over the set of experiments
    mean_lifespans = np.zeros((len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
 #  std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1, N_MAP_EVALS, N_EVAL_MAPS))  # also take std of each model's average performance
@@ -290,7 +288,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       txt_verb = 'Collecting data for cross-eval visualization'
    else:
       txt_verb = 'Inferring'
-   # FIXME: why tf is this breaking if I move inside the loop?
+   # FIXME: why tf is this MapGenerator breaking if I move it inside the loop?
    if MAP_GENERATOR is None:
       MAP_GENERATOR = MapGenerator(map_exp_configs[0])
    for (gen_i, (map_exp_name, map_exp_config)) in enumerate(zip(map_exp_names, map_exp_configs)):
@@ -327,7 +325,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                NPOLICIES = 1
                l_eval_args += '--MODEL {} '.format(model_exp_name)
             NPOP = NPOLICIES
-            #TODO: deal with PAIRED, and combinations of PAIRED and non-PAIRED experiments
             l_eval_args += '--NPOLICIES {} --NPOP {} --PAIRED {}'.format(NPOLICIES, NPOP, model_config.PAIRED)
 
             if render:
@@ -400,20 +397,35 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" , "generator_objective" and "PAIRED" dimensions exclusively. Expand crappy get_exp_shorthand function if we need more.
       # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
 
-      # get mean  model performance over maps/generators during a given eval
-      mean_aggr_lifespan = mean_lifespans.mean(axis=-1).mean(axis=1)
-      # get standard deviation of this aggregate score across evals
-      std_aggr_lifespan = mean_aggr_lifespan.std(axis=-1)
-      # get mean lifespan over evals on each map
-      mean_lifespans = mean_lifespans.mean(axis=-2)
-      # mean and standard deviation of lifespans over maps
-      mean_lifespans = mean_lifespans.mean(axis=-1)
-      std_lifespans = mean_lifespans.std(axis=-1)
+      def get_meanstd(data):
+         '''Funky function for getting mean, standard deviation of our data'''
+         mean_model_mapgen = data.mean(axis=(-2, -1))
+         std_model_mapgen = data.std(axis=(-2, -1))
+
+         # add a column looking at the mean performance of each model over all maps
+         mean_model = data.mean(axis=(-2, -1))
+         mean_model = mean_model.mean(axis=-1, keepdims=True)
+
+         # standard deviation in this column is calculated a little differently: by getting the aggregate score of each model
+         # model over all maps, then looking at *this* random variable's standard deviation over evals
+
+         # this is the mean over generators and maps (not evals!)
+         aggr_model = data.mean(axis=(-3, -1))
+         # std over evals
+         std_model = aggr_model.std(axis=-1, keepdims=True)
+
+         means = np.concatenate((mean_model_mapgen, mean_model), axis=-1)
+         stds = np.concatenate((std_model_mapgen, std_model), axis=-1)
+
+         return means, stds
+
+      # mean and standard deviation of lifespans over maps and evals
+      mean_mapgen_lifespans, std_mapgen_lifespans = get_meanstd(mean_lifespans)
       # Repeat this averaging logic for other stats
-      div_scores = div_scores.mean(axis=-2).mean(axis=-1)
-      mean_skills = mean_skills.mean(axis=-1).mean(axis=-1)
+      mean_mapgen_div_scores, std_mapgen_divscores = get_meanstd(div_scores)
+      mean_mapgen_skills, std_mapgen_skills = get_meanstd(mean_skills)
       if opts.multi_policy:
-         mean_survivors = mean_survivors.mean(axis=-2).mean(axis=-1)
+         mean_mapgen_survivors, std_mapgen_survivors = get_meanstd(mean_survivors)
 
       row_labels = []
       col_labels = []
@@ -424,13 +436,17 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       for c in map_exp_names:
          col_labels.append(get_exp_shorthand(c))
       col_labels.append('mean')
-      cross_eval_heatmap(mean_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]", errors=std_lifespans)
+      cross_eval_heatmap(mean_mapgen_lifespans, row_labels, col_labels, "lifespans", "mean lifespan [ticks]",
+                         errors=std_mapgen_lifespans)
       for (s_i, skill_name) in enumerate(SKILLS):
-         cross_eval_heatmap(mean_skills[s_i], row_labels, col_labels, skill_name, "mean {} [xp]".format(skill_name))
-      for (s_i, div_calc_name) in enumerate(DIV_CALCS):
-         cross_eval_heatmap(div_scores[s_i], row_labels, col_labels, "{} diversity".format(div_calc_name), "{} diversity".format(div_calc_name))
+         cross_eval_heatmap(mean_mapgen_skills[s_i], row_labels, col_labels, skill_name,
+                            "mean {} [xp]".format(skill_name), errors=std_mapgen_skills[s_i])
+      for (d_i, div_calc_name) in enumerate(DIV_CALCS):
+         cross_eval_heatmap(mean_mapgen_div_scores[d_i], row_labels, col_labels, "{} diversity".format(div_calc_name),
+                            "{} diversity".format(div_calc_name), errors=std_mapgen_divscores[d_i])
       if opts.multi_policy:
-         cross_eval_heatmap(mean_survivors, row_labels, col_labels, "mean survivors", "")
+         cross_eval_heatmap(mean_mapgen_survivors, row_labels, col_labels, "mean survivors", "",
+                            errors=std_mapgen_survivors)
 
 def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel, errors=None):
    fig, ax = plt.subplots()
@@ -455,11 +471,22 @@ def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel, errors=No
 
    # Add col. with averages over each row (each model)
 #  col_labels += ['mean']
-   data = np.hstack((data, np.expand_dims(data.mean(axis=1), 1)))
+#  data = np.hstack((data, np.expand_dims(data.mean(axis=1), 1)))
 
    im, cbar = heatmap(data, row_labels, col_labels, ax=ax,
                       cmap="YlGn", cbarlabel=cbarlabel)
-   texts = annotate_heatmap(im, valfmt="{x:.1f}")
+
+   class CellFormatter(object):
+      def __init__(self, errors):
+         self.errors = errors
+      def func(self, x, pos):
+         x_str = "{:.1f}".format(x)
+         err = errors[pos]
+         x_str = x_str + "  ± {:.1f}".format(err)
+         return x_str
+   cf = CellFormatter(errors)
+
+   texts = annotate_heatmap(im, valfmt=matplotlib.ticker.FuncFormatter(cf.func))
    ax.set_title(title)
 
 #  fig.tight_layout(rect=[1,0,1,0])

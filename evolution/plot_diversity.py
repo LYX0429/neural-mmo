@@ -315,7 +315,7 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
    for i in range(data.shape[0]):
       for j in range(data.shape[1]):
          kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
-         text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+         text = im.axes.text(j, i, valfmt(data[i, j], pos=(i, j)), **kw)
          texts.append(text)
 
    return texts
@@ -338,13 +338,13 @@ if __name__ == '__main__':
    #  plt.rcParams["figure.figsize"] = (20,3)
    #  figs, axs = plt.subplots(3, 3)
       title = 'uniform random population'
-      path = os.path.join('eval_experiment', 'toy_cases', title)
+      path = os.path.join('../eval_experiment', 'toy_cases', title)
       agent_skills = np.random.randint(0, 20000, (16, 2))
       plot(agent_skills, title, path)
    #  plt.show()
 
       title = 'uniform generalists'
-      path = os.path.join('eval_experiment', 'toy_cases', title)
+      path = os.path.join('../eval_experiment', 'toy_cases', title)
       mean = (10000, 10000)
       cov = [[1e6, 1e5],[1e5,1e6]]
       agent_skills = np.random.multivariate_normal(mean, cov, n_agents)
@@ -354,7 +354,7 @@ if __name__ == '__main__':
    #  plt.show()
 
       title = 'uniform specialists'
-      path = os.path.join('eval_experiment', 'toy_cases', title)
+      path = os.path.join('../eval_experiment', 'toy_cases', title)
       mean = (18000, 2000)
       cov = [[1e6, 1e5],[1e5,1e6]]
       agent_skills = np.random.multivariate_normal(mean, cov, n_agents)
@@ -364,7 +364,7 @@ if __name__ == '__main__':
    #  plt.show()
 
       title = 'bimodal specialists'
-      path = os.path.join('eval_experiment', 'toy_cases', title)
+      path = os.path.join('../eval_experiment', 'toy_cases', title)
       mean = (18000, 2000)
       cov = [[1e6, 1e5],[1e5,1e6]]
       agent_skills_1 = np.random.multivariate_normal(mean, cov, n_agents//2)
@@ -379,7 +379,7 @@ if __name__ == '__main__':
       plot(agent_skills, title, path)
 
       title = 'trimodal specialists'
-      path = os.path.join('eval_experiment', 'toy_cases', title)
+      path = os.path.join('../eval_experiment', 'toy_cases', title)
       mean = (2000, 2000)
       cov = [[1e6, 1e5],[1e5,1e6]]
       agent_skills_1 = np.random.multivariate_normal(mean, cov, n_agents//3)
@@ -396,7 +396,7 @@ if __name__ == '__main__':
       agent_skills = np.vstack((agent_skills_1, agent_skills_2, agent_skills_3))
       plot(agent_skills, title, path)
    else:
-      map_dir = os.path.join('eval_experiment', args.map, str(args.infer_idx))
+      map_dir = os.path.join('../eval_experiment', args.map, str(args.infer_idx))
       model_stats = {}
       for model_name in args.compare_models:
          model_dir = os.path.join(map_dir, model_name)

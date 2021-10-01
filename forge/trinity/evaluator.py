@@ -1,4 +1,3 @@
-from pdb import set_trace as TT
 import os
 from tqdm import tqdm
 import numpy as np
@@ -8,7 +7,7 @@ from forge.trinity.overlay import OverlayRegistry
 from forge.blade.io.action import static as Action
 from forge.blade.lib.log import InkWell
 from evolution.diversity import diversity_calc
-from plot_diversity import plot_div_2d
+from evolution.plot_diversity import plot_div_2d
 
 
 class Base:

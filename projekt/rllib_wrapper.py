@@ -1,6 +1,5 @@
 from pathlib import Path
 import json
-from pdb import set_trace as TT
 
 from collections import defaultdict
 from itertools import chain
@@ -8,17 +7,11 @@ import shutil
 import os
 import re
 import csv
-from timeit import default_timer as timer
 
 import gym
 from matplotlib import pyplot as plt
 import matplotlib
 from ray.rllib.agents import Trainer
-from ray.rllib.utils import override
-from ray.rllib.utils.from_config import from_config
-from ray.tune import Trainable
-from ray.tune.registry import ENV_CREATOR, _global_registry
-from ray.tune.utils import merge_dicts
 
 matplotlib.use('Agg')
 import numpy as np
@@ -27,7 +20,7 @@ import torch
 from ray.rllib.evaluation import RolloutWorker
 from forge.blade.lib.material import Water, Lava, Stone
 from tqdm import tqdm
-from plot_diversity import heatmap
+from evolution.plot_diversity import heatmap
 import projekt
 from forge.blade.lib.log import InkWell
 from forge.blade.core. terrain import Save, MapGenerator
@@ -73,7 +66,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       self.config = config['config']
       if self.config.GRIDDLY:
          from griddly_nmmo.env import NMMO
-         from griddly import GymWrapperFactory, gd
       self.headers = self.config.SKILLS
       super().__init__(self.config)
       self.evo_dones = None

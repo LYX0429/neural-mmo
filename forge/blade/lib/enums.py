@@ -233,6 +233,8 @@ class Palette:
             'Neural_': Neon.BLUE,
             'Baseline': Solid.RED,
             'RiverBottleneckBaseline': Solid.GREY,
+            'ResourceNichesBaseline': Solid.CHARTREUSE,
+            'BottleneckedResourceNichesBaseline': Neon.BLUE,
             'Simplex': Solid.SKY,
             'CPPN': Solid.BLUE,
             'All': Solid.ORANGE,
