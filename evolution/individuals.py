@@ -484,6 +484,9 @@ class TileFlipGenome(Genome):
 
     def mutate(self):
         #TODO: uncomment and tweak this newer/smarter stuff
+
+        # TODO: actually it's not very smart at all. Use gaussians or something to make it smarter and
+        #  make it so that local/global entropy might actually change from drift!!!
         map_width = self.map_width
         mut_scale = map_width ** 2 * 0.005
 #       mut_scale = 1
@@ -493,6 +496,8 @@ class TileFlipGenome(Genome):
         idxs = np.argwhere(np.zeros((map_width, map_width)) == 0)
         pos_idxs = np.random.choice(idxs.shape[0], n_muts, replace=False)
         mut_idxs = idxs[pos_idxs]
+#       print(mut_idxs)
+#       print(new)
         self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = (self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] + new) % self.n_tiles
 #       self.map_arr[mut_idxs[:,0], mut_idxs[:,1]] = new
 

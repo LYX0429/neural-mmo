@@ -78,7 +78,8 @@ gen_objective_names = [
    'Discrete',
    'FarNearestNeighbor',
    'CloseNearestNeighbor',
-   'InvL2',
+   'AdversityDiversity',
+   'AdversityDiversityTrgs',
 ]
 genome_names = [
    'Baseline',
@@ -101,14 +102,14 @@ def get_exp_shorthand(exp_name):
    found_genome_name = False
    for genome_name in genome_names:
 #     if genome_name in exp_name:
-      if 'gene-'+genome_name in exp_name:
+      if 'gene-'+genome_name+'_' in exp_name:
          exp_shorthand += genome_name
          assert not found_genome_name
          found_genome_name = True
    assert found_genome_name
    found_obj_name = False
    for obj_name in gen_objective_names:
-      if obj_name in exp_name:
+      if 'fit-'+obj_name+'_' in exp_name:
          exp_shorthand += ' ' + obj_name
          assert not found_obj_name
          found_obj_name = True

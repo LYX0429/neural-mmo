@@ -29,10 +29,10 @@ genomes = [
 #  'Baseline',
 #  'RiverBottleneckBaseline',
 #  'ResourceNichesBaseline',
-   'BottleneckedResourceNichesBaseline',
+#  'BottleneckedResourceNichesBaseline',
 #  'Simplex',
 #  'NCA',
-#  'TileFlip',
+   'TileFlip',
 #  'CPPN',
 #  'Primitives',
 #  'L-System',
@@ -80,8 +80,35 @@ PAIRED_bools = [
 adv_div_ratios = [.5]
 # adv_div_ratios = np.arange(0, 1.01, 1/6)  # this gets stretched to [-1, 1] and used to shrink one agent or the either
 
-adv_div_trgs = np.arange(0, 1.01, 1/5)
-adv_div_trgs = itertools.product(adv_div_trgs, adv_div_trgs)
+#adv_div_trgs = np.arange(0, 1.01, 1/5)
+#adv_div_trgs = [
+#  0,
+#  1/5,
+#  2/5,
+#  3/5,
+#  4/5,
+#  1,
+#  ]
+#adv_div_trgs = itertools.product(adv_div_trgs, adv_div_trgs)
+
+# For "AdversityDiversityTrgs" -- how long should agents live, how diverse should they be
+adv_trgs = [
+#  0,
+#  1/5,
+#  2/5,
+#  3/5,
+#  4/5,
+   1,
+]
+div_trgs = [
+   0,
+#  1/5,
+#  2/5,
+#  3/5,
+#  4/5,
+#  1,
+]
+adv_div_trgs = itertools.product(adv_trgs, div_trgs)
 
 ##########################
 
