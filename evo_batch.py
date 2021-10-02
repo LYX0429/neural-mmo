@@ -26,10 +26,10 @@ from evolution.utils import get_exp_shorthand, get_eval_map_inds
 ##### HYPER-PARAMETERS #####
 
 genomes = [
-   'Baseline',
-   'RiverBottleneckBaseline',
+#  'Baseline',
+#  'RiverBottleneckBaseline',
 #  'ResourceNichesBaseline',
-#  'BottleneckedResourceNichesBaseline',
+   'BottleneckedResourceNichesBaseline',
 #  'Simplex',
 #  'NCA',
 #  'TileFlip',

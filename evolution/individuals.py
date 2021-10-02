@@ -739,7 +739,7 @@ class ResourceNichesGenome(Genome):
          pt_pairs = list(itertools.product(sample_pts, sample_pts))
          pt_pairs = list(filter(lambda p: not(p[0] == p[1]), pt_pairs))
          if any([l2_norm(p[0], p[1]) < self.niche_loc_spacing for p in pt_pairs]):
-            print("points are too close, resetting")
+#           print("points are too close, resetting")
             process_list = []
             sample_pts = []
 
@@ -782,7 +782,7 @@ class ResourceNichesGenome(Genome):
 
       def layout_resources(self, loc, disp_vec, tbv, bbv, rv):
          resource_drop_start = el_add(el_mul(disp_vec, rv), loc)
-         print(loc, resource_drop_start, rv)
+#        print(loc, resource_drop_start, rv)
          top_band_start = el_add(resource_drop_start, tbv)
          bot_band_start = el_add(resource_drop_start, bbv)
          self.map_arr[resource_drop_start] = enums.MaterialEnum.LAVA.value.index

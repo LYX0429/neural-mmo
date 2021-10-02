@@ -67,7 +67,7 @@ def plot_qdpy_fitness(save_path, evolver=None, logbook=None):
    line1_err = ax1.errorbar(gen, fit_avgs, np.hstack(fit_stds), color='green', mfc='green', mec='green', linestyle="-",
                             label="Average Fitness",
                             ms=20, mew=4,
-                            alpha=100 / len(gen),
+                            alpha=min(0.9, 100 / len(gen)),
                             # alpha=0.9,
                             )
    line1 = ax1.plot(gen, fit_avgs, 'b-', label='Average Fitness')
