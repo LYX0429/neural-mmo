@@ -38,7 +38,7 @@ class Base:
       calc_diversity = diversity_calc(self.config)
 
       for i in range(n_evals):
-         self.env.reset(idx=self.config.INFER_IDX)
+         self.env.reset(idx=self.config.INFER_IDXS[0])
          self.obs = self.env.step({})[0]
          self.state = {}
          self.registry = OverlayRegistry(self.config, self.env)
@@ -51,7 +51,7 @@ class Base:
             divs[t] = diversity
          div_mat[i] = divs
 
-      plot_div_2d(ts, div_mat, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDX)
+      plot_div_2d(ts, div_mat, self.config.MODEL.split('/')[-1], self.config.MAP.split('/')[-1], self.config.INFER_IDXS[0])
 
       print('Diversity: {}'.format(diversity))
 

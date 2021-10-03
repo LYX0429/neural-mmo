@@ -19,7 +19,7 @@ from projekt import rllib_wrapper
 from evolution.global_actors import Counter, Stats
 from projekt.config import get_experiment_name
 from pcg import get_tile_data
-from evolution.qdpy_wrapper import plot_qdpy_fitness
+from evolution.qdpy_wrapper import plot_qdpy_fitness, render_map_grid
 from evolution.evo_map import save_maps
 TILE_TYPES, TILE_PROBS = get_tile_data(griddly=False)
 
@@ -134,11 +134,13 @@ def main():
 
    if config.VIS_MAPS:
       archive = pickle.load(open(os.path.join(save_path, 'ME_archive.p'), 'rb'))
+      grid = archive['container']
+#     render_map_grid(grid, save_path)
       logbook = pickle.load(open(os.path.join(save_path, 'logbook.pkl'), 'rb'))
       print('Plotting histogram of map fitness.')
       plot_qdpy_fitness(save_path=save_path, logbook=logbook, evolver=None)
       print('Saving and rendering maps from the archive of elites.')
-      save_maps(individuals=archive['container'], save_path=save_path, config=config)
+      save_maps(individuals=grid, save_path=save_path, config=config)
       return
    try:
       print('Attempting to load evolver from save file.')
@@ -174,7 +176,7 @@ def main():
       evolver.reload_log()
       # evolver.container = container
       if config.RENDER:
-         evolver.config.INFER_IDX = config.INFER_IDX
+         evolver.config.INFER_IDXS = config.INFER_IDXS
       if evolver.MAP_ELITES:
          evolver.reload_archive()
       if evolver.MAP_ELITES:

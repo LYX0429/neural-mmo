@@ -80,6 +80,7 @@ gen_objective_names = [
    'CloseNearestNeighbor',
    'AdversityDiversity',
    'AdversityDiversityTrgs',
+   'InvL2',
 ]
 genome_names = [
    'Baseline',

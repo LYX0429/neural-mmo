@@ -19,10 +19,12 @@ def sharp(self, noise):
    return 2 * (0.5 - abs(0.5 - noise));
 
 class Save:
-   def render(mats, lookup, path):
+   def render(mats, lookup, path=None):
       images = [[lookup[e] for e in l] for l in mats]
       image = np.vstack([np.hstack(e) for e in images])
-      imsave(path, image)
+      if path:
+         imsave(path, image)
+      return image
 
    def fractal(terrain, path):
       frac = (256*terrain).astype(np.uint8)

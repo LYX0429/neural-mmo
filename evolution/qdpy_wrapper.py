@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import ray
 import scipy
+from PIL import Image
 
 import deap
 from deap import algorithms, base, creator, gp, tools
@@ -797,3 +798,47 @@ class meNMMO(EvolverNMMO):
 
          print("All results are available in the '%s' pickle file." %
                algo.final_filename)
+
+def render_map_grid(grid, save_path, d=5):
+   map_generator = MapGenerator(grid.config)
+   shape = grid.shape
+   ind_keys = sorted(list(grid.solutions.keys()))
+   # make a list of list of indices corresponding sufficiently populated rows
+   ind_idxs = []
+   x = -1
+   y_idxs = []
+   n_y = 0
+   for k in ind_keys:
+      if k[0] > x:
+         if n_y >= 10:
+            ind_idxs.append((x, y_idxs))
+         x = k[0]
+         n_y = 0
+         y_idxs = []
+      if grid.solutions[k]:
+         n_y += 1
+         y_idxs.append(k[1])
+
+   # select indices to render with maximum spacing
+   render_idxs = []
+   x_rel_idxs = [int(i* (len(ind_idxs)-1) / (d-1)) for i in range(d)]
+   for xi in x_rel_idxs:
+      x_idx = ind_idxs[xi][0]
+      y_rel_idxs = [int(i * (len(ind_idxs[xi][1])-1) / (d-1)) for i in range(d)]
+      y_idxs = [(x_idx, ind_idxs[xi][1][yi]) for yi in y_rel_idxs]
+      render_idxs.append(y_idxs)
+
+   map_grid = []
+   for (i, row) in enumerate(render_idxs):
+      map_grid.append([])
+      for (j, (x, y)) in enumerate(render_idxs[i]):
+         ind = grid.solutions[(x, y)][0]
+         map_arr = ind.chromosome.map_arr
+         im = Save.render(map_arr[grid.config.TERRAIN_BORDER-1:-grid.config.TERRAIN_BORDER+1, grid.config.TERRAIN_BORDER-1:-grid.config.TERRAIN_BORDER+1],
+         map_generator.textures, path=None)
+         map_grid[i].append(im)
+#        map_grid.append(grid.index_grid)
+   map_grid = [np.hstack(row) for row in map_grid]
+   map_grid = np.vstack(map_grid)
+   img = Image.fromarray(map_grid, 'RGB')
+   img.save(os.path.join(save_path, 'map_grid.png'))

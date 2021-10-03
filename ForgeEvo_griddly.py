@@ -281,7 +281,7 @@ if __name__ == '__main__':
 #     evolver.config.ROOT = config.ROOT
         evolver.config.TERRAIN_RENDER = config.TERRAIN_RENDER
         evolver.config.TRAIN_RENDER = config.TRAIN_RENDER
-        evolver.config.INFER_IDX = config.INFER_IDX
+        evolver.config.INFER_IDXS = config.INFER_IDXS
         evolver.config.RENDER = config.RENDER
         evolver.config.ARCHIVE_UPDATE_WINDOW = config.ARCHIVE_UPDATE_WINDOW
         #     evolver.config.SKILLS = config.SKILLS

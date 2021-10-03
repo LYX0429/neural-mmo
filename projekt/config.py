@@ -7,7 +7,7 @@ def get_experiment_name(config):
    #  assert len(config.SKILLS) == 1
    map_obj_name = config.FITNESS_METRIC
    if config.FITNESS_METRIC == 'AdversityDiversity':
-      map_obj_name += '{:.1f}'.format(config.ADVERSITY_DIVERSITY_RATIO)
+      map_obj_name += '_{:.1f}'.format(config.ADVERSITY_DIVERSITY_RATIO)
    if config.FITNESS_METRIC == 'AdversityDiversityTrgs':
       # label ratio
       map_obj_name += '_r_' + '{:.1f}'.format(config.ADVERSITY_DIVERSITY_RATIO)
@@ -187,7 +187,7 @@ class TreeOrerock(SmallMaps):
    SKILLS               = ALL_SKILLS
    FITNESS_METRIC       = 'L2'
    MAP = 'PCG'
-   INFER_IDX = 0
+   INFER_IDXS = []
    N_EVAL = 20
    EVO_VERBOSE          = True
    EVO_SAVE_INTERVAL    = 5

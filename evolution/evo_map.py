@@ -843,7 +843,7 @@ class EvolverNMMO(LambdaMuEvolver):
      #if not best_g:
      #    raise Exception('No population found for inference.')
      #print("Loading map {} for inference.".format(best_g))
-      best_g = self.config.INFER_IDX
+      best_g = self.config.INFER_IDXS
 #     global_counter.set.remote(best_g)
       self.config.EVALUATE = True
 

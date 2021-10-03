@@ -1,3 +1,4 @@
+from pdb import set_trace as TT
 from pathlib import Path
 import json
 
@@ -346,7 +347,11 @@ class RLlibEvaluator(evaluator.Base):
          self.maps = maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in archive])
          idx = list(maps.keys())[np.random.choice(len(maps))]
          self.env.set_map(idx=idx, maps=maps)
-      self.env.reset(idx=config.INFER_IDX, step=False)
+      if not config.RENDER:
+         # FIXME: assuming we'll evaluate on this one first. True for now but... is this necessary?
+         self.env.reset(idx=config.INFER_IDXS[0], step=False)
+      else:
+         self.env.reset(idx=config.INFER_IDXS, step=False)
 #     self.env.reset(idx=0, step=False)
       if not config.GRIDDLY:
          self.registry = OverlayRegistry(self.env, self.model)#, trainer, config)
@@ -360,29 +365,37 @@ class RLlibEvaluator(evaluator.Base):
          try:
             os.mkdir(self.eval_path_map)
          except FileExistsError:
-            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+            print('Eval result directory exists for this map-generator, will overwrite any existing files: {}'.format(self.eval_path_map))
 
-         self.eval_path_map = os.path.join(self.eval_path_map, str(self.config.INFER_IDX))
+         for infer_idx in self.config.INFER_IDXS:
+            eval_path_map = os.path.join(self.eval_path_map, str(infer_idx))
 
-         try:
-            os.mkdir(self.eval_path_map)
-         except FileExistsError:
-            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+            try:
+               os.mkdir(eval_path_map)
+            except FileExistsError:
+               print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(
+                  eval_path_map))
 
-         self.eval_path_model = os.path.join(self.eval_path_map, self.config.MODEL.split('/')[-1])
+            eval_path_model = os.path.join(eval_path_map, self.config.MODEL.split('/')[-1])
 
-         try:
-            os.mkdir(self.eval_path_model)
-         except FileExistsError:
-            print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
+            try:
+               os.mkdir(eval_path_model)
+            except FileExistsError:
+               print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(
+                  eval_path_model))
 
          self.calc_diversity = diversity_calc(config)
 
    def render(self):
-      self.obs = self.env.reset(idx=self.config.INFER_IDX)
-      self.registry = RLlibOverlayRegistry(
-            self.config, self.env).init(self.trainer, self.model)
-      super().render()
+      for infer_idx in self.config.INFER_IDXS:
+         try:
+            # TODO: handle more maps in here?
+            self.obs = self.env.reset(idx=self.config.INFER_IDXS)
+            self.registry = RLlibOverlayRegistry(
+                  self.config, self.env).init(self.trainer, self.model)
+            super().render()
+         except Exception as e:
+            TT()
 
 #   def tick(self, pos, cmd):
 #      '''Simulate a single timestep
@@ -412,32 +425,36 @@ class RLlibEvaluator(evaluator.Base):
       #    assert isinstance(model_name, str)
       #    model_name = get_genome_name(model_name)
       map_name = get_exp_shorthand(self.config.MAP.split('/')[-1])
-      map_idx = self.config.INFER_IDX
-      self.exp_name = exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
-      # Render the map in case we hadn't already
-      map_arr = self.env.realm.map.inds()
-      map_generator = MapGenerator(self.config)
-      t_start = self.config.TERRAIN_BORDER
-      t_end = self.config.TERRAIN_SIZE - self.config.TERRAIN_BORDER
-      Save.render(map_arr[t_start:t_end, t_start:t_end],
-            map_generator.textures, os.path.join(self.eval_path_map, '{} map {}.png'.format(self.config.MAP.split('/')[-1], self.config.INFER_IDX)))
-      ts = np.arange(self.config.EVALUATION_HORIZON)
-      n_stat_calcs = 1
-      assert self.config.EVALUATION_HORIZON % n_stat_calcs == 0
-      stat_interval = self.config.EVALUATION_HORIZON // n_stat_calcs
       n_evals = self.config.N_EVAL
       n_eval_maps = self.config.N_EVAL_MAPS
       n_metrics = len(DIV_CALCS)
       n_skills = len(self.config.SKILLS)
+      ts = np.arange(self.config.EVALUATION_HORIZON)
+      n_stat_calcs = 1
+      assert self.config.EVALUATION_HORIZON % n_stat_calcs == 0
+      stat_interval = self.config.EVALUATION_HORIZON // n_stat_calcs
+      # Evaluating on each map as specified in config
+      map_generator = MapGenerator(self.config)
       for map_i in range(n_eval_maps):
+         map_idx = self.config.INFER_IDXS[map_i]
+         self.exp_name = exp_name = 'MODEL_{}_MAP_{}_ID{}_{}steps'.format(model_name, map_name, map_idx, self.config.EVALUATION_HORIZON)
+         # Render the map in case we hadn't already
+         map_arr = self.env.realm.map.inds()
+         t_start = self.config.TERRAIN_BORDER
+         t_end = self.config.TERRAIN_SIZE - self.config.TERRAIN_BORDER
+         eval_path_map = os.path.join(self.eval_path_map, str(map_idx))
+         eval_path_model = os.path.join(eval_path_map, self.config.MODEL.split('/')[-1])
+         Save.render(map_arr[t_start:t_end, t_start:t_end],
+               map_generator.textures, os.path.join(eval_path_map, '{} map {}.png'.format(
+               self.config.MAP.split('/')[-1], map_idx)))
          div_mat = np.zeros((n_evals, n_metrics, self.config.EVALUATION_HORIZON // stat_interval))
    #     heatmaps = np.zeros((n_evals, self.config.EVALUATION_HORIZON, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
          heatmaps = np.zeros((n_evals, n_skills + 1, self.config.TERRAIN_SIZE, self.config.TERRAIN_SIZE))
          final_stats = []
-         data_path = os.path.join(self.eval_path_model, '{} eval.npy'.format(exp_name))
+         data_path = os.path.join(eval_path_model, '{} eval.npy'.format(exp_name))
          if self.config.NEW_EVAL:
             for i in range(n_evals):
-               self.env.reset(idx=self.config.INFER_IDX)
+               self.env.reset(idx=map_idx)
                self.obs = self.env.step({})[0]
                self.state = {}
                self.registry = OverlayRegistry(self.config, self.env)
@@ -471,7 +488,7 @@ class RLlibEvaluator(evaluator.Base):
                      heatmaps[i, si+1, r, c] += 1
                   if eval_done:
                      break
-               self.count_survivors(map_i)  # no-op if we're not the MultiEvaluator. This is #FIXME gross!!
+               self.count_survivors(map_idx)  # no-op if we're not the MultiEvaluator. This is #FIXME gross!!
             heatmaps = heatmaps.mean(0)  # take mean of heatmaps over separate evals
             div_mat = np.vstack((div_mat.mean(0, keepdims=True), div_mat.std(0, keepdims=True)))  # take mean and std over evals
             with open(data_path, 'wb') as f:
@@ -484,88 +501,93 @@ class RLlibEvaluator(evaluator.Base):
                div_mat = np.load(f)
                heatmaps = np.load(f)
 
-         plot_name = 'diversity {}'.format(exp_name)
-         plot_diversity(np.where(ts % stat_interval == 0)[0], div_mat[0], div_mat[1], [d[1] for d in DIV_CALCS], exp_name, self.config)
-         plt.savefig(os.path.join(self.eval_path_model, exp_name), dpi=96)
-         plt.close()
-         for s_heat, s_name in zip(heatmaps, self.config.SKILLS + ['visited']):
-            fig, ax = plt.subplots()
-            ax.title.set_text('{} heatmap'.format(s_name))
-            map_arr = self.env.realm.map.inds()
-            mask = (map_arr == Water.index ) + (map_arr == Lava.index) + (map_arr == Stone.index)
-            s_heat = np.ma.masked_where((mask==True), s_heat)
-            s_heat = np.flip(s_heat, 0)
-   #        s_heat = np.log(s_heat + 1)
-            im = ax.imshow(s_heat, cmap='cool')
-            ax.set_xlim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
-            ax.set_ylim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
-            cbar = ax.figure.colorbar(im, ax=ax)
-            cbar.ax.set_ylabel('{} (log(xp)/tick)'.format(s_name))
-            plt.savefig(os.path.join(self.eval_path_model, '{} heatmap {}.png'.format(s_name, exp_name)))
+         # FIXME: we want the option to re-render these withoue evaluating. For now we bias toward skipping since this
+         #  massively slows down collection of past evaluations for cross-eval visualizations, which is our current
+         #  focus.
+         if self.config.NEW_EVAL:
+            plot_name = 'diversity {}'.format(exp_name)
+            plot_diversity(np.where(ts % stat_interval == 0)[0], div_mat[0], div_mat[1], [d[1] for d in DIV_CALCS], exp_name, self.config)
+            plt.savefig(os.path.join(eval_path_model, exp_name), dpi=96)
+            plt.close()
+            for s_heat, s_name in zip(heatmaps, self.config.SKILLS + ['visited']):
+               fig, ax = plt.subplots()
+               ax.title.set_text('{} heatmap'.format(s_name))
+               map_arr = self.env.realm.map.inds()
+               mask = (map_arr == Water.index ) + (map_arr == Lava.index) + (map_arr == Stone.index)
+               s_heat = np.ma.masked_where((mask==True), s_heat)
+               s_heat = np.flip(s_heat, 0)
+      #        s_heat = np.log(s_heat + 1)
+               im = ax.imshow(s_heat, cmap='cool')
+               ax.set_xlim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
+               ax.set_ylim(self.config.TERRAIN_BORDER, self.config.TERRAIN_SIZE-self.config.TERRAIN_BORDER)
+               cbar = ax.figure.colorbar(im, ax=ax)
+               cbar.ax.set_ylabel('{} (log(xp)/tick)'.format(s_name))
+               plt.savefig(os.path.join(eval_path_model, '{} heatmap {}.png'.format(s_name, exp_name)))
 
-         mean_divs = {}
-         # Originally we were taking the mean of diversity and lifespan stats over various timesteps, then calculating mean
-         # and stddev over different episodes/trials. Instead, let's just look at the last step.
-   #     means_np = div_mat.mean(axis=-1).mean(axis=0)
-   #     stds_np = div_mat.mean(axis=-1).std(axis=0)
-         means_np = div_mat[:, :, -1].mean(axis=0)
-         stds_np = div_mat[:, :, -1].std(axis=0)
-         for j, (_, div_name) in enumerate(DIV_CALCS):
-            mean_divs[div_name] = {}
-            mean_divs[div_name]['mean'] = means_np[j]
-            mean_divs[div_name]['std'] = stds_np[j]
-         with open(os.path.join(self.eval_path_model, 'stats.json'), 'w') as outfile:
-            json.dump(mean_divs, outfile, indent=2)
+            mean_divs = {}
+            # Originally we were taking the mean of diversity and lifespan stats over various timesteps, then calculating mean
+            # and stddev over different episodes/trials. Instead, let's just look at the last step.
+      #     means_np = div_mat.mean(axis=-1).mean(axis=0)
+      #     stds_np = div_mat.mean(axis=-1).std(axis=0)
+            means_np = div_mat[:, :, -1].mean(axis=0)
+            stds_np = div_mat[:, :, -1].std(axis=0)
+            for j, (_, div_name) in enumerate(DIV_CALCS):
+               mean_divs[div_name] = {}
+               mean_divs[div_name]['mean'] = means_np[j]
+               mean_divs[div_name]['std'] = stds_np[j]
+            with open(os.path.join(eval_path_model, 'stats.json'), 'w') as outfile:
+               json.dump(mean_divs, outfile, indent=2)
 
-         from sklearn.manifold import TSNE
-         tsne = TSNE(n_components=2, random_state=0)
-         final_agent_skills = np.vstack([get_pop_stats(stats['skills'], pop=None) for stats in final_stats])
-         X_2d = tsne.fit_transform(final_agent_skills)
-         plt.close()
-         plt.figure()
-         plt.title('TSNE plot of agents')
-   #     colors = np.hstack([stats['lifespans'] for stats in final_stats])
-        #colors = lifespans
-         # FIXME: an issue here
-   #     sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
-   #     cbar = plt.colorbar(sc)
-   #     cbar.ax.set_ylabel('lifespans')
-   #     plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
-   #     plt.close()
-         plt.figure()
-         p1 = plt.bar(np.arange(final_agent_skills.shape[0]), final_agent_skills.mean(axis=1), 5, yerr=final_agent_skills.std(axis=1))
-         plt.title('agent bars {}'.format(exp_name))
-         plt.close()
-         plt.figure()
-         p1 = plt.bar(np.arange(final_agent_skills.shape[1]), final_agent_skills.mean(axis=0), 1, yerr=final_agent_skills.std(axis=0))
-         plt.xticks(np.arange(final_agent_skills.shape[1]), self.config.SKILLS)
-         plt.ylabel('experience points')
-         plt.title('skill bars {}'.format(exp_name))
-         plt.savefig(os.path.join(self.eval_path_model, 'skill bars {}.png'.format(exp_name)))
-         plt.close()
-         plt.figure()
-         plt.title('agent-skill matrix {}'.format(exp_name))
-         im, cbar = heatmap(final_agent_skills, {}, self.config.SKILLS)
-         plt.savefig(os.path.join(self.eval_path_model, 'agent-skill matrix {}'.format(exp_name)))
-   #     if final_agent_skills.shape[1] == 2:
-   #        plot_div_2d(final_stats)
-   #        plt.figure()
-   #        plt.title('Agents')
-   #        sc = plt.scatter(final_agent_skills[:, 0], final_agent_skills[:, 1], c=colors)
-   #        cbar = plt.colorbar(sc)
-   #        cbar.ax.set_ylabel('lifespans')
-   #        plt.ylabel('woodcutting')
-   #        plt.xlabel('mining')
-   #        plt.savefig(os.path.join(self.eval_path_model, 'agents scatter.png'.format(exp_name)))
+            from sklearn.manifold import TSNE
+            tsne = TSNE(n_components=2, random_state=0)
+            final_agent_skills = np.vstack([get_pop_stats(stats['skills'], pop=None) for stats in final_stats])
+            X_2d = tsne.fit_transform(final_agent_skills)
+            plt.close()
+            plt.figure()
+            plt.title('TSNE plot of agents')
+      #     colors = np.hstack([stats['lifespans'] for stats in final_stats])
+           #colors = lifespans
+            # FIXME: an issue here
+      #     sc = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors)
+      #     cbar = plt.colorbar(sc)
+      #     cbar.ax.set_ylabel('lifespans')
+      #     plt.savefig(os.path.join(self.eval_path_model, 'TSNE {}.png'.format(exp_name)))
+      #     plt.close()
+            plt.figure()
+            p1 = plt.bar(np.arange(final_agent_skills.shape[0]), final_agent_skills.mean(axis=1), 5, yerr=final_agent_skills.std(axis=1))
+            plt.title('agent bars {}'.format(exp_name))
+            plt.close()
+            plt.figure()
+            p1 = plt.bar(np.arange(final_agent_skills.shape[1]), final_agent_skills.mean(axis=0), 1, yerr=final_agent_skills.std(axis=0))
+            plt.xticks(np.arange(final_agent_skills.shape[1]), self.config.SKILLS)
+            plt.ylabel('experience points')
+            plt.title('skill bars {}'.format(exp_name))
+            plt.savefig(os.path.join(eval_path_model, 'skill bars {}.png'.format(exp_name)))
+            plt.close()
+            plt.figure()
+            plt.title('agent-skill matrix {}'.format(exp_name))
+            im, cbar = heatmap(final_agent_skills, {}, self.config.SKILLS)
+            plt.savefig(os.path.join(eval_path_model, 'agent-skill matrix {}'.format(exp_name)))
+      #     if final_agent_skills.shape[1] == 2:
+      #        plot_div_2d(final_stats)
+      #        plt.figure()
+      #        plt.title('Agents')
+      #        sc = plt.scatter(final_agent_skills[:, 0], final_agent_skills[:, 1], c=colors)
+      #        cbar = plt.colorbar(sc)
+      #        cbar.ax.set_ylabel('lifespans')
+      #        plt.ylabel('woodcutting')
+      #        plt.xlabel('mining')
+      #        plt.savefig(os.path.join(self.eval_path_model, 'agents scatter.png'.format(exp_name)))
 
-   #     print('Diversity: {}'.format(diversity))
+      #     print('Diversity: {}'.format(diversity))
 
-         log = InkWell()
-         log.update(self.env.terminal())
+            log = InkWell()
+            log.update(self.env.terminal())
 
-   #     fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
-         fpath = os.path.join(self.eval_path_model, 'evaluation.npy')
-         np.save(fpath, log.packet)
+      #     fpath = os.path.join(self.config.LOG_DIR, self.config.LOG_FILE)
+            fpath = os.path.join(eval_path_model, 'evaluation.npy')
+            np.save(fpath, log.packet)
+            plt.close()
 
 
    def tick(self, pos, cmd):
@@ -638,7 +660,7 @@ class RLlibMultiEvaluator(RLlibEvaluator):
          self.maps = maps = dict([(ind.idx, ind.chromosome.map_arr) for ind in archive])
          idx = list(maps.keys())[np.random.choice(len(maps))]
          self.env.set_map(idx=idx, maps=maps)
-      self.env.reset(idx=config.INFER_IDX, step=False)
+      self.env.reset(idx=config.INFER_IDXS[0], step=False)
       #     self.env.reset(idx=0, step=False)
       if not config.GRIDDLY:
          # We're just using the 0th model here, maybe a better way, maybe these visualizations don't matter here
@@ -654,22 +676,25 @@ class RLlibMultiEvaluator(RLlibEvaluator):
          try:
             os.mkdir(self.eval_path_map)
          except FileExistsError:
-            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+            print('Eval result directory exists for this map-generator, will overwrite any existing files: {}'.format(self.eval_path_map))
 
-         self.eval_path_map = os.path.join(self.eval_path_map, str(self.config.INFER_IDX))
+         for infer_idx in self.config.INFER_IDXS:
+            eval_path_map = os.path.join(self.eval_path_map, str(infer_idx))
 
-         try:
-            os.mkdir(self.eval_path_map)
-         except FileExistsError:
-            print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(self.eval_path_map))
+            try:
+               os.mkdir(self.eval_path_map)
+            except FileExistsError:
+               print('Eval result directory exists for this map, will overwrite any existing files: {}'.format(
+                  eval_path_map))
 
-#        self.eval_path_model = os.path.join(self.eval_path_map, self.config.MODEL.split('/')[-1])
-         self.eval_path_model = os.path.join(self.eval_path_map, 'multi_policy')
+   #        self.eval_path_model = os.path.join(self.eval_path_map, self.config.MODEL.split('/')[-1])
+            eval_path_model = os.path.join(eval_path_map, 'multi_policy')
 
-         try:
-            os.mkdir(self.eval_path_model)
-         except FileExistsError:
-            print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(self.eval_path_model))
+            try:
+               os.mkdir(eval_path_model)
+            except FileExistsError:
+               print('Eval result directory exists for this model, will overwrite any existing files: {}'.format(
+                  eval_path_model))
 
          self.calc_diversity = diversity_calc(config)
 
@@ -677,7 +702,8 @@ class RLlibMultiEvaluator(RLlibEvaluator):
       self.idx_to_pop = {}
       # self.survivors = np.empty(shape=(self.config.NPOLICIES, self.config.N_EVAL))
       # store survivors per model, per map
-      self.survivors = [{i: [] for i in range(self.config.NPOLICIES)} for _ in range(config.N_EVAL_MAPS)]
+      self.survivors = {map_idx: {i: [] for i in range(self.config.NPOLICIES)}
+                         for map_idx in range(config.N_EVAL_MAPS)}
 
    def count_survivors(self, map_idx):
       # for (k, v) in self.pop_living.items():
@@ -686,18 +712,24 @@ class RLlibMultiEvaluator(RLlibEvaluator):
 
    def evaluate(self, generalize=False):
       super().evaluate()
-      data_path = os.path.join(self.eval_path_model, '{} multi_eval.npy'.format(self.exp_name))
-      if self.config.NEW_EVAL:
-         model_names = self.config.MULTI_MODEL_NAMES
-         survivors = [{model_names[k]: np.array(v) for (k, v) in map_survivors.items()} for map_survivors in self.survivors]
-         with open(data_path, 'wb') as f:
-            np.save(f, survivors)
-      else:
-         with open(data_path, 'rb') as f:
-            survivors = np.load(f, allow_pickle=True)
+#     data_path = os.path.join(self.eval_path_model, '{} multi_eval.npy'.format(self.exp_name))
+
+      # compile dictionary of survivors per map per model
+      survivors = {}
+      model_names = self.config.MULTI_MODEL_NAMES
+      for infer_idx in self.config.INFER_IDXS:
+         data_path = os.path.join(self.eval_path_map, str(infer_idx), 'multi_policy')
+         if self.config.NEW_EVAL:
+            survivors[infer_idx] = {model_names[k]: np.array(v) for (k, v) in self.survivors[infer_idx].items()}
+            with open(data_path, 'wb') as f:
+               np.save(f, survivors)
+         else:
+            with open(data_path, 'rb') as f:
+               survivors = np.load(f, allow_pickle=True)
       # n models
       x_pos = np.arange(len(survivors[0]))
-      model_survivors = np.hstack([map_survivors[i] for map_survivors in self.survivors for i in range(len(model_names))])
+      model_survivors = np.hstack([map_survivors[i] for map_idx, map_survivors in self.survivors.items()
+                                   for i in range(len(model_names))])
       means = [model_survivors[i].mean() for i in range(len(model_names))]
       stds = [model_survivors[i].std() for i in range(len(model_names))]
       fig, ax = plt.subplots()
