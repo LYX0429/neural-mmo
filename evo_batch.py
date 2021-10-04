@@ -30,6 +30,7 @@ genomes = [
 #  'RiverBottleneckBaseline',
 #  'ResourceNichesBaseline',
 #  'BottleneckedResourceNichesBaseline',
+#  'LabyrinthBaseline',
 #  'Simplex',
 #  'NCA',
 #  'TileFlip',

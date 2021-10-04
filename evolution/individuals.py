@@ -14,6 +14,7 @@ from pytorch_neat.cppn import create_cppn
 # from numba import njit
 from typing import Any
 import itertools
+import gc
 
 # Not using this
 class SpawnPoints():
@@ -615,6 +616,133 @@ class SimplexNoiseGenome(Genome):
             map_arr[i, j] = self.thresh_tiles[t]
          self.map_arr = map_arr.astype(np.uint8)
 
+class MazeGenome(Genome):
+   def __init__(self, n_tiles, map_width):
+      super().__init__(n_tiles, map_width)
+
+      self.cell_thickness = 3
+      self.wall_thickness = 1
+
+      self.tiles = np.array([
+         enums.MaterialEnum.WATER.value.index,
+         enums.MaterialEnum.GRASS.value.index,
+         enums.MaterialEnum.LAVA.value.index,
+         enums.MaterialEnum.SPAWN.value.index,
+         enums.MaterialEnum.GRASS.value.index,
+         enums.MaterialEnum.FOREST.value.index,
+         enums.MaterialEnum.TREE.value.index,
+         enums.MaterialEnum.OREROCK.value.index,
+         enums.MaterialEnum.STONE.value.index,
+      ])
+
+      self.init_baseline()
+
+
+   def init_baseline(self):
+      self.x0, self.y0 = np.random.randint(-1e4, 1e4, size=2)
+      self.step_size = 0.125
+      # Following the parameters for the baseline simplex noise maps -- see projekt/config
+      self.n_bands = 9
+      self.thresholds = np.array([
+         0.20,
+         0.4,
+         0.41,
+         0.48,
+         0.715,
+         0.75,
+         0.8,
+         0.85,
+         1.0
+      ])
+      return
+
+   def mutate(self):
+      pass
+
+   def gen_map(self):
+      self.map_arr = np.full((self.map_width, self.map_width), enums.MaterialEnum.STONE.value.index, dtype=float)
+      self.generate_maze()
+      self.layout_base_map()
+
+      def count_spawns(matl):
+         spawn_count = 0
+         for i in range(matl.shape[0]):
+            for j in range(matl.shape[1]):
+               if matl[i, j] == enums.MaterialEnum.SPAWN.value.index:
+                  spawn_count += 1
+         return spawn_count
+
+   def layout_base_map(self):
+      map_width = self.map_width
+      s = np.arange(map_width)
+      X, Y = np.meshgrid(s, s)
+      val = np.zeros((map_width, map_width), dtype=float)
+      val = vec_noise.snoise2(self.x0 + X * self.step_size, self.y0 + Y * self.step_size)
+      if self.tiles.shape[0] != self.tiles.shape[0]:
+         raise Exception('Number of thresholds ({}) does not match number of tile "bands" ({}).'.format(self.landscape_threshes.shape[0], self.landscape_tiles.shape[0]))
+      for i in range(self.map_arr.shape[0]):
+         for j in range(self.map_arr.shape[1]):
+            t = np.where(0.5 + 0.5 * val[i, j] <= self.thresholds)[0][0]
+            if t >= self.tiles.shape[0]:
+               raise Exception("Selected tile is out of bounds in list of tiles for niche genome.")
+            self.map_arr[i, j] = self.tiles[t] if self.map_arr[i,j] == enums.MaterialEnum.GRASS.value.index else self.map_arr[i,j]
+
+   def generate_maze(self):
+      grid_size = (self.map_width - self.wall_thickness) // (self.cell_thickness + self.wall_thickness)
+      nodes = [(i,j) for j in range(grid_size) for i in range(grid_size)]
+      neighbors = lambda n: [(n[0] + x, n[1] + y) for x,y in [(-1,0),(1,0),(0,-1),(0,1)] if n[0] + x >= 0 and n[0] + x < grid_size and n[1] + y >= 0 and n[1] + y < grid_size]
+
+      class DJS:
+         def __init__(self, n_s):
+            self.n_mapping = {}
+            for i, v in enumerate(n_s):
+               n = self.DSN(v, i)
+               self.n_mapping[v] = n
+
+         def find(self, n):
+            return self.find_n(n).p
+
+         def find_n(self, n):
+            if type(self.n_mapping[n].p) is int:
+               return self.n_mapping[n]
+            else:
+               p_n = self.find_n(self.n_mapping[n].p.val)
+               self.n_mapping[n].p = p_n
+               return p_n
+
+         def union(self, n1, n2):
+            p1 = self.find_n(n1)
+            p2 = self.find_n(n2)
+            if p1.p != p2.p:
+               p1.p = p2
+
+         class DSN:
+            def __init__(self, val, p):
+               self.val = val
+               self.p = p
+
+      E = [(n, nb) for n in nodes for nb in neighbors(n)]
+      maze = []
+      ds = DJS(nodes)
+
+      while len(maze) < len(nodes) - 1:
+         e = E.pop(np.random.randint(0, len(E) - 1))
+         if ds.find(e[0]) != ds.find(e[1]):
+            ds.union(e[0], e[1])
+            maze.append(e)
+
+      for e in maze:
+         min_x = self.wall_thickness+min(e[0][1], e[1][1])*(self.cell_thickness + self.wall_thickness)
+         max_x = self.wall_thickness+max(e[0][1], e[1][1])*(self.cell_thickness + self.wall_thickness)
+         min_y = self.wall_thickness+min(e[0][0], e[1][0])*(self.cell_thickness + self.wall_thickness)
+         max_y = self.wall_thickness+max(e[0][0], e[1][0])*(self.cell_thickness + self.wall_thickness)
+         self.map_arr[min_x:max_x+self.cell_thickness,min_y:max_y+self.cell_thickness] = enums.MaterialEnum.GRASS.value.index
+
+      del E
+      del maze
+      del ds
+      gc.collect()
+
 class ResourceNichesGenome(Genome):
    def __init__(self, n_tiles, map_width, lava_border_width, access_bottleneck=False):
       super().__init__(n_tiles, map_width)
@@ -1148,7 +1276,8 @@ class EvoIndividual(Individual):
            self.chromosome = ResourceNichesGenome(self.n_tiles, evolver.map_width, self.TERRAIN_BORDER)
        elif evolver.BOTTLENECKED_RESOURCE_NICHES_BASELINE:
            self.chromosome = ResourceNichesGenome(self.n_tiles, evolver.map_width, self.TERRAIN_BORDER, access_bottleneck=True)
-
+       elif evolver.MAZE_BASELINE:
+           self.chromosome = MazeGenome(self.n_tiles, evolver.map_width)
 
        self.chromosome.gen_map()
        self.validate_map()
