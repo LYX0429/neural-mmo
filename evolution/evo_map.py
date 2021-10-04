@@ -219,6 +219,7 @@ class EvolverNMMO(LambdaMuEvolver):
       self.RIVER_BOTTLENECK_BASELINE = config.GENOME == 'RiverBottleneckBaseline'
       self.RESOURCE_NICHES_BASELINE = config.GENOME == 'ResourceNichesBaseline'
       self.BOTTLENECKED_RESOURCE_NICHES_BASELINE = config.GENOME == 'BottleneckedResourceNichesBaseline'
+      self.MAZE_BASELINE = config.GENOME == 'LabyrinthBaseline'
       if not (self.CA
                or self.LSYSTEM
                or self.CPPN
@@ -229,7 +230,8 @@ class EvolverNMMO(LambdaMuEvolver):
                or self.BASELINE_SIMPLEX
                or self.RIVER_BOTTLENECK_BASELINE
                or self.RESOURCE_NICHES_BASELINE
-               or self.BOTTLENECKED_RESOURCE_NICHES_BASELINE):
+               or self.BOTTLENECKED_RESOURCE_NICHES_BASELINE
+               or self.MAZE_BASELINE):
          raise Exception('Invalid genome')
       self.NEAT = config.EVO_ALGO == 'NEAT'
       self.LEARNING_PROGRESS = config.FITNESS_METRIC == 'ALP'
