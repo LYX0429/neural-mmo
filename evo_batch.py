@@ -30,18 +30,18 @@ genomes = [
 #  'RiverBottleneckBaseline',
 #  'ResourceNichesBaseline',
 #  'BottleneckedResourceNichesBaseline',
-#  'LabyrinthBaseline',
+   'LabyrinthBaseline',
 #  'Simplex',
 #  'NCA',
 #  'TileFlip',
 #  'CPPN',
 #  'Primitives',
 #  'L-System',
-   'All',
+#  'All',
 ]
 generator_objectives = [
 #  'MapTestText',
-#  'Lifespans',
+   'Lifespans',
 #  'L2',
 #  'Hull',
 #  'Differential',
@@ -51,7 +51,7 @@ generator_objectives = [
 #  'CloseNearestNeighbor',
 #  'InvL2',
 #  'AdversityDiversity',
-   'AdversityDiversityTrgs',
+#  'AdversityDiversityTrgs',
 ]
 skills = [
     'ALL',
@@ -349,7 +349,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
             Save.np(map_arr, map_path)
 #           png_path = os.path.join('evo_experiment', map_exp_name, 'maps', 'map' + str(infer_idx) + '.png')
 #           Save.render(map_arr[TERRAIN_BORDER:-TERRAIN_BORDER, TERRAIN_BORDER:-TERRAIN_BORDER], MAP_GENERATOR.textures, png_path)
-         print('{} on maps {}, with fitness {}, and ages {}.'.format(txt_verb, infer_idxs, best_fitnesses,
+         print('{} on maps {}, with fitness scores {}, and ages {}.'.format(txt_verb, infer_idxs, best_fitnesses,
                                                                      [map.age for map in eval_inds]))
          for (mdl_i, (model_exp_name, model_config)) in enumerate(zip(model_exp_names, experiment_configs)):
             l_eval_args = '--config TreeOrerock --MAP {} '.format(map_exp_name,
@@ -407,7 +407,7 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
                      data = np.load(eval_data_path, allow_pickle=True)
                      map_eval_data.append(data)
                except FileNotFoundError as fnf:
-                  print(fnf)
+                  # print(fnf)
                   print('Skipping. Missing eval data at: {}'.format(eval_data_path))
                   continue
                # FIXME: this is a tad gnarly. Could we do this more cleanly over different maps?
@@ -538,8 +538,10 @@ def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel, errors=No
          continue
       i += 1
 
-   fig.set_figheight(1.5*len(col_labels))
-   fig.set_figwidth(1.0*len(row_labels))
+#  fig.set_figheight(1.5*len(col_labels))
+#  fig.set_figwidth(1.0*len(row_labels))
+   fig.set_figwidth(20)
+   fig.set_figheight(20)
 
    # Add col. with averages over each row (each model)
 #  col_labels += ['mean']

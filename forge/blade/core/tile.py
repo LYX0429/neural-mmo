@@ -88,7 +88,7 @@ class Tile:
    def harvest(self):
       if self.capacity == 0:
          return False
-      elif self.capacity <= 1:
+      elif self.capacity >= 1:
          self.state = self.mat.degen(self.config)
          self.index.update(self.state.index)
       self.capacity -= 1

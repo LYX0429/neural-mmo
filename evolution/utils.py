@@ -87,6 +87,7 @@ genome_names = [
    'RiverBottleneckBaseline',
    'ResourceNichesBaseline',
    'BottleneckedResourceNichesBaseline',
+   'LabyrinthBaseline',
    'Simplex',
    'NCA',
    'TileFlip',
