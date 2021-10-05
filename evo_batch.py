@@ -32,16 +32,16 @@ genomes = [
 #  'BottleneckedResourceNichesBaseline',
 #  'LabyrinthBaseline',
 #  'Simplex',
-#  'NCA',
+   'NCA',
 #  'TileFlip',
    'CPPN',
 #  'Primitives',
-#  'L-System',
+   'L-System',
 #  'All',
 ]
 generator_objectives = [
 #  'MapTestText',
-#  'Lifespans',
+   'Lifespans',
 #  'L2',
 #  'Hull',
 #  'Differential',
@@ -78,7 +78,7 @@ me_bin_sizes = [
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
    True,
-#  False
+   False
 ]
 adv_div_ratios = [.5]
 # adv_div_ratios = np.arange(0, 1.01, 1/6)  # this gets stretched to [-1, 1] and used to shrink one agent or the either
