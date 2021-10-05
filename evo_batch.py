@@ -102,7 +102,6 @@ adv_trgs = [
    3/5,
    4/5,
    1,
-
 ]
 div_trgs = [
    0,
@@ -136,7 +135,11 @@ MAP_GENERATOR = None
 def launch_cmd(new_cmd, i):
    with open(sbatch_file, 'r') as f:
       content = f.read()
-      content = re.sub('nmmo\d*', 'nmmo{}'.format(i), content)
+      job_name = 'nmmo_'
+      if EVALUATE:
+          job_name += 'eval_'
+      job_name += str(i)
+      content = re.sub('nmmo_(eval_)?\d+', job_name, content)
       content = re.sub('#SBATCH --time=\d+:', '#SBATCH --time={}:'.format(JOB_TIME), content)
       new_content = re.sub('python Forge.*', new_cmd, content)
 
@@ -166,7 +169,6 @@ def launch_batch(exp_name, get_exp_info_only=False):
       #FIXME: we're overwriting a variable from original NMMO here. Will this be a problem?
       N_EVAL_MAPS = 4  # How many maps to evaluate on. This must always be divisible by 2
       N_MAP_EVALS = 2  # How many times to evaluate on each map
-
    else:
       NENT = 16
       N_EVAL_MAPS = 4
@@ -304,7 +306,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
 #  std_lifespans = np.zeros((len(model_exp_names), len(map_exp_names) + 1, N_MAP_EVALS, N_EVAL_MAPS))  # also take std of each model's average performance
    mean_skills = np.zeros((len(SKILLS), len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
    div_scores = np.zeros((len(DIV_CALCS), len(model_exp_names), len(map_exp_names), N_MAP_EVALS, N_EVAL_MAPS))
-
    div_scores[:] = np.nan
    mean_skills[:] = np.nan
    mean_lifespans[:] = np.nan
@@ -460,7 +461,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
    if vis_cross_eval or vis_only:  # might as well do cross-eval vis if visualizing individual evals I guess
       print("Visualizing cross-evaluation.")
       # NOTE: this is placeholder code, valid only for the current batch of experiments which varies along the "genome" , "generator_objective" and "PAIRED" dimensions exclusively. Expand crappy get_exp_shorthand function if we need more.
-
       # TODO: annotate the heatmap with labels more fancily, i.e. use the lists of hyperparams to create concise (hierarchical?) axis labels.
 
       def get_meanstd(data):
@@ -499,7 +499,6 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       row_labels = []
       col_labels = []
 
-
       for r in model_exp_names:
          row_labels.append(get_exp_shorthand(r))
 
@@ -514,14 +513,12 @@ def launch_cross_eval(experiment_names, experiment_configs, vis_only=False, rend
       for (d_i, div_calc_name) in enumerate(DIV_CALCS):
          cross_eval_heatmap(mean_mapgen_div_scores[d_i], row_labels, col_labels, "{} diversity".format(div_calc_name),
                             "{} diversity".format(div_calc_name), errors=std_mapgen_divscores[d_i])
-
       if opts.multi_policy:
          cross_eval_heatmap(mean_mapgen_survivors, row_labels, col_labels, "mean survivors", "",
                             errors=std_mapgen_survivors)
 
-def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
+def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel, errors=None):
    fig, ax = plt.subplots()
-
 
    # Remove empty rows and columns
    i = 0
@@ -551,7 +548,6 @@ def cross_eval_heatmap(data, row_labels, col_labels, title, cbarlabel):
    # Add col. with averages over each row (each model)
 #  col_labels += ['mean']
 #  data = np.hstack((data, np.expand_dims(data.mean(axis=1), 1)))
-
 
    im, cbar = heatmap(data, row_labels, col_labels, ax=ax,
                       cmap="YlGn", cbarlabel=cbarlabel)
@@ -635,6 +631,11 @@ if __name__ == '__main__':
       action='store_true',
    )
    opts.add_argument(
+      '--vis_evals',
+      help='Visualize the results of individual evaluations and cross-evaluation. (No new evaluations.)',
+      action='store_true',
+   )
+   opts.add_argument(
       '--vis_maps',
       help='Save and visualize evolved maps, and plot their fitness.',
       action='store_true'
@@ -666,15 +667,17 @@ if __name__ == '__main__':
    EVALUATE = opts.evaluate
    LOCAL = opts.local
    TRAIN_BASELINE = opts.train_baseline
-   CUDA = not opts.cpu and not opts.vis_maps
+   CUDA = not opts.cpu and not opts.vis_maps and not EVALUATE
    VIS_CROSS_EVAL = opts.vis_cross_eval
+   VIS_EVALS = opts.vis_evals
    RENDER = opts.render
    if EVALUATE or opts.vis_maps:
       JOB_TIME = 3
    elif CUDA:
       JOB_TIME = 48  # NYU HPC Greene limits number of gpu jobs otherwise
    else:
-      JOB_TIME = 120
+      pass
+#     JOB_TIME = 120  # never use CPU-only for training anyway
 
    if CUDA:
       sbatch_file = 'evo_train.sh'
@@ -698,12 +701,17 @@ if __name__ == '__main__':
          print('rendering experiments: {}\n KeyboardInterrupt (Ctrl+c) to render next.'.format(experiment_names))
          launch_cross_eval(experiment_names, vis_only=False, render=True, experiment_configs=experiment_configs)
       else:
-         if not VIS_CROSS_EVAL:
+         if not (VIS_CROSS_EVAL or VIS_EVALS):
             print('cross evaluating experiments: {}'.format(experiment_names))
             # only launch these cross evaluations if we need to
             launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=False)
          # otherwise just load up old data to visualize results
-         launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=True)
+         if VIS_EVALS:
+            # visualize individual evaluations.
+            launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=True)
+         elif VIS_CROSS_EVAL or LOCAL:  # elif since vis_only also prompts cross-eval visualization
+            # visualize cross-evaluation tables
+            launch_cross_eval(experiment_names, experiment_configs=experiment_configs, vis_only=False, vis_cross_eval=True)
    else:
       # Launch a batch of joint map-evolution and agent-training experiments (maybe also a baseline agent-training experiment on a fixed set of maps).
       launch_batch(EXP_NAME)
