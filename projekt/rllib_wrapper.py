@@ -78,6 +78,39 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       else:
          self.ACTION_MATCHING = False
 
+   def reward(self, ent):
+      config = self.config
+
+      # ACHIEVEMENT = config.REWARD_ACHIEVEMENT
+      # SCALE = config.ACHIEVEMENT_SCALE
+      SCALE = 1.0/15.0
+      # COOPERATIVE = config.COOPERATIVE
+
+      individual = 0 if ent.entID in self.realm.players else -1
+      team = 0
+
+      # if ACHIEVEMENT:
+      individual += SCALE * ent.achievements.update(self.realm, ent, dry=True)
+      # if COOPERATIVE:
+      #    nDead = len([p for p in self.dead.values() if p.population == ent.pop])
+      #    team = -nDead / config.TEAM_SIZE
+      # if COOPERATIVE and ACHIEVEMENT:
+      #    pre, post = [], []
+      #    for p in self.realm.players.corporeal.values():
+      #       if p.population == ent.pop:
+      #          pre.append(p.achievements.score(aggregate=False))
+      #          post.append(p.achievements.update(
+      #             self.realm, ent, aggregate=False, dry=True))
+      #
+      #    pre = np.array(pre).max(0)
+      #    post = np.array(post).max(0)
+      #    team += SCALE * (post - pre).sum()
+
+      ent.achievements.update(self.realm, ent)
+
+      # alpha = config.TEAM_SPIRIT
+      alpha = 0
+      return alpha * team + (1.0 - alpha) * individual
 
    def init_skill_log(self):
       self.skill_log_path = './evo_experiment/{}/map_{}_skills.csv'.format(self.config.EVO_DIR, self.worldIdx)
@@ -130,6 +163,8 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       player_packet = player.packet()
       a_skills = player_packet['skills']
       a_skill_vals = {}
+
+      a_skill_vals["achievement"] = player.achievements.score()
 
       for k, v in a_skills.items():
          if not isinstance(v, dict):

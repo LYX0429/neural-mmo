@@ -6,6 +6,7 @@ from forge.blade.lib import material
 
 from forge.blade.systems.skill import Skills
 from forge.blade.systems.inventory import Inventory
+from forge.blade.systems.achievement import Diary
 from forge.blade.entity import entity
 from forge.blade.io.stimulus import Static
 from forge.blade.io import action
@@ -24,6 +25,7 @@ class Player(entity.Entity):
 
       #Submodules
       self.skills     = Skills(self)
+      self.achievements = Diary(realm.config)
       #self.inventory = Inventory(dataframe)
       #self.chat      = Chat(dataframe)
 
@@ -95,6 +97,7 @@ class Player(entity.Entity):
       self.resources.update(realm, self, actions)
       self.skills.update(realm, self, actions)
       self.explored.add(self.pos)
+      self.achievements.update(realm, self)
 
 #   def act(self, world, atnArgs):
 #      #Right now we only support one arg. So *args for future update

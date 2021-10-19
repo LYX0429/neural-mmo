@@ -41,7 +41,7 @@ genomes = [
 ]
 generator_objectives = [
 #  'MapTestText',
-   'Lifespans',
+#  'Lifespans',
 #  'L2',
 #  'Hull',
 #  'Differential',
@@ -52,7 +52,7 @@ generator_objectives = [
 #  'InvL2',
 #  'AdversityDiversity',
 #  'AdversityDiversityTrgs',
-   'Even'
+   'Achievement'
 
 ]
 skills = [

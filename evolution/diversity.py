@@ -491,32 +491,15 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, 
 
    return score
    
-def calc_evenly_spread(agent_stats, pop=None, punish_youth=True):
+def calc_achievement(agent_stats, pop=None, punish_youth=False):
    if 'skills' not in agent_stats:
       return 0
-   agent_skills = get_pop_stats(agent_stats['skills'], pop)
-   lifespans = get_pop_stats(agent_stats['lifespans'], pop)
-   assert len(agent_skills) == len(lifespans)
-   if punish_youth:
-      agent_skills = contract_by_lifespan(agent_skills, lifespans)
+   achievement = get_pop_stats(agent_stats['achievement'], pop)
 
-   # For each agent. Get the distances to other agents and save in distances
    n_agents = agent_skills.shape[0]
-   a = agent_skills
-   b = a.reshape(n_agents, 1, a.shape[1])
-   distances = np.sqrt(np.einsum('ijk, ijk->ij', a-b, a-b))
-
-   score = 0
-   # Find the farest agent
-   greatest_distance = 0
-   for distance in distances:
-      if -np.sum(distance) < greatest_distance:
-         greatest_distance = -np.sum(distance)
-
-   # Find the average skills of all agents
-   average_skills = np.sum(agent_skills) // agent_skills.shape[0] // agent_skills.shape[1]
-   score = greatest_distance + average_skills
+   score = np.sum(achievement) / n_agents
    return score
+
 env_objectives = {
    'L2': calc_diversity_l2,
    'InvL2': calc_homogeneity_l2,
@@ -534,7 +517,7 @@ env_objectives = {
    'MapTest': calc_local_map_entropy,
    'MapTestText': ham_text,
    'y_deltas': calc_y_deltas,
-   'Even': calc_evenly_spread,
+   'Achievement': calc_achievement,
 }
 
 DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'),
