@@ -494,8 +494,6 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, 
 def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False, config=None):
    if 'skills' not in agent_stats:
       return 0
-   for k in agent_stats:
-      print(k)
    achievement = get_pop_stats(agent_stats['achievement'], pop)
 
    n_agents = achievement.shape[0]
