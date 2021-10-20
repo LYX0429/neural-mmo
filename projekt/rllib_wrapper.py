@@ -164,6 +164,8 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       a_skills = player_packet['skills']
       a_skill_vals = {}
 
+      a_skill_vals["achievement"] = player.achievements.score()
+
       for k, v in a_skills.items():
          if not isinstance(v, dict):
             continue
@@ -223,6 +225,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       for player_pop, pop_skills in skills.items():
          stats[player_pop] = np.zeros((len(skills[player_pop]), len(self.headers)))
          lifespans[player_pop] = np.zeros((len(skills[player_pop])))
+         achievements[player_pop] = np.zeros((len(skills[player_pop])))
          player_n = 0
          for player_id, a_skills in pop_skills.items():
             # over agents
@@ -234,6 +237,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
                   stats[player_pop][player_n, j] = a_skills[k]
                   j += 1
             lifespans[player_pop][player_n] = a_skills['time_alive']
+            achievements[player_pop][player_n] = a_skills['achievement']
             if self.ACTION_MATCHING:
                actions_matched[player_pop][player_n] = a_skills['actions_matched']
             player_n += 1
@@ -242,6 +246,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       stats = {
             'skills': [stats],
             'lifespans': [lifespans],
+            'achievement': [achievements],
            #'lifetimes': lifetimes,
             }
       if self.ACTION_MATCHING:
