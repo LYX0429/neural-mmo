@@ -8,10 +8,7 @@ class Tier:
 class Diary:
    def __init__(self, config):
       self.achievements = []
-
-      if config.game_system_enabled('Achievement'):
-         self.achievements = [Exploration]
-
+      self.achievements = [Exploration]
       self.achievements = [a(config) for a in self.achievements]
 
    @property
