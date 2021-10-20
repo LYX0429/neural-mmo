@@ -164,8 +164,6 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
       a_skills = player_packet['skills']
       a_skill_vals = {}
 
-      a_skill_vals["achievement"] = player.achievements.score()
-
       for k, v in a_skills.items():
          if not isinstance(v, dict):
             continue

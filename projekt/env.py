@@ -148,11 +148,15 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
          a_skill_vals['exploration'] = player.exploration_grid.sum() * 20
          # timeAlive will only add expressivity if we fit more than one gaussian.
          a_skill_vals['time_alive'] = player_packet['history']['timeAlive']
+         # Achievement
+         a_skill_vals["achievement"] = player.achievements.score()
+
          skills[d] = a_skill_vals
       if a_skills:
          stats = np.zeros((len(skills), len(self.headers)))
         #stats = np.zeros((len(skills), 1))
          lifespans = np.zeros((len(skills)))
+         achievement = np.zeros((len(skills)))
          # over agents
          for i, a_skills in enumerate(skills.values()):
             # over skills
@@ -162,9 +166,11 @@ class RLLibEnv(core.Env, rllib.MultiAgentEnv):
                   stats[i, j] = a_skills[k]
                   j += 1
             lifespans[i] = a_skills['time_alive']
+            achievement[i] = a_skills['achievement']
          stats = {
                'skills': stats,
                'lifespans': lifespans,
+               'achievement': achievement,
                }
          return stats
 
