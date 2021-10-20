@@ -498,7 +498,7 @@ def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False, config
       print(k)
    achievement = get_pop_stats(agent_stats['achievement'], pop)
 
-   n_agents = agent_skills.shape[0]
+   n_agents = achievement.shape[0]
    score = np.sum(achievement) / n_agents
    return score
 
