@@ -491,7 +491,7 @@ def calc_diversity_l2(agent_stats, skill_headers=None, verbose=False, pop=None, 
 
    return score
    
-def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False):
+def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False, config):
    if 'skills' not in agent_stats:
       return 0
    achievement = get_pop_stats(agent_stats['achievement'], pop)
