@@ -257,7 +257,7 @@ class Env:
          ob             = self.realm.dataframe.get(ent)
          obs[entID]     = ob
 
-         rewards[entID] = self.reward(entID)
+         rewards[entID] = self.reward(ent)
          dones[entID]   = False
 
       for entID, ent in dead.items():
@@ -481,7 +481,7 @@ class Env:
          ob             = self.realm.dataframe.get(ent)
          obs[entID]     = ob
 
-         rewards[entID] = self.reward(entID)
+         rewards[entID] = self.reward(ent)
          dones[entID]   = False
          self.dummi_ob = ob
 
