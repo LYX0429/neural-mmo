@@ -456,15 +456,3 @@ class Config(Template):
          if np.random.rand() > 0.5:
             r, c = c, r
          return r, c
-
-class Achievement:
-   '''Achievement Reward System'''
-
-   @property #Reserved flag
-   def Achievement(self):
-      return True
-
-   EXPLORATION_EASY        = 32
-   EXPLORATION_NORMAL      = 64
-   EXPLORATION_HARD        = 127
-
