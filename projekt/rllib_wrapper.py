@@ -217,6 +217,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
 #     if a_skills:
       stats = {}
       lifespans = {}
+      achievements = {}
      #stats = np.zeros((len(skills), 1))
      #lifespans = {i: np.zeros((len(skills[i]))) for i in range(self.config.NPOP)}
       if self.ACTION_MATCHING:
