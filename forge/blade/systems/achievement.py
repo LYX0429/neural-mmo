@@ -1,15 +1,26 @@
 from pdb import set_trace as T
 
-class Tier:
-   EASY   = 4
-   NORMAL = 10
-   HARD   = 25
-
 class Diary:
    def __init__(self, config):
       self.achievements = []
-      self.achievements = [Exploration]
-      self.achievements = [a(config) for a in self.achievements]
+      self.achievements = [Get_food, Get_water, Surviving_1]
+      self.achievements = [a() for a in self.achievements]
+
+      index = {'Get_food': 0, 'Get_water': 1, 'Surviving_1': 2}
+
+      self.achievements[index['Get_food']].activate = True
+      self.achievements[index['Get_food']].prerequisite = 0
+      self.achievements[index['Get_food']].value = 1
+      self.achievements[index['Get_food']].next = [index['Surviving_1']]
+
+      self.achievements[index['Get_water']].activate = True
+      self.achievements[index['Get_water']].prerequisite = 0
+      self.achievements[index['Get_water']].value = 1
+      self.achievements[index['Get_water']].next = [index['Surviving_1']]
+
+      self.achievements[index['Surviving_1']].prerequisite = 2
+      self.achievements[index['Surviving_1']].value = 5
+      self.achievements[index['Surviving_1']].next = []
 
    @property
    def stats(self):
@@ -22,53 +33,143 @@ class Diary:
       return score
 
    def update(self, realm, entity, aggregate=True, dry=False):
-      scores = [a.update(realm, entity, dry) for a in self.achievements]
+      scores = []
+      for a in self.achievements:
+         score, unlock = a.update(realm, entity, dry)
+         scores.append(score)
+         if unlock:
+            for i in a.next:
+               self.achievements[i].prerequisite -= 1
+               if self.achievements[i].prerequisite == 0:
+                  self.achievements[i].activate = True
+
       if scores and aggregate:
          return sum(scores)
       return scores
 
 
 class Achievement:
-   def __init__(self, easy=None, normal=None, hard=None):
-      self.progress = 0
-
-      self.easy     = easy
-      self.normal   = normal
-      self.hard     = hard
+   def __init__(self):
+      self.activate = False
+      self.complete = False
+      self.next = []
+      self.prerequisite = 1
+      self.value = 0
 
    @property
    def stats(self):
-      return self.__class__.__name__, self.progress
+      return self.__class__.__name__, self.complete
 
-   def score(self, progress=None):
-      if not progress:
-         progress = self.progress
-      if self.hard and progress >= self.hard:
-         return Tier.HARD
-      elif self.normal and progress >= self.normal:
-         return Tier.NORMAL
-      elif self.easy and progress >= self.easy:
-         return Tier.EASY
+   def score(self, complete=None):
+      if not complete:
+         complete = self.complete
+      if complete:
+         return self.value
       return 0
 
    def update(self, value, dry):
-      if value <= self.progress:
+      if not self.activate:
          return 0
 
       #Progress to score conversion
-      old = self.score(self.progress)
+      old = self.score(self.complete)
       new = self.score(value)
 
       if not dry:
-         self.progress = value
+         if not self.complete and value:
+            unlock = True
+         else:
+            unlock = False
+         self.complete = value
+      return new - old, unlock
 
-      return new - old
-
-class Exploration(Achievement):
-   def __init__(self, config):
-      super().__init__(easy   = config.EXPLORATION_EASY,
-                       normal = config.EXPLORATION_NORMAL,
-                       hard   = config.EXPLORATION_HARD)
+class Exploration_1(Achievement):
+   def __init__(self):
+      super().__init__()
 
    def update(self, realm, entity, dry):
-      return super().update(entity.history.exploration, dry)
+      if entity.history.exploration >= 10:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+
+class Get_food(Achievement):
+   def __init__(self):
+      super().__init__()
+      self.food = 99999
+
+   def update(self, realm, entity, dry):
+      old = self.food
+      new = entity.resources.food.val
+      if dry:
+         self.food = new
+      if new > old:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Get_water(Achievement):
+   def __init__(self):
+      super().__init__()
+      self.water = 99999
+
+   def update(self, realm, entity, dry):
+      old = self.water
+      new = entity.resources.water.val
+      if dry:
+         self.water = new
+      if new > old:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Surviving_1(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.history.timeAlive.val >= 1000:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Skill_up_hunting_1(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.skills.hunting.level >= 11:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Skill_up_fishing_1(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.skills.fishing.level >= 11:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Skill_up_woodcutting_1(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.skills.woodcutting.level >= 11:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Skill_up_mining_1(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.skills.mining.level >= 11:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)

@@ -258,10 +258,6 @@ class EvoNMMO(TreeOrerock):
    SINGLE_SPAWN = False
    SKILLS = 'ALL'
 
-   # Achievement
-   EXPLORATION_EASY        = 32
-   EXPLORATION_NORMAL      = 64
-   EXPLORATION_HARD        = 127
 
 class Explore(EvoNMMO):
    SKILLS = EXPLORE_SKILLS
