@@ -35,9 +35,7 @@ class Diary:
    def update(self, realm, entity, aggregate=True, dry=False):
       scores = []
       for a in self.achievements:
-         result = a.update(realm, entity, dry)
-         score = result[0]
-         unlock = result[1]
+         score, unlock = a.update(realm, entity, dry)
          scores.append(score)
          if unlock:
             for i in a.next:
@@ -71,7 +69,7 @@ class Achievement:
 
    def update(self, value, dry):
       if not self.activate:
-         return 0
+         return 0, False
 
       #Progress to score conversion
       old = self.score(self.complete)
@@ -82,7 +80,7 @@ class Achievement:
          if not self.complete and value:
             unlock = True
          self.complete = value
-      return (new - old, unlock)
+      return new - old, unlock
 
 class Exploration_1(Achievement):
    def __init__(self):
