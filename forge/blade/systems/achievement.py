@@ -75,11 +75,10 @@ class Achievement:
       old = self.score(self.complete)
       new = self.score(value)
 
+      unlock = False
       if not dry:
          if not self.complete and value:
             unlock = True
-         else:
-            unlock = False
          self.complete = value
       return new - old, unlock
 
