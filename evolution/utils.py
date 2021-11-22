@@ -81,6 +81,7 @@ gen_objective_names = [
    'AdversityDiversity',
    'AdversityDiversityTrgs',
    'InvL2',
+   'Achievement'
 ]
 genome_names = [
    'Baseline',

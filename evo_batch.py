@@ -41,7 +41,7 @@ genomes = [
 ]
 generator_objectives = [
 #  'MapTestText',
-#  'Lifespans',
+   'Lifespans',
 #  'L2',
 #  'Hull',
 #  'Differential',
@@ -77,7 +77,7 @@ me_bin_sizes = [
 # Are we running a PAIRED-type algorithm? If so, we use two policies, and reward the generator for maximizing the
 # difference in terms of the generator_objective between the "protagonist" and "antagonist" policies.
 PAIRED_bools = [
-   True,
+#  True,
    False
 ]
 adv_div_ratios = [.5]

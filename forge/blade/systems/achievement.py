@@ -3,25 +3,46 @@ from pdb import set_trace as T
 class Diary:
    def __init__(self, config):
       self.achievements = []
-      self.achievements = [Get_food, Get_water, Surviving_1]
+      self.achievements = [Get_food, Get_water, Surviving_1, Surviving_2, Surviving_3, Exploration_1,
+                           Exploration_2, Exploration_3]
       self.achievements = [a() for a in self.achievements]
 
-      index = {'Get_food': 0, 'Get_water': 1, 'Surviving_1': 2}
+      index = {'Get_food': 0, 'Get_water': 1, 'Surviving_1': 2, 'Surviving_2': 3, 'Surviving_3': 4,
+               'Exploration_1': 5, 'Exploration_2': 6, 'Exploration_3': 7, }
 
       self.achievements[index['Get_food']].activate = True
       self.achievements[index['Get_food']].prerequisite = 0
       self.achievements[index['Get_food']].value = 1
-      self.achievements[index['Get_food']].next = [index['Surviving_1']]
+      self.achievements[index['Get_food']].next = [index['Surviving_1'], index['Exploration_1']]
 
       self.achievements[index['Get_water']].activate = True
       self.achievements[index['Get_water']].prerequisite = 0
       self.achievements[index['Get_water']].value = 1
-      self.achievements[index['Get_water']].next = [index['Surviving_1']]
+      self.achievements[index['Get_water']].next = [index['Surviving_1'], index['Exploration_1']]
 
       self.achievements[index['Surviving_1']].prerequisite = 2
-      self.achievements[index['Surviving_1']].value = 5
-      self.achievements[index['Surviving_1']].next = []
+      self.achievements[index['Surviving_1']].value = 3
+      self.achievements[index['Surviving_1']].next = [index['Surviving_2']]
 
+      self.achievements[index['Surviving_2']].prerequisite = 1
+      self.achievements[index['Surviving_2']].value = 5
+      self.achievements[index['Surviving_2']].next = [index['Surviving_3']]
+
+      self.achievements[index['Surviving_3']].prerequisite = 1
+      self.achievements[index['Surviving_3']].value = 10
+      self.achievements[index['Surviving_3']].next = []
+
+      self.achievements[index['Exploration_1']].prerequisite = 2
+      self.achievements[index['Exploration_1']].value = 5
+      self.achievements[index['Exploration_1']].next = [index['Exploration_2']]
+
+      self.achievements[index['Exploration_2']].prerequisite = 1
+      self.achievements[index['Exploration_2']].value = 10
+      self.achievements[index['Exploration_2']].next = [index['Exploration_3']]
+
+      self.achievements[index['Exploration_3']].prerequisite = 1
+      self.achievements[index['Exploration_3']].value = 15
+      self.achievements[index['Exploration_3']].next = []
    @property
    def stats(self):
       return [a.stats for a in self.achievements]
@@ -92,6 +113,26 @@ class Exploration_1(Achievement):
       else:
          return super().update(False, dry)
 
+class Exploration_2(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.history.exploration >= 20:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Exploration_3(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.history.exploration >= 30:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
 
 class Get_food(Achievement):
    def __init__(self):
@@ -128,7 +169,28 @@ class Surviving_1(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
+      print(entity.history.timeAlive.val)
       if entity.history.timeAlive.val >= 1000:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Surviving_2(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.history.timeAlive.val >= 3000:
+         return super().update(True, dry)
+      else:
+         return super().update(False, dry)
+
+class Surviving_3(Achievement):
+   def __init__(self):
+      super().__init__()
+
+   def update(self, realm, entity, dry):
+      if entity.history.timeAlive.val >= 6000:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
