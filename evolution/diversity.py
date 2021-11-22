@@ -144,9 +144,9 @@ def calc_mean_lifetime(agent_stats, skill_headers=None, verbose=False, pop=None,
 def sum_lifespans(agent_stats, skill_headers=None, verbose=False, pop=None, infos={}, config=None):
    lifespans = get_pop_stats(agent_stats['lifespans'], pop=pop)
    score = lifespans.mean()
-   if verbose:
-      print('Mean lifespan, pop {}: {}'.format(pop, score))
-
+   # if verbose:
+   #    print('Mean lifespan, pop {}: {}'.format(pop, score))
+   print('Mean lifespan, pop {}: {}'.format(pop, score))
    return score
 
 def sum_experience(agent_stats, skill_headers=None, verbose=False, pop=None, config=None):

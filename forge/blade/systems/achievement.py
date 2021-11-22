@@ -169,7 +169,6 @@ class Surviving_1(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      print(entity.history.timeAlive.val)
       if entity.history.timeAlive.val >= 1000:
          return super().update(True, dry)
       else:
