@@ -21,26 +21,26 @@ class Diary:
       self.achievements[index['Get_water']].next = [index['Surviving_1'], index['Exploration_1']]
 
       self.achievements[index['Surviving_1']].prerequisite = 2
-      self.achievements[index['Surviving_1']].value = 3
-      self.achievements[index['Surviving_1']].next = [index['Surviving_2']]
+      self.achievements[index['Surviving_1']].value = 1
+      self.achievements[index['Surviving_1']].next = [index['Surviving_2'], index['Exploration_1']]
 
       self.achievements[index['Surviving_2']].prerequisite = 1
-      self.achievements[index['Surviving_2']].value = 5
-      self.achievements[index['Surviving_2']].next = [index['Surviving_3']]
+      self.achievements[index['Surviving_2']].value = 1
+      self.achievements[index['Surviving_2']].next = [index['Surviving_3'], index['Exploration_2']]
 
       self.achievements[index['Surviving_3']].prerequisite = 1
-      self.achievements[index['Surviving_3']].value = 10
-      self.achievements[index['Surviving_3']].next = []
+      self.achievements[index['Surviving_3']].value = 1
+      self.achievements[index['Surviving_3']].next = [index['Exploration_3']]
 
-      self.achievements[index['Exploration_1']].prerequisite = 2
+      self.achievements[index['Exploration_1']].prerequisite = 3
       self.achievements[index['Exploration_1']].value = 5
       self.achievements[index['Exploration_1']].next = [index['Exploration_2']]
 
-      self.achievements[index['Exploration_2']].prerequisite = 1
+      self.achievements[index['Exploration_2']].prerequisite = 2
       self.achievements[index['Exploration_2']].value = 10
       self.achievements[index['Exploration_2']].next = [index['Exploration_3']]
 
-      self.achievements[index['Exploration_3']].prerequisite = 1
+      self.achievements[index['Exploration_3']].prerequisite = 2
       self.achievements[index['Exploration_3']].value = 15
       self.achievements[index['Exploration_3']].next = []
    @property
@@ -169,7 +169,7 @@ class Surviving_1(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.history.timeAlive.val >= 1000:
+      if entity.history.timeAlive.val >= 5:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
@@ -179,7 +179,7 @@ class Surviving_2(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.history.timeAlive.val >= 3000:
+      if entity.history.timeAlive.val >= 15:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
@@ -189,7 +189,7 @@ class Surviving_3(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.history.timeAlive.val >= 6000:
+      if entity.history.timeAlive.val >= 30:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
