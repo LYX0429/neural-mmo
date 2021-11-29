@@ -495,12 +495,11 @@ def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False, config
    if 'skills' not in agent_stats:
       return 0
    achievement = get_pop_stats(agent_stats['achievement'], pop)
-   lifespan = sum_lifespans(agent_stats, infos=infos, pop=pop) * 0.2
+   lifespan = sum_lifespans(agent_stats, infos=infos, pop=pop)
 
    score = achievement.mean()
    print('Achievement score: ', score)
    print('Lifespan score: ', lifespan)
-   score += lifespan
    return score
 
 env_objectives = {
