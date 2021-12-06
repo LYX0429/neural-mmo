@@ -502,6 +502,17 @@ def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False, config
    print('Lifespan score: ', lifespan)
    return score
 
+def calc_achievement_2(agent_stats, pop=None, infos={}, punish_youth=False, config=None):
+   if 'skills' not in agent_stats:
+      return 0
+   achievement = get_pop_stats(agent_stats['achievement'], pop)
+   lifespan = sum_lifespans(agent_stats, infos=infos, pop=pop) / 5
+
+   score = achievement.mean() + lifespan
+   print('Achievement score: ', score)
+   print('Lifespan score: ', lifespan)
+   return score
+
 env_objectives = {
    'L2': calc_diversity_l2,
    'InvL2': calc_homogeneity_l2,
@@ -520,6 +531,7 @@ env_objectives = {
    'MapTestText': ham_text,
    'y_deltas': calc_y_deltas,
    'Achievement': calc_achievement,
+   'Achievement2': calc_achievement_2,
 }
 
 DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'),

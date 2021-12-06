@@ -268,7 +268,7 @@ class Skill_up_woodcutting_1(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.skills.woodcutting.level >= 11:
+      if entity.skills.woodcutting.level >= 13:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
@@ -278,7 +278,7 @@ class Skill_up_woodcutting_2(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.skills.woodcutting.level >= 13:
+      if entity.skills.woodcutting.level >= 16:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
@@ -288,7 +288,7 @@ class Skill_up_woodcutting_3(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.skills.woodcutting.level >= 15:
+      if entity.skills.woodcutting.level >= 20:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
@@ -298,7 +298,7 @@ class Skill_up_mining_1(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.skills.mining.level >= 11:
+      if entity.skills.mining.level >= 13:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
@@ -308,7 +308,7 @@ class Skill_up_mining_2(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.skills.mining.level >= 13:
+      if entity.skills.mining.level >= 16:
          return super().update(True, dry)
       else:
          return super().update(False, dry)
@@ -318,7 +318,7 @@ class Skill_up_mining_3(Achievement):
       super().__init__()
 
    def update(self, realm, entity, dry):
-      if entity.skills.mining.level >= 15:
+      if entity.skills.mining.level >= 20:
          return super().update(True, dry)
       else:
          return super().update(False, dry)

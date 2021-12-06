@@ -36,12 +36,12 @@ genomes = [
 #  'TileFlip',
    'CPPN',
 #  'Primitives',
-   'L-System',
+#  'L-System',
 #  'All',
 ]
 generator_objectives = [
 #  'MapTestText',
-   'Lifespans',
+#  'Lifespans',
 #  'L2',
 #  'Hull',
 #  'Differential',
@@ -52,7 +52,8 @@ generator_objectives = [
 #  'InvL2',
 #  'AdversityDiversity',
 #  'AdversityDiversityTrgs',
-   'Achievement'
+   'Achievement',
+   'Achievement2'
 
 ]
 skills = [
@@ -69,8 +70,8 @@ algos = [
 #   'NEAT',
 ]
 me_bin_sizes = [
-#   [1,1],
-    [50, 50],
+    [1,1],
+#   [50, 50],
 #   [100,100],
 ]
 
@@ -209,7 +210,7 @@ def launch_batch(exp_name, get_exp_info_only=False):
          continue
       if (np.array(me_bins) == 1).all():
          # If we're doing a simple evolutionary strategy (lazily, through qdpy ME, then set 12 individuals per bin
-         items_per_bin = 12
+         items_per_bin = 100
          feature_calc = None
       else:
          items_per_bin = 1
