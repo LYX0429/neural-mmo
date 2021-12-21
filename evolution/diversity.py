@@ -503,7 +503,7 @@ def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False, config
    score = achievement.mean()
    print('Achievement score: ', score)
    print('Lifespan score: ', lifespan)
-   #print(printAchievement(agent_stats, pop))
+   print(printAchievement(agent_stats, pop))
    return score
 
 def calc_achievement_2(agent_stats, pop=None, infos={}, punish_youth=False, config=None):
@@ -518,7 +518,7 @@ def calc_achievement_2(agent_stats, pop=None, infos={}, punish_youth=False, conf
    score = achievement.mean() + lifespan
    print('Achievement score: ', score)
    print('Lifespan score: ', lifespan * 5)
-   #print(printAchievement(agent_stats, pop))
+   print(printAchievement(agent_stats, pop))
    return score
 
 
