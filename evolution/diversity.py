@@ -538,9 +538,6 @@ def calc_achievement_3(agent_stats, pop=None, infos={}, punish_youth=False, conf
 
 def printAchievement(agent_stats, pop):
    achievement = get_pop_stats(agent_stats['achievement'], pop)
-   if not achievement:
-      return []
-
    ach_list = [0 for _ in range(len(achievement[0]))]
    for i in achievement:
       ach_list += i
