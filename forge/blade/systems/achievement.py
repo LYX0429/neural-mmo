@@ -101,6 +101,8 @@ class Diary:
    def update(self, realm, entity, aggregate=True, dry=False):
       scores = []
       for a in self.achievements:
+         if a.complete or not a.activate:
+            continue
          score, unlock = a.update(realm, entity, dry)
          scores.append(score)
          if unlock:
@@ -187,7 +189,7 @@ class Get_food(Achievement):
    def update(self, realm, entity, dry):
       old = self.food
       new = entity.resources.food.val
-      if dry:
+      if not dry:
          self.food = new
       if new > old:
          return super().update(True, dry)
@@ -202,7 +204,7 @@ class Get_water(Achievement):
    def update(self, realm, entity, dry):
       old = self.water
       new = entity.resources.water.val
-      if dry:
+      if not dry:
          self.water = new
       if new > old:
          return super().update(True, dry)
