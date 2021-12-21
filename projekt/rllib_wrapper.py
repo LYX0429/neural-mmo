@@ -243,7 +243,7 @@ class RLlibEnv(Env, rllib.MultiAgentEnv):
             if self.ACTION_MATCHING:
                actions_matched[player_pop][player_n] = a_skills['actions_matched']
             player_n += 1
-
+         achievements[player_pop] = np.array(achievements[player_pop])
       # Add lifespans of the living to those of the dead
       stats = {
             'skills': [stats],
