@@ -60,6 +60,7 @@ class History:
   
       self.origPos     = ent.pos
       self.exploration = 0
+      self.playerKills = 0
 
       self.damage    = Static.Entity.Damage(   ent.dataframe, ent.entID)
       self.timeAlive = Static.Entity.TimeAlive(ent.dataframe, ent.entID)

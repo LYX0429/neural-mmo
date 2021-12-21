@@ -59,7 +59,9 @@ class Player(entity.Entity):
       
    def receiveDamage(self, source, dmg):
       if not super().receiveDamage(source, dmg):
-         return 
+         if source:
+            source.history.playerKills += 1
+         return
 
       self.resources.food.decrement(dmg)
       self.resources.water.decrement(dmg)

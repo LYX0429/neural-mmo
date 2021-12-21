@@ -497,9 +497,13 @@ def calc_achievement(agent_stats, pop=None, infos={}, punish_youth=False, config
    achievement = get_pop_stats(agent_stats['achievement'], pop)
    lifespan = sum_lifespans(agent_stats, infos=infos, pop=pop)
 
+   for i, v in enumerate(achievement):
+      achievement[i] = sum(v)
+
    score = achievement.mean()
    print('Achievement score: ', score)
    print('Lifespan score: ', lifespan)
+   print(printAchievement(agent_stats, pop))
    return score
 
 def calc_achievement_2(agent_stats, pop=None, infos={}, punish_youth=False, config=None):
@@ -508,10 +512,39 @@ def calc_achievement_2(agent_stats, pop=None, infos={}, punish_youth=False, conf
    achievement = get_pop_stats(agent_stats['achievement'], pop)
    lifespan = sum_lifespans(agent_stats, infos=infos, pop=pop) / 5
 
+   for i, v in enumerate(achievement):
+      achievement[i] = sum(v)
+
+   score = achievement.mean() + lifespan
+   print('Achievement score: ', score)
+   print('Lifespan score: ', lifespan * 5)
+   print(printAchievement(agent_stats, pop))
+   return score
+
+
+def calc_achievement_3(agent_stats, pop=None, infos={}, punish_youth=False, config=None):
+   if 'skills' not in agent_stats:
+      return 0
+   achievement = get_pop_stats(agent_stats['achievement'], pop)
+   lifespan = sum_lifespans(agent_stats, infos=infos, pop=pop)
+
+   for i, v in enumerate(achievement):
+      achievement[i] = sum(v)
+
    score = achievement.mean() + lifespan
    print('Achievement score: ', score)
    print('Lifespan score: ', lifespan)
    return score
+
+def printAchievement(agent_stats, pop):
+   achievement = get_pop_stats(agent_stats['achievement'], pop)
+   if not achievement:
+      return []
+
+   ach_list = [0 for _ in range(len(achievement[0]))]
+   for i in achievement:
+      ach_list += i
+   return ach_list
 
 env_objectives = {
    'L2': calc_diversity_l2,
@@ -532,6 +565,7 @@ env_objectives = {
    'y_deltas': calc_y_deltas,
    'Achievement': calc_achievement,
    'Achievement2': calc_achievement_2,
+   'Achievement3': calc_achievement_3,
 }
 
 DIV_CALCS = [(calc_diversity_l2, 'mean pairwise L2'), (calc_differential_entropy, 'differential entropy'),

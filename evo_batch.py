@@ -32,7 +32,7 @@ genomes = [
 #  'BottleneckedResourceNichesBaseline',
 #  'LabyrinthBaseline',
 #  'Simplex',
-   'NCA',
+#  'NCA',
 #  'TileFlip',
    'CPPN',
 #  'Primitives',
@@ -53,7 +53,8 @@ generator_objectives = [
 #  'AdversityDiversity',
 #  'AdversityDiversityTrgs',
    'Achievement',
-   'Achievement2'
+   'Achievement2',
+#  'Achievement3',
 
 ]
 skills = [
@@ -70,8 +71,8 @@ algos = [
 #   'NEAT',
 ]
 me_bin_sizes = [
-    [1,1],
-#   [50, 50],
+#   [1,1],
+    [50, 50],
 #   [100,100],
 ]
 
@@ -210,7 +211,7 @@ def launch_batch(exp_name, get_exp_info_only=False):
          continue
       if (np.array(me_bins) == 1).all():
          # If we're doing a simple evolutionary strategy (lazily, through qdpy ME, then set 12 individuals per bin
-         items_per_bin = 100
+         items_per_bin = 12
          feature_calc = None
       else:
          items_per_bin = 1
