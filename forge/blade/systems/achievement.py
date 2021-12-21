@@ -95,7 +95,7 @@ class Diary:
       score = [a.score() for a in self.achievements]
       if score and aggregate:
          return sum(score)
-      score = [a.complete for a in self.achievements]
+      score = (a.complete for a in self.achievements)
       return score
 
    def update(self, realm, entity, aggregate=True, dry=False):
